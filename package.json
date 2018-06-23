@@ -1,0 +1,41 @@
+{
+  "name": "jupyterlab_hpc",
+  "version": "0.1.0",
+  "description": "jupyterlab extension for HPC applications on the NERSC system at lbl",
+  "keywords": [
+    "jupyter",
+    "jupyterlab",
+    "jupyterlab-extension"
+  ],
+  "homepage": "https://gitlab.com/jthays/jupyterlab_hpc.git",
+  "bugs": {
+    "url": "https://gitlab.com/jthays/jupyterlab_hpc.git/issues"
+  },
+  "license": "BSD-3-Clause",
+  "author": "Jon Hays",
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/jthays/jupyterlab_hpc.git.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf lib",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@jupyterlab/application": "^0.16.0"
+  },
+  "devDependencies": {
+    "rimraf": "^2.6.1",
+    "typescript": "~2.6.0"
+  },
+  "jupyterlab": {
+    "extension": true
+  }
+}
