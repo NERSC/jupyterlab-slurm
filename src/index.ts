@@ -25,7 +25,6 @@ class SlurmWidget extends Widget {
   */ 
   private queue_table: HTMLElement;
 
-  
   /**
   * Construct a new SLURM widget.
   */
@@ -43,20 +42,20 @@ class SlurmWidget extends Widget {
 
   }
 
-  // Pull queue data and populate html table
-  public populate_queue_table(queue_table: HTMLElement) {
-    fetch('/shell/ps/aux').then(response => {
-      return response.text();
-    }).then(data => this.generate_table(queue_table, data));
-  }
-
   public onUpdateRequest(msg: Message) {
     console.log("update request called!")
-    this.populate_queue_table(this.queue_table);
+    this._populate_queue_table();
+  }
+
+  // Pull queue data and populate HTML queue_table
+  private _populate_queue_table() {
+    fetch('/shell/ps/aux').then(response => {
+      return response.text();
+    }).then(data => this._generate_table(data));
   }
 
   // Generate HTML table and populate with queue_data
-  private generate_table(queue_table: HTMLElement, data: string) {
+  private _generate_table(data: string) {
     console.log("table refreshed!")
     let lines = data.split('\n');
     for (let i = 0; i < lines.length; i++) {
@@ -69,9 +68,9 @@ class SlurmWidget extends Widget {
         cell.appendChild(cellText);
         row.appendChild(cell);
       } // for (inner)
-      queue_table.appendChild(row);
+      this.queue_table.appendChild(row);
     } // for (outer)
-  } // generate_table
+  } // _generate_table
 } // class SlurmWidget
 
 
@@ -95,10 +94,8 @@ function activate(app: JupyterLab, palette: ICommandPalette) {
       }
       // Refresh the widget's state
       widget.update();
-      // widget.update();
-      // var update = widget.update;
-      // setInterval(widget.populate_queue_table, 1000, widget.queue_table);
-      // console.log("setInterval called correctly!");
+      // Refresh table every 60 seconds by default
+      setInterval(() => widget.update(), 60000);
       // Activate the widget
       app.shell.activateById(widget.id);
     }
@@ -142,10 +139,10 @@ const extension: JupyterLabPlugin<void> = {
 //     queue_table.className = 'jp-queueTable';
 
 //     widget.node.appendChild(queue_table);
-//     populate_queue_table(queue_table);
+//     _populate_queue_table(queue_table);
 
 //     // Refresh table at specified interval
-//     // setInterval(populate_queue_table, 2000, queue_table);
+//     // setInterval(_populate_queue_table, 2000, queue_table);
 
 
 
@@ -168,13 +165,13 @@ const extension: JupyterLabPlugin<void> = {
 // };
 
 // // Pull queue data and populate html table
-// function populate_queue_table(queue_table: HTMLElement) {
+// function _populate_queue_table(queue_table: HTMLElement) {
 //   fetch('/shell/ps/aux').then(response => {
 //     return response.text();
-//   }).then(data => generate_table(queue_table, data))
+//   }).then(data => _generate_table(queue_table, data))
 // }
 
-// function generate_table(queue_table: HTMLElement, data: string) {
+// function _generate_table(queue_table: HTMLElement, data: string) {
 //   console.log("table refreshed!")
 //   let lines = data.split('\n');
 //   for (let i = 0; i < lines.length; i++) {
