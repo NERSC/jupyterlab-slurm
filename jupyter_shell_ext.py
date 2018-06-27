@@ -8,6 +8,8 @@ class ShellExecutionHandler(IPythonHandler):
     def get(self, command):
         response = run_command(command.strip().split("/"))
         # finish(chunk) writes chunk to the output buffer and ends the HTTP request
+        # Should probably process data here (on the server) and put it in a nice
+        # format for loading into a table, instead of on the server!!!!
         self.finish(response.stdout.strip())
 
 def load_jupyter_server_extension(nb_server_app):
