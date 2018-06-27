@@ -1,0 +1,24 @@
+.jp-queueWidget {
+    display: grid;
+    flex-direction: column;
+    overflow: auto;
+    overflow-x: auto;
+}
+
+.jp-queueTable {
+    border-collapse: collapse;
+    border-style: ridge;
+    border-width: 3px;
+    /*margin: auto;*/
+    /*text-align: center;*/
+}
+
+.jp-qTableBorder {
+    font-size: 12px;
+    border-style: ridge;
+    border-width: 3px;
+}
+
+/*.jp-Attribution {
+    margin: 20px auto;
+}*/
