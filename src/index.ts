@@ -23,6 +23,7 @@ import {
 
 import * as $ from 'jquery';
 import 'datatables.net';
+import 'datatables.net-buttons';
 import 'datatables.net-dt';
 import 'datatables.net-dt/css/jquery.dataTables.css';
 
@@ -35,9 +36,6 @@ class SlurmWidget extends Widget {
   * The table element containing SLURM queue data.
   */ 
   private queue_table: HTMLElement;
-  // private api: DataTables.Api;
-
-
 
   /**
   * Construct a new SLURM widget.
@@ -52,11 +50,14 @@ class SlurmWidget extends Widget {
 
     this.queue_table = document.createElement('table');
     this.queue_table.setAttribute('id', 'queue');
-    // this.queue_table.className = 'jp-queueTable';
+    this.queue_table.setAttribute('width', '100%');
+    // These class definitions are from the
+    // DataTables default styling package
     this.queue_table.classList.add('display', 'cell-border');
     this.node.appendChild(this.queue_table);
 
-    // Add thead to queue_table
+    // Add thead to queue_table; this is required 
+    // for DataTable's AJAX functionality. 
     let tbl_head = document.createElement('thead');
     this.queue_table.appendChild(tbl_head);
     let head_row = tbl_head.insertRow(0);
@@ -68,142 +69,45 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
-    // TODO: add thead (and maybe tbody?) to queue_table! It
-    //       is required!!!
-
-
-
-    // Render table
+    // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        "ajax": '/shell/ps/aux'
+        // scrollY: "200px",
+        // scrollX: true,
+        // scrollCollapse: true,
+        ajax: '/shell/ps/aux',
+        // Table element layout parameter
+        dom: '<Bfr<t><li>p>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
+        buttons: [
+          {
+            text: "Reload",
+            action: function (e, dt, node, config) {
+              dt.ajax.reload(null, false);
+            }
+          }
+        ]
       })
     })
-
-    // Table automatically reloads every minute
-    // setInterval( function () {
-    //   $('#queue').DataTable().ajax.reload(null, false);
-    // }, 3000 );
-
-
-
-
-    // $(document).ready(function() {
-    //   $('#queue').DataTable( {
-    //     ajax: {
-    //       url: "/shell/ps/aux",
-    //       dataSrc: "data"
-    //      },
-    //     columns: [
-    //     { data: 'name' },
-    //     { data: 'position' },
-    //     { data: 'salary' },
-    //     { data: 'state_date' },
-    //     { data: 'office' }
-    // ]
-    //   });
-    // });
-
+    console.log("button added?")
   }
 
-  // Reload the queue table. This method is called
-  // when widget.update() is called
-  public onUpdateRequest(msg: Message) {
-    console.log("update request called with auto reload FAST!");
+  private _reload_queue_table() {
     $('#queue').DataTable().ajax.reload(null, false);
-    console.log("reload called with false!");
-    // this._update_queue_table();
-    // this._generate_queue_table();
   }
 
-  // Pull queue data and populate queue_table
-  // private _update_queue_table() {
-  //   fetch('/shell/ps/aux').then(response => {
-  //     return response.text();
-  //   }).then(data => this._populate_queue_table(data));
-  // }
-
-  // public _generate_queue_table() {
-  //   var table = $('#queue').DataTable( {
-  //     ajax: {
-  //       url: "/shell/ps/aux",
-  //       dataSrc: "data"
-  //     },
-  //     columns: [
-  //     { data: 'name' },
-  //     { data: 'position' },
-  //     { data: 'salary' },
-  //     { data: 'state_date' },
-  //     { data: 'office' }
-  //     ]
-  //   });
-  //   table.ajax.reload();
-
-
-    // $(this.queue_table).ready(function() {
-    //   $('#queue').DataTable( {
-    //     ajax: {
-    //       url: "/shell/ps/aux",
-    //       dataSrc: "data"
-    //      }
-    //   });
-    // });
-  // }
-
-
-
-  // Generate HTML table and populate with queue_data
-  // private _populate_queue_table(data: string) {
-  //   // Clear table content
-  //   while (this.queue_table.hasChildNodes()) {
-  //     this.queue_table.removeChild(this.queue_table.lastChild);
-  //   }
-
-    // Adding classes again, necessary? The clearing of the
-    // table might be clearing the class list as well...
-  //   this.queue_table.classList.add('display', 'cell-border');
-  //   let lines = data.split('\n');
-
-  //   // Create header and append to table
-  //   let header_row = document.createElement("tr");
-  //   let col_names = lines[0].split(/[\s]+/);
-  //   for (let i = 0; i < 8; i++) {
-  //     let headElem = document.createElement("th");
-  //     let headerText = document.createTextNode(col_names[i]);
-  //     headElem.appendChild(headerText);
-  //     header_row.appendChild(headElem);
-  //   }
-  //   let tblHead = document.createElement("thead");
-  //   tblHead.appendChild(header_row);
-  //   this.queue_table.appendChild(tblHead);
-
-  //   // Create table body and cells and append to table
-  //   let tblBody = document.createElement("tbody");
-  //   for (let i = 1; i < lines.length; i++) {
-  //     let row_values = lines[i].split(/[\s]+/)
-  //     let row = document.createElement('tr');
-  //     for (let j = 0; j < 8; j++) {
-  //       let cell = document.createElement('td');
-  //       // cell.className = 'jp-queueTable';
-  //       // cell.className = 'jquery.dataTables';
-
-  //       let cellText = document.createTextNode(row_values[j]);
-  //       cell.appendChild(cellText);
-  //       row.appendChild(cell);
-  //     } // for (inner)
-  //     tblBody.appendChild(row);
-  //   } // for (outer)
-  //   this.queue_table.appendChild(tblBody);
-
-  //   $(document).ready(function() {
-  //     $('#queue').DataTable();
-  //   } );
-    
-
-
-
-  // } // _populate_queue_table
-
+  /**
+  * Reloads the queue table by using DataTables
+  * AJAX functionality, which reloads only the data that 
+  * is needed. IMPORTANT: This method is called
+  * when widget.update() is called, and . The false
+  * param passed to ajax.reload(..) indicates that the table's
+  * pagination will not be reset upon reload, which does 
+  * require some overhead due to sorting, etc.
+  */
+  public onUpdateRequest(msg: Message) {
+    // $('#queue').DataTable().ajax.reload(null, false);
+    this._reload_queue_table();
+  }
 
 } // class SlurmWidget
 
@@ -223,16 +127,12 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
     label: 'SLURM Queue Monitor',
     execute: () => {
       console.log("execute function entered!")
-      // So this function runs ONLY when the 'SLURM Queue Monitor' button
-      // is pushed!
       if (!widget) {
         console.log("no widget region entered!")
         // Instantiate a new widget if one does not exist
-        widget = new SlurmWidget(); // this should be only line in this block; setInterval should go in constructor, update is unecessary..
-        // widget.update() calls the onUpdateRequest method
-        // widget.update();
-        // Refresh table every 60 seconds by default
-        setInterval(() => widget.update(), 5000);
+        widget = new SlurmWidget(); 
+        // Reload table every 60 seconds
+        setInterval(() => widget.update(), 60000);
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
@@ -241,12 +141,10 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there
         app.shell.addToMainArea(widget);
-        // set interval here?
       } else {
         // Refresh the widget's state
         console.log("else entered!")
         widget.update();
-        // setInterval(() => widget.update(), 60000);
     }
       // Activate the widget
       app.shell.activateById(widget.id);
@@ -256,7 +154,7 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
   // Add the command to the palette.
   palette.addItem({command, category: 'HPC Tools'})
 
-  // Track and resotre the widget state
+  // Track and restore the widget state
   let tracker = new InstanceTracker<Widget>({ namespace: 'hpc'});
   restorer.restore(tracker, {
     command,
@@ -265,7 +163,6 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
   });
 
 } // activate
-
 
 /**
  * Initialization data for the jupyterlab_hpc extension.
