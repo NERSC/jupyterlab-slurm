@@ -14,14 +14,14 @@ class ShellExecutionHandler(IPythonHandler):
         data = response.stdout.strip()
 
         
-        # lines = data.split('\n')
-        # col_names = lines[0].split()
-        # data_dict = {}
-        # data_list = []
+        lines = data.split('\n')
+        col_names = lines[0].split()
+        data_dict = {}
+        data_list = []
 
-        # for line in lines:
-        #     data_list += [[entry for entry in line.split()[:5]]]
-        # data_dict["data"] = data_list[:]
+        for line in lines:
+            data_list += [[entry for entry in line.split()[:5]]]
+        data_dict["data"] = data_list[:]
 
         # for line in lines:
         #     data_list += {col_names[i]: entry 
@@ -29,9 +29,9 @@ class ShellExecutionHandler(IPythonHandler):
         # data_dict["data"] = data_list[:]
 
         # print("GET called!")
-        self.finish(response.stdout.strip())
+        # self.finish(response.stdout.strip())
         # self.finish(json.dumps(data_list))
-        # self.finish(json.dumps(data_dict))
+        self.finish(json.dumps(data_dict))
 
 def load_jupyter_server_extension(nb_server_app):
     """

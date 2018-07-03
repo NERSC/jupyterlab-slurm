@@ -35,7 +35,7 @@ class SlurmWidget extends Widget {
   * The table element containing SLURM queue data.
   */ 
   private queue_table: HTMLElement;
-  // private table: DataTables.Api;
+  // private api: DataTables.Api;
 
 
 
@@ -56,9 +56,37 @@ class SlurmWidget extends Widget {
     this.queue_table.classList.add('display', 'cell-border');
     this.node.appendChild(this.queue_table);
 
+    // Add thead to queue_table
+    let tbl_head = document.createElement('thead');
+    this.queue_table.appendChild(tbl_head);
+    let head_row = tbl_head.insertRow(0);
+    let cols = ["User", "PID", "%CPU", "%MEM", "VSZ"];
+    for (let i = 0; i < cols.length; i++) {
+      let h = document.createElement('th');
+      let t = document.createTextNode(cols[i]);
+      h.appendChild(t);
+      head_row.appendChild(h);
+    }
 
     // TODO: add thead (and maybe tbody?) to queue_table! It
     //       is required!!!
+
+
+
+    // Render table
+    $(document).ready(function() {
+      $('#queue').DataTable( {
+        "ajax": '/shell/ps/aux'
+      })
+    })
+
+    // Table automatically reloads every minute
+    // setInterval( function () {
+    //   $('#queue').DataTable().ajax.reload(null, false);
+    // }, 3000 );
+
+
+
 
     // $(document).ready(function() {
     //   $('#queue').DataTable( {
@@ -78,18 +106,22 @@ class SlurmWidget extends Widget {
 
   }
 
+  // Reload the queue table. This method is called
+  // when widget.update() is called
   public onUpdateRequest(msg: Message) {
-    console.log("update request called!")
-    this._update_queue_table();
+    console.log("update request called with auto reload FAST!");
+    $('#queue').DataTable().ajax.reload(null, false);
+    console.log("reload called with false!");
+    // this._update_queue_table();
     // this._generate_queue_table();
   }
 
   // Pull queue data and populate queue_table
-  private _update_queue_table() {
-    fetch('/shell/ps/aux').then(response => {
-      return response.text();
-    }).then(data => this._populate_queue_table(data));
-  }
+  // private _update_queue_table() {
+  //   fetch('/shell/ps/aux').then(response => {
+  //     return response.text();
+  //   }).then(data => this._populate_queue_table(data));
+  // }
 
   // public _generate_queue_table() {
   //   var table = $('#queue').DataTable( {
@@ -121,56 +153,56 @@ class SlurmWidget extends Widget {
 
 
   // Generate HTML table and populate with queue_data
-  private _populate_queue_table(data: string) {
-    // Clear table content
-    while (this.queue_table.hasChildNodes()) {
-      this.queue_table.removeChild(this.queue_table.lastChild);
-    }
+  // private _populate_queue_table(data: string) {
+  //   // Clear table content
+  //   while (this.queue_table.hasChildNodes()) {
+  //     this.queue_table.removeChild(this.queue_table.lastChild);
+  //   }
 
     // Adding classes again, necessary? The clearing of the
     // table might be clearing the class list as well...
-    this.queue_table.classList.add('display', 'cell-border');
-    let lines = data.split('\n');
+  //   this.queue_table.classList.add('display', 'cell-border');
+  //   let lines = data.split('\n');
 
-    // Create header and append to table
-    let header_row = document.createElement("tr");
-    let col_names = lines[0].split(/[\s]+/);
-    for (let i = 0; i < 8; i++) {
-      let headElem = document.createElement("th");
-      let headerText = document.createTextNode(col_names[i]);
-      headElem.appendChild(headerText);
-      header_row.appendChild(headElem);
-    }
-    let tblHead = document.createElement("thead");
-    tblHead.appendChild(header_row);
-    this.queue_table.appendChild(tblHead);
+  //   // Create header and append to table
+  //   let header_row = document.createElement("tr");
+  //   let col_names = lines[0].split(/[\s]+/);
+  //   for (let i = 0; i < 8; i++) {
+  //     let headElem = document.createElement("th");
+  //     let headerText = document.createTextNode(col_names[i]);
+  //     headElem.appendChild(headerText);
+  //     header_row.appendChild(headElem);
+  //   }
+  //   let tblHead = document.createElement("thead");
+  //   tblHead.appendChild(header_row);
+  //   this.queue_table.appendChild(tblHead);
 
-    // Create table body and cells and append to table
-    let tblBody = document.createElement("tbody");
-    for (let i = 1; i < lines.length; i++) {
-      let row_values = lines[i].split(/[\s]+/)
-      let row = document.createElement('tr');
-      for (let j = 0; j < 8; j++) {
-        let cell = document.createElement('td');
-        // cell.className = 'jp-queueTable';
-        // cell.className = 'jquery.dataTables';
+  //   // Create table body and cells and append to table
+  //   let tblBody = document.createElement("tbody");
+  //   for (let i = 1; i < lines.length; i++) {
+  //     let row_values = lines[i].split(/[\s]+/)
+  //     let row = document.createElement('tr');
+  //     for (let j = 0; j < 8; j++) {
+  //       let cell = document.createElement('td');
+  //       // cell.className = 'jp-queueTable';
+  //       // cell.className = 'jquery.dataTables';
 
-        let cellText = document.createTextNode(row_values[j]);
-        cell.appendChild(cellText);
-        row.appendChild(cell);
-      } // for (inner)
-      tblBody.appendChild(row);
-    } // for (outer)
-    this.queue_table.appendChild(tblBody);
+  //       let cellText = document.createTextNode(row_values[j]);
+  //       cell.appendChild(cellText);
+  //       row.appendChild(cell);
+  //     } // for (inner)
+  //     tblBody.appendChild(row);
+  //   } // for (outer)
+  //   this.queue_table.appendChild(tblBody);
 
-    $(document).ready(function() {
-      $('#queue').DataTable();
-    } );
+  //   $(document).ready(function() {
+  //     $('#queue').DataTable();
+  //   } );
     
 
 
 
-  } // _populate_queue_table
+  // } // _populate_queue_table
 
 
 } // class SlurmWidget
@@ -196,11 +228,11 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
       if (!widget) {
         console.log("no widget region entered!")
         // Instantiate a new widget if one does not exist
-        widget = new SlurmWidget();
+        widget = new SlurmWidget(); // this should be only line in this block; setInterval should go in constructor, update is unecessary..
         // widget.update() calls the onUpdateRequest method
-        widget.update();
+        // widget.update();
         // Refresh table every 60 seconds by default
-        setInterval(() => widget.update(), 60000);
+        setInterval(() => widget.update(), 5000);
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
