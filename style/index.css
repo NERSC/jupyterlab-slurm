@@ -1,12 +1,14 @@
 .jp-queueWidget {
-    display: grid;
+    display: inline-block;
+    /*display: grid;*/
+
     flex-direction: column;
 
     /* should replace these options with DataTables
     * scrolling options
     */
-    overflow: auto;
-    overflow-x: auto;
+    /*overflow: auto;*/
+    /*overflow-x: auto;*/
 }
 
 .jp-queueTable {

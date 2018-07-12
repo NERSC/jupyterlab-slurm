@@ -37,12 +37,12 @@
     "@types/datatables.net": "^1.10.12",
     "@types/datatables.net-buttons": "^1.4.0",
     "@types/datatables.net-select": "^1.2.4",
-    "datatables.net-buttons-dt": "^1.5.3",
+    "@types/jquery": "^3.3.4",
+    "datatables.net-buttons-dt": "^1.4.0",
     "datatables.net-dt": "^1.10.19",
-    "datatables.net-select-dt": "^1.2.7"
+    "datatables.net-select-dt": "^1.2.4"
   },
   "devDependencies": {
-    "@types/jquery": "^3.3.4",
     "rimraf": "^2.6.1",
     "typescript": "~2.6.0"
   },

@@ -23,9 +23,11 @@ import {
 
 import * as $ from 'jquery';
 import 'datatables.net';
+// import 'datatables.net-dt';
 import 'datatables.net-buttons';
-import 'datatables.net-dt';
+import 'datatables.net-select';
 import 'datatables.net-dt/css/jquery.dataTables.css';
+// import 'datatables.net/1.10.19/css/jquery.dataTables.css';
 
 import '../style/index.css';
 
@@ -36,6 +38,8 @@ class SlurmWidget extends Widget {
   * The table element containing SLURM queue data.
   */ 
   private queue_table: HTMLElement;
+  // The column index of job ID
+  readonly JOBID_IDX = 1;
 
   /**
   * Construct a new SLURM widget.
@@ -44,13 +48,16 @@ class SlurmWidget extends Widget {
     super();
     console.log("constructor called");
     this.id = 'nersc-hpc-jupyterlab';
-    this.title.label = 'SLURM Queue Monitor';
+    this.title.label = 'SLURM Queue Manager';
     this.title.closable = true;
     this.addClass('jp-queueWidget');
 
     this.queue_table = document.createElement('table');
     this.queue_table.setAttribute('id', 'queue');
     this.queue_table.setAttribute('width', '100%');
+    this.queue_table.setAttribute('style', 'font:14px');
+    // this.queue_table.setAttribute('height', '80%');
+
     // These class definitions are from the
     // DataTables default styling package
     this.queue_table.classList.add('display', 'cell-border');
@@ -61,7 +68,7 @@ class SlurmWidget extends Widget {
     let tbl_head = document.createElement('thead');
     this.queue_table.appendChild(tbl_head);
     let head_row = tbl_head.insertRow(0);
-    let cols = ["User", "PID", "%CPU", "%MEM", "VSZ"];
+    let cols = ["User", "PID", "%CPU", "%MEM", "VSZ", "RSS", "TT", "STAT"];
     for (let i = 0; i < cols.length; i++) {
       let h = document.createElement('th');
       let t = document.createTextNode(cols[i]);
@@ -69,13 +76,38 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
+    // reference to this object for use in the jquery func below
+    var self = this;
+
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        // scrollY: "200px",
-        // scrollX: true,
-        // scrollCollapse: true,
         ajax: '/shell/ps/aux',
+        select: true,
+        pageLength: 15,
+        language: {
+          search: "User"
+        },
+        columns: [
+        { name: 'User', searchable: true },
+        { name: 'PID', searchable: false },
+        { name: '%CPU', searchable: false },
+        { name: '%MEM', searchable: false },
+        { name: 'VSZ', searchable: false },
+        { name: 'RSS', searchable: false },
+        { name: 'TT', searchable: false },
+        { name: 'STAT', searchable: false },        
+        ],
+        columnDefs: [
+          {
+            className: "dt-center", 
+            targets: "_all"
+          }
+        ],
+        autoWidth: true,
+        scrollY: "400px",
+        scrollX: true,
+        scrollCollapse: true,
         // Table element layout parameter
         dom: '<Bfr<t><li>p>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
         buttons: [
@@ -84,8 +116,43 @@ class SlurmWidget extends Widget {
             action: function (e, dt, node, config) {
               dt.ajax.reload(null, false);
             }
+          },
+          {
+            extend: 'selected',
+            text: 'Kill Selected Job(s)',
+            action: function (e, dt, node, config) {
+              var selected_data = dt.rows( { selected: true } ).data().toArray();
+              for (let i = 0; i < selected_data.length; i++) {
+                let xhttp = new XMLHttpRequest();
+                // killing is restricted for certain processes, but this is
+                // irrelevant for this toy version, and this is good enough 
+                // to see the desired functionality
+                xhttp.open("GET", "/shell/kill" + selected_data[i][1], true);
+                console.log(xhttp.send());
+                console.log(selected_data[i][1]);
+              }
+              dt.ajax.reload(null, false);
+              // SlurmWidget._reload_queue_table();
+
+              // var data = table.rows( { selected: true }).data().toArray(); //, PID:name ).data(); //.cells(PID:name);
+              // This (below) should work dammit!
+              // var data = table.cells(null, 'PID:name', { selected: true } ).data().toArray();
+              // var pid = data.columns('PID:name').data().toArray();
+              // var data = table.cells('', 'PID:name', <any>{ selected: true }).data().toArray();
+
+              // var pid = data.PID
+              // var data = table.cells(, pid:name);
+            }
+          },
+          {
+            extend: 'selected',
+            text: 'Pause Selected Job(s)',
+            action: (e, dt, node, config) => {
+              self._run_on_selected("/shell/kill/-STOP", dt);
+            }  
           }
-        ]
+          
+        ]             
       })
     })
     console.log("button added?")
@@ -93,6 +160,22 @@ class SlurmWidget extends Widget {
 
   private _reload_queue_table() {
     $('#queue').DataTable().ajax.reload(null, false);
+    console.log("searchable");
+  }
+
+  private _run_on_selected(cmd: string, dt: DataTables.Api) {
+    let selected_data = dt.rows( { selected: true } ).data().toArray();
+    for (let i = 0; i < selected_data.length; i++) {
+      let xhttp = new XMLHttpRequest();
+      // killing is restricted for certain processes, but this is
+      // irrelevant for this toy version, and this is good enough 
+      // to see the desired functionality
+      xhttp.open("GET", cmd + '/' + selected_data[i][this.JOBID_IDX], true);
+      xhttp.send();
+      console.log(selected_data[i][1]);
+    }
+    this._reload_queue_table();
+    // dt.ajax.reload(null, false);
   }
 
   /**
@@ -124,7 +207,7 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
   // Add an application command
   const command: string = 'hpc:open';
   app.commands.addCommand(command, {
-    label: 'SLURM Queue Monitor',
+    label: 'SLURM Queue Manager',
     execute: () => {
       console.log("execute function entered!")
       if (!widget) {
