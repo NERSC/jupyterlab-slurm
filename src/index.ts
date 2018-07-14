@@ -56,15 +56,17 @@ class SlurmWidget extends Widget {
     this.queue_table.setAttribute('id', 'queue');
     this.queue_table.setAttribute('width', '100%');
     this.queue_table.setAttribute('style', 'font:14px');
+    // this.queue_table.setAttribute('style', 'margin-top:200px');
+    // this.queue_table.classList.add('jp-queueTable');
     // this.queue_table.setAttribute('height', '80%');
 
-    // These class definitions are from the
+    // These css class definitions are from the
     // DataTables default styling package
     this.queue_table.classList.add('display', 'cell-border');
     this.node.appendChild(this.queue_table);
 
-    // Add thead to queue_table; this is required 
-    // for DataTable's AJAX functionality. 
+    // Add thead to queue_table, and define column names;
+    // this is required for DataTable's AJAX functionality. 
     let tbl_head = document.createElement('thead');
     this.queue_table.appendChild(tbl_head);
     let head_row = tbl_head.insertRow(0);
@@ -84,6 +86,7 @@ class SlurmWidget extends Widget {
       $('#queue').DataTable( {
         ajax: '/shell/ps/aux',
         select: true,
+        deferRender: true,        
         pageLength: 15,
         language: {
           search: "User"
@@ -104,12 +107,15 @@ class SlurmWidget extends Widget {
             targets: "_all"
           }
         ],
+        // Set rowId to maintain selection after table reload 
+        // (use primary key for rowId). 
+        rowId: self.JOBID_IDX.toString(),
         autoWidth: true,
         scrollY: "400px",
         scrollX: true,
         scrollCollapse: true,
-        // Table element layout parameter
-        dom: '<Bfr<t><li>p>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
+        // Element layout parameter
+        dom: '<"toolbar"Bfr><t><lip>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
         buttons: [
           {
             text: "Reload",
@@ -120,28 +126,8 @@ class SlurmWidget extends Widget {
           {
             extend: 'selected',
             text: 'Kill Selected Job(s)',
-            action: function (e, dt, node, config) {
-              var selected_data = dt.rows( { selected: true } ).data().toArray();
-              for (let i = 0; i < selected_data.length; i++) {
-                let xhttp = new XMLHttpRequest();
-                // killing is restricted for certain processes, but this is
-                // irrelevant for this toy version, and this is good enough 
-                // to see the desired functionality
-                xhttp.open("GET", "/shell/kill" + selected_data[i][1], true);
-                console.log(xhttp.send());
-                console.log(selected_data[i][1]);
-              }
-              dt.ajax.reload(null, false);
-              // SlurmWidget._reload_queue_table();
-
-              // var data = table.rows( { selected: true }).data().toArray(); //, PID:name ).data(); //.cells(PID:name);
-              // This (below) should work dammit!
-              // var data = table.cells(null, 'PID:name', { selected: true } ).data().toArray();
-              // var pid = data.columns('PID:name').data().toArray();
-              // var data = table.cells('', 'PID:name', <any>{ selected: true }).data().toArray();
-
-              // var pid = data.PID
-              // var data = table.cells(, pid:name);
+            action: (e, dt, node, config) => {
+              self._run_on_selected("/shell/kill", dt);
             }
           },
           {
@@ -150,32 +136,43 @@ class SlurmWidget extends Widget {
             action: (e, dt, node, config) => {
               self._run_on_selected("/shell/kill/-STOP", dt);
             }  
+          },
+          {
+            extend: 'selected',
+            text: 'Resume Selected Job(s)',
+            action: (e, dt, node, config) => {
+              self._run_on_selected("/shell/kill/-CONT", dt);
+            }  
+          },
+          {
+            extend: 'selectNone'
           }
-          
+       
         ]             
-      })
-    })
-    console.log("button added?")
+      });
+
+      // Add some padding around the toolbar ('toolbar' div element
+      // created in the dom option in the DataTables function)
+      $('div.toolbar').css("margin-top", "10px");
+      $('div.toolbar').css("margin-right", "10px");
+    });
   }
 
   private _reload_queue_table() {
     $('#queue').DataTable().ajax.reload(null, false);
     console.log("searchable");
+    // console.log(<any>$("#selector").selectedIndex);
   }
 
   private _run_on_selected(cmd: string, dt: DataTables.Api) {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
       let xhttp = new XMLHttpRequest();
-      // killing is restricted for certain processes, but this is
-      // irrelevant for this toy version, and this is good enough 
-      // to see the desired functionality
       xhttp.open("GET", cmd + '/' + selected_data[i][this.JOBID_IDX], true);
       xhttp.send();
       console.log(selected_data[i][1]);
     }
-    this._reload_queue_table();
-    // dt.ajax.reload(null, false);
+    dt.ajax.reload(null, false);
   }
 
   /**
@@ -209,9 +206,7 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
   app.commands.addCommand(command, {
     label: 'SLURM Queue Manager',
     execute: () => {
-      console.log("execute function entered!")
       if (!widget) {
-        console.log("no widget region entered!")
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
         // Reload table every 60 seconds
@@ -226,7 +221,6 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
         app.shell.addToMainArea(widget);
       } else {
         // Refresh the widget's state
-        console.log("else entered!")
         widget.update();
     }
       // Activate the widget
@@ -257,4 +251,4 @@ const extension: JupyterLabPlugin<void> = {
   activate: activate
 };
 
-  export default extension;
+export default extension;
