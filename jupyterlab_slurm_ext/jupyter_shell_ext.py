@@ -1,25 +1,26 @@
-import subprocess
+#import subprocess
 import json
 import re
+#import shlex
+import asyncio
 
 from notebook.utils import url_path_join
 from notebook.base.handlers import IPythonHandler
 
 class ShellExecutionHandler(IPythonHandler):
     # Use @asynchronous decorator?
-    def get(self, command):
+    async def get(self, command):
         kill = re.search("kill/(.*)", command)
         if kill:
-            run_command(command.strip().split('/'))
+            await self.run_command(command)
             # can add response as the parameter to finish to send output
             # back to the extension, in case we want to display such info to
             # the user
             self.finish()
         else:
-            response = run_command(command.strip().split("/"))
-            data = response.stdout.strip()
+            data = await self.run_command(command)
             lines = data.split('\n')[1:] # exclude header row
-            col_names = lines[0].split()
+            # col_names = lines[0].split()
             data_dict = {}
             data_list = []
             for line in lines:
@@ -31,6 +32,42 @@ class ShellExecutionHandler(IPythonHandler):
             # finish(chunk) writes chunk (any?) to the output 
             # buffer and ends the HTTP request
             self.finish(json.dumps(data_dict))
+
+    async def run_command(self, command):
+        def split_into_arguments(command):
+            #commands = shlex.split(command)
+            commands = command.strip().split("/")
+            return commands
+        
+        def bytes_to_strings(bytes):
+            return bytes.decode().strip()
+
+        def _log_function(self, message, stderr, stdout, returncode):
+            self.log.error(message)
+            self.log.error("STDERR: " + bytes_to_strings(stderr))
+            self.log.debug("STDOUT: " + bytes_to_strings(stdout))
+            self.log.debug("Return code: " + str(returncode))
+
+        commands = split_into_arguments(command)
+
+        process = await asyncio.create_subprocess_exec(*commands,
+                                                           stdout=asyncio.subprocess.PIPE,
+                                                           stderr=asyncio.subprocess.PIPE)
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+
+        except Exception as e:
+            process.kill()
+            stdout, stderr = await process.communicate()
+            _log_function(self, "Process failed to execute.", stderr, stdout, process.returncode)
+            raise e
+        else:
+            if process.returncode != 0:
+                _log_function(self, "Process exited with return code that was non-zero.", stderr, stdout, process.returncode)
+                raise
+            
+        return bytes_to_strings(stdout)
 
 def load_jupyter_server_extension(nb_server_app):
     """
@@ -45,18 +82,3 @@ def load_jupyter_server_extension(nb_server_app):
     route_pattern = url_path_join(web_app.settings['base_url'], '/shell/(.*)')
     web_app.add_handlers(host_pattern, [(route_pattern, ShellExecutionHandler)])
 
-def run_command(cmd):
-    try:
-        return subprocess.run(cmd,
-            stderr=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            check=True, timeout=60, encoding="utf-8")
-    except subprocess.CalledProcessError as e:
-        print("Error:", e.stderr)
-        raise e 
-        # maybe catch 404 errors, and handle them with
-        # tornado.web.Finish, an exception which doesn't 
-        # produce an error response (maybe put try/catch
-        # in get method)
-
-        
