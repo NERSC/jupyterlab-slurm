@@ -84,7 +84,7 @@ class SlurmWidget extends Widget {
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        ajax: '/shell/squeue',
+        ajax: '/squeue',
         select: true,
         deferRender: true,        
         pageLength: 15,
@@ -127,21 +127,21 @@ class SlurmWidget extends Widget {
             extend: 'selected',
             text: 'Kill Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/shell/scancel", dt);
+              self._run_on_selected("/scancel", "DELETE", dt);
             }
           },
           {
             extend: 'selected',
-            text: 'Pause Selected Job(s)',
+            text: 'Hold Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/shell/scontrol/hold", dt);
+              self._run_on_selected("/scontrol/hold", "PATCH", dt);
             }  
           },
           {
             extend: 'selected',
-            text: 'Resume Selected Job(s)',
+            text: 'Release Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/shell/scontrol/resume", dt);
+              self._run_on_selected("/scontrol/release", "PATCH", dt);
             }  
           },
           {
@@ -164,11 +164,11 @@ class SlurmWidget extends Widget {
     // console.log(<any>$("#selector").selectedIndex);
   }
 
-  private _run_on_selected(cmd: string, dt: DataTables.Api) {
+  private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
       let xhttp = new XMLHttpRequest();
-      xhttp.open("GET", cmd + '/' + selected_data[i][this.JOBID_IDX], true);
+      xhttp.open(requestType, cmd + '/' + selected_data[i][this.JOBID_IDX], true);
       xhttp.send();
       console.log(selected_data[i][1]);
     }
