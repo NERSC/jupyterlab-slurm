@@ -169,6 +169,7 @@ class SlurmWidget extends Widget {
     for (let i = 0; i < selected_data.length; i++) {
       let xhttp = new XMLHttpRequest();
       xhttp.open(requestType, cmd + '/' + selected_data[i][this.JOBID_IDX], true);
+      xhttp.setRequestHeader("Authorization", "token 3709c37249d2e3984d6e430b526c70b356cd9f8eae95536c");
       xhttp.send();
       console.log(selected_data[i][1]);
     }
