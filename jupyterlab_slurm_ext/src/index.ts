@@ -1,5 +1,6 @@
-// TODO: Add Refresh button (defualt refresh every one minute)
-// 
+// import {  ServerConnection } from '@jupyterlab/services';
+
+import { PageConfig } from '@jupyterlab/coreutils'
 
 import {
   JupyterLab, JupyterLabPlugin, ILayoutRestorer
@@ -167,11 +168,17 @@ class SlurmWidget extends Widget {
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
-      let xhttp = new XMLHttpRequest();
-      xhttp.open(requestType, cmd + '/' + selected_data[i][this.JOBID_IDX], true);
-      xhttp.setRequestHeader("Authorization", "token 3709c37249d2e3984d6e430b526c70b356cd9f8eae95536c");
-      xhttp.send();
-      console.log(selected_data[i][1]);
+       let xhttp = new XMLHttpRequest();
+       xhttp.open(requestType, cmd, true);
+       xhttp.setRequestHeader("Authorization", "token " + PageConfig.getToken());
+       xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
+       xhttp.send("jobID="+selected_data[i][this.JOBID_IDX]);
+
+      //const settings = ServerConnection.makeSettings();
+      //const url = cmd + '/' + selected_data[i][this.JOBID_IDX];
+      //const init = {}; // fetch settings (see: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+      //ServerConnection.makeRequest(url, init, settings).then(response => { console.log('got', response);});
+      //console.log(selected_data[i][1]);
     }
     dt.ajax.reload(null, false);
   }

@@ -49,15 +49,29 @@ class ShellExecutionHandler(IPythonHandler):
             
         return (bytes_to_strings(stdout), bytes_to_strings(stderr))
 
+    def request_log_function(self):
+        self.log.debug("self.request.body_arguments: "+str(self.request.body_arguments))
+        self.log.debug("self.request.body: "+str(self.request.body))
+        self.log.debug("self.request.query_arguments: "+str(self.request.query_arguments))
+        self.log.debug("self.request.query: "+str(self.request.query))
+        self.log.debug("self.request.headers: "+str(self.request.headers))
+        self.log.debug("self.request.path: "+str(self.request.path))
+        self.log.debug("self.request.uri: "+str(self.request.uri))
+        self.log.debug("self.request.method: "+str(self.request.method))
+        self.log.debug("self.request.arguments: "+str(self.request.arguments))
+
 ### Conventions:
 ## Query arguments: always settings for how to use or options provided by a SLURM command.
 ## Body arguments: always job designators, e.g. job ID, paths to SLURM scripts, input streams of SLURM script contents, etc.
 ## Path arguments: always commands (including commands sent to `scontrol`, e.g. `scontrol hold`/`scontrol resume`)
 
+## Unsurprisingly, the job ID's are always (for scancel and scontrol) the body argument named 'jobID'
+
 # Since this is idempotent, hypothetically one could also use PUT instead of DELETE here.
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
+        self.request_log_function()
         jobIDs = self.get_body_arguments('jobID')
         self.log.debug("jobIDs: "+str(jobIDs))
         self.log.debug("command before joining: "+str(['scancel'] + jobIDs))
@@ -68,6 +82,7 @@ class ScancelHandler(ShellExecutionHandler):
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
+        self.request_log_function()
         job_list = ','.join(self.get_body_arguments('jobID'))
         self.log.debug("job_list: "+str(job_list))
         if command == 'hold' or command == 'release':
@@ -86,6 +101,7 @@ class SbatchHandler(ShellExecutionHandler):
             file_object.close()
             return
         
+        self.request_log_function()
         scriptIs = self.get_query_argument('scriptIs')
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if scriptIs:
