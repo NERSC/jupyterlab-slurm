@@ -1,131 +1,154 @@
+/* ordering of stylesheet corresponds approximately to locations on page: */
+/* first priority: top to bottom direction, second priority: left to right direction */
+
 .jp-queueWidget {
     display: inline-block;
-    /*display: grid;*/
-
-
+    background-color: var(--jp-layout-color1);
     flex-direction: column;
-
-    /* should replace these options with DataTables
-    * scrolling options
-    */
-    /*overflow: auto;*/
-    /*overflow-x: auto;*/
 }
 
-.jp-queueTable {
-    /*font-size: 12px;*/
-    /*border-collapse: collapse;*/
-    /*border-style: ridge;*/
-    /*border-width: 3px;*/
-    margin-top: 200px;
-    /*margin-bottom: 25%;*/
-    /*margin: auto;*/
-    /*text-align: center;*/
+/* basically all of the substance/content of the widget */
+#queue_wrapper {
+  margin-left: 3em;
+  margin-right: 3em;
 }
 
-.queueTableRow {
-  background-color: red;
+/* most of the text outside of the table */
+.dataTables_wrapper .dataTables_length, 
+.dataTables_wrapper .dataTables_filter, 
+.dataTables_wrapper .dataTables_info, 
+.dataTables_wrapper .dataTables_processing,
+.dataTables_wrapper .dataTables_paginate, 
+.dataTables_wrapper .dataTables_paginate .paginate_button,
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+.dataTables_scrollHeadInner {
+  /* The !important is unnecessary for everything except the paginate classes */
+  /* the dataTables developers hard-coded !important into their CSS for those classes */
+  color: var(--jp-ui-font-color1) !important;
+  font-size: var(--jp-ui-font-size1);
+  font-family: var(--jp-ui-font-family);
+  /* the only way to beat an !important is with an !important of a higher specificity */
 }
 
+/* space storing the buttons and search bar at the top of the table */
+.toolbar {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  /* see here: https://stackoverflow.com/questions/9519841/why-does-this-css-margin-top-style-not-work#9519933 */;
+  overflow: auto;
+}
 
-/*smaller size filter text box*/
-/*.dataTables_filter>label>input
-{
-    line-height:normal !important;
-}*/
+/* attributes of the buttons at the top of the table */
+.button {
+  font-size: var(--jp-ui-font-size1);
+  color: var(--jp-ui-font-color1);
+  border-width: var(--jp-border-width);
+  border-color: var(--jp-border-color2);
+  border-radius: var(--jp-border-radius);
+  font-family: var(--jp-ui-font-family);
+  background-color: var(--jp-layout-color2);
+  box-shadow: var(--jp-toolbar-box-shadow);
+  margin-right: 0.3em;
+  /* copy-pasted from dataTables CSS for .dataTables_wrapper .dataTables_paginate .paginate_button */
+  cursor: pointer;
+  *cursor: hand;
+}
 
-/*entry length text size changed*/
-/*.dataTables_length > label
-{
-    font-weight:normal !important;
-    font-size:13px !important; 
-}*/
-/*filter label text size changed*/
-/*.dataTables_filter > label
-{
-    font-weight:normal !important;
-    font-size:15px !important; 
-    margin-right: 20px;
-}*/
-/*table header size changed*/
-/*.wb-tables > thead > tr > th
-{
-    font-weight:600 !important;
-    font-size:14px !important; 
-    padding:5px !important;
-}*/
+/* space containing the buttons only, not the search bar */
+.dt-buttons {
+  float: left;
+}
 
-/*table data size changed*/
-/*.wb-tables > tbody > tr > td
-{
-    padding:2px !important;
-    font-size: 13px !important;
-}*/
+/* user search bar -- necessary to have space between it and the buttons */
+.dataTables_filter {
+  float: right;
+}
 
-/*table paging size changed*/
-/*.dataTables_paginate > span > a
-{
-    margin-bottom: 0px !important;
-    padding: 2px 10px !important;
-}*/
-/*table paging size changed*/
-/*.dataTables_paginate > a
-{
-    margin-bottom: 0px !important;
-    padding: 2px 10px !important;
-}*/
+/* Header and footer of queue table */
+table.dataTable thead th, table.dataTable thead td {
+  font-weight: normal;
+  border-bottom-color: var(--jp-border-color1);
+  border-width: var(--jp-border-width);
+}
 
-/*table paging float right*/
-/*.dataTables_paginate
-{
-    text-align:right !important;
-    margin-top: -10px !important;
-}*/
+/* queue tables cells/boxes (specifically their borders) */
+table.dataTable.cell-border tbody th, table.dataTable.cell-border tbody td {
+  border-color: var(--jp-border-color1);
+  font-weight: normal;
+  font-size: var(--jp-ui-font-size1);
+  border-width: var(--jp-border-width);
+}
 
-/*fixed sorting arrow 'after'*/
-/*table.dataTable thead .sorting-icons:after {
-      content: "\e114";
-      font-weight:lighter;
-      font-size:x-small;
-      display:list-item;
-      list-style:none;  
-      margin-left:-1px;
-      border:0px solid white !important;
-      padding:0 !important;
-      line-height:0.5em !important;
-      margin-top:0px !important;   
-      background: none !important;
-}*/
-/*fixed sorting arrow 'before'*/      
-/*table.dataTable thead .sorting-icons:before {
-      content: "\e113";
-      font-weight:lighter;
-      font-size:x-small;
-      display:list-item;
-      list-style:none;
-      margin-left:-0.4px;
-      border:0px solid white !important;
-      padding :0 !important;
+/* left side of queue table */
+table.dataTable.cell-border tbody tr th:first-child,
+table.dataTable.cell-border tbody tr td:first-child {
+  border-left-width: var(--jp-border-width);
+  border-left-color: var(--jp-border-color1);
+  border-left-style: solid;
+}
 
-      line-height :0.5em !important;
-      margin-top :0px !important;
-      background: none !important;
-}*/
+/* columns which are not being sorted on and are unselected */
+table.dataTable tbody tr {
+  background-color: var(--jp-brand-color3);
+  color: var(--jp-ui-font-color3);
+}
 
-/*fixed sorting arrows position*/     
-/*.sorting-cnt 
-{
-    float:right;
-    margin-right: 10px;
-    display:block;
-}*/
+/* columns which are not being sorted on and are selected */
+table.dataTable tbody tr.selected {
+  background-color: var(--jp-brand-color2);
+  color: var(--jp-ui-font-color2);
+}
 
-/*.jp-qTableBorder {
-    font-size: 12px;
-    border-style: ridge;
-    border-width: 3px;
-}*/
-/*
-.jp-Attribution {
-    margin: 20px auto;
-}*/
+/* columns which are being sorted on and are unselected */
+table.dataTable.order-column tbody tr > .sorting_1,
+table.dataTable.order-column tbody tr > .sorting_2,
+table.dataTable.order-column tbody tr > .sorting_3, table.dataTable.display tbody tr > .sorting_1,
+table.dataTable.display tbody tr > .sorting_2,
+table.dataTable.display tbody tr > .sorting_3 {
+  background-color: var(--jp-brand-color1);
+  color: var(--jp-ui-font-color1);
+}
+
+/* columns which are being sorted on and are selected */
+table.dataTable.order-column tbody tr.selected > .sorting_1,
+table.dataTable.order-column tbody tr.selected > .sorting_2,
+table.dataTable.order-column tbody tr.selected > .sorting_3, table.dataTable.display tbody tr.selected > .sorting_1,
+table.dataTable.display tbody tr.selected > .sorting_2,
+table.dataTable.display tbody tr.selected > .sorting_3 {
+  background-color: var(--jp-brand-color0);
+  color: var(--jp-ui-font-color0);
+}
+
+/* bottom of the table */
+.dataTables_wrapper.no-footer .dataTables_scrollBody {
+  border-bottom-color: var(--jp-border-color1);
+  border-bottom-width: var(--jp-border-width);
+  margin-bottom: 1.5em;
+}
+
+/* Information stating how many rows have been selected */
+.select-item {
+  margin-left: 3em;
+}
+
+/* button for the currently selected "page" in the table */
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+  background-color: var(--jp-layout-color0);
+  /* what is wrong with these dataTables people?! */
+  color: var(--jp-ui-font-color0) !important;
+  background-image: none;
+}
+
+/* settings for all buttons for the "pages" of the table */
+.dataTables_wrapper .dataTables_paginate .paginate_button,
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+  font-size: var(--jp-ui-font-size1);
+  border-width: var(--jp-border-width);
+  border-color: var(--jp-border-color2);
+  border-radius: var(--jp-border-radius);
+  font-family: var(--jp-ui-font-family);
+  box-shadow: var(--jp-toolbar-box-shadow);
+}

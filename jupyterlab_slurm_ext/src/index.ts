@@ -1,6 +1,6 @@
 // import {  ServerConnection } from '@jupyterlab/services';
 
-import { PageConfig } from '@jupyterlab/coreutils'
+import { PageConfig } from '@jupyterlab/coreutils';
 
 import {
   JupyterLab, JupyterLabPlugin, ILayoutRestorer
@@ -36,15 +36,12 @@ import '../style/index.css';
 
 class SlurmWidget extends Widget {
   /**
-  * The table element containing SLURM queue data.
-  */ 
+  * The table element containing SLURM queue data. */ 
   private queue_table: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
 
-  /**
-  * Construct a new SLURM widget.
-  */
+  /* Construct a new SLURM widget. */
   constructor() {
     super();
     console.log("constructor called");
@@ -57,13 +54,10 @@ class SlurmWidget extends Widget {
     this.queue_table.setAttribute('id', 'queue');
     this.queue_table.setAttribute('width', '100%');
     this.queue_table.setAttribute('style', 'font:14px');
-    // this.queue_table.setAttribute('style', 'margin-top:200px');
-    // this.queue_table.classList.add('jp-queueTable');
-    // this.queue_table.setAttribute('height', '80%');
 
-    // These css class definitions are from the
-    // DataTables default styling package
-    this.queue_table.classList.add('display', 'cell-border');
+    // These css class definitions are from the DataTables default styling package
+    // See: https://datatables.net/manual/styling/classes#display
+    this.queue_table.classList.add('order-column', 'cell-border');
     this.node.appendChild(this.queue_table);
 
     // Add thead to queue_table, and define column names;
@@ -86,11 +80,13 @@ class SlurmWidget extends Widget {
     $(document).ready(function() {
       $('#queue').DataTable( {
         ajax: '/squeue',
-        select: true,
+        select: {
+          style: 'multi',
+        },
         deferRender: true,        
         pageLength: 15,
         language: {
-          search: "User"
+          search: "User",
         },
         columns: [
         { name: 'JOBID', searchable: false },
@@ -117,7 +113,7 @@ class SlurmWidget extends Widget {
         scrollCollapse: true,
         // Element layout parameter
         dom: '<"toolbar"Bfr><t><lip>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
-        buttons: [
+        buttons: { buttons: [
           {
             text: "Reload",
             action: function (e, dt, node, config) {
@@ -149,15 +145,22 @@ class SlurmWidget extends Widget {
             extend: 'selectNone'
           }
        
-        ]             
+        ],
+        // https://datatables.net/reference/option/buttons.dom.button
+        // make it easier to identify/grab buttons to change their appearance
+        dom: {
+          button: {
+            tag: 'button',
+            className: 'button',
+          }
+        }  }
       });
 
-      // Add some padding around the toolbar ('toolbar' div element
-      // created in the dom option in the DataTables function)
-      $('div.toolbar').css("margin-top", "10px");
-      $('div.toolbar').css("margin-right", "10px");
-    });
+
+      });
   }
+
+
 
   private _reload_queue_table() {
     $('#queue').DataTable().ajax.reload(null, false);
@@ -218,7 +221,8 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
         // Reload table every 60 seconds
-        setInterval(() => widget.update(), 60000);
+        // DEBUG: comment this out so output in Chrome developer tools not constantly changing
+        //setInterval(() => widget.update(), 60000);
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
