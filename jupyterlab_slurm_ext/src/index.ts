@@ -223,11 +223,27 @@ class SlurmWidget extends Widget {
     var submitScript = $('#submit_script');
     $('#submit_button').click( () => {// grab contents of text area, convert to string, then URI encode them
                                       var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      alert(scriptContents);} );
+                                      let xhttp = new XMLHttpRequest();
+
+                                      xhttp.onreadystatechange = () => {
+                                        if (xhttp.readyState === xhttp.DONE) {
+                                        alert("xhttp.response: "+ xhttp.response.toString());
+                                        alert("xhttp.responseText: "+ xhttp.responseText.toString());
+                                        alert("xhttp.responseType: "+ xhttp.responseType.toString());
+                                        }
+                                      }
+
+                                      xhttp.open('POST', 'sbatch?scriptIs=contents', true);
+                                      xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+                                      xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                      xhttp.send('script='+scriptContents);
+                                      alert(scriptContents);
+                                      
+                                      dt.ajax.reload(null, false);
+                                      submitScript.remove();
+                                      } );
     $('#cancel_button').unbind().click( () => {submitScript.remove();} );
     
-
-    dt.ajax.reload(null, false);
   }
   };
 

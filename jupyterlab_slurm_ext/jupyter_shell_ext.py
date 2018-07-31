@@ -127,13 +127,21 @@ class SbatchHandler(ShellExecutionHandler):
             raise MissingArgumentError('scriptIs')
         
         jobID = re.compile('([0-9]+)$').search(stdout).group(1)
+        # self.log.debug("jobID: "+str(jobID))
+        # jobID_dict = {'jobID': jobID}
+        # self.finish(json.dumps(jobID_dict))
         self.finish(jobID)
-        return jobID
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
     async def get(self):
+        # userOnly = self.get_query_argument('userOnly')
+        # if (userOnly == 'true'):
+        #    data, stderr = await self.run_command('squeue -u $USER')
+        # elif (userOnly == 'false'):
+        #    data, stderr = await self.run_command('squeue')
         data, stderr = await self.run_command('squeue')
+        self.log.debug('stderr: '+str(stderr))
         lines = data.split('\n')[1:] # exclude header row
         data_dict = {}
         data_list = []
