@@ -32,8 +32,6 @@ import 'datatables.net-dt/css/jquery.dataTables.css';
 
 import '../style/index.css';
 
-
-
 class SlurmWidget extends Widget {
   /**
   * The table element containing SLURM queue data. */ 
@@ -44,7 +42,7 @@ class SlurmWidget extends Widget {
   /* Construct a new SLURM widget. */
   constructor() {
     super();
-    console.log("constructor called");
+    console.log('constructor called');
     this.id = 'nersc-hpc-jupyterlab';
     this.title.label = 'SLURM Queue Manager';
     this.title.closable = true;
@@ -65,7 +63,7 @@ class SlurmWidget extends Widget {
     let tbl_head = document.createElement('thead');
     this.queue_table.appendChild(tbl_head);
     let head_row = tbl_head.insertRow(0);
-    let cols = ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"];
+    let cols = ['JOBID', 'PARTITION', 'NAME', 'USER', 'ST', 'TIME', 'NODES', 'NODELIST(REASON)'];
     for (let i = 0; i < cols.length; i++) {
       let h = document.createElement('th');
       let t = document.createTextNode(cols[i]);
@@ -86,7 +84,7 @@ class SlurmWidget extends Widget {
         deferRender: true,        
         pageLength: 15,
         language: {
-          search: "User",
+          search: 'User',
         },
         columns: [
         { name: 'JOBID', searchable: false },
@@ -100,23 +98,23 @@ class SlurmWidget extends Widget {
         ],
         columnDefs: [
           {
-            className: "dt-center", 
-            targets: "_all"
+            className: 'dt-center', 
+            targets: '_all'
           }
         ],
         // Set rowId to maintain selection after table reload 
         // (use primary key for rowId). 
         rowId: self.JOBID_IDX.toString(),
         autoWidth: true,
-        scrollY: "400px",
+        scrollY: '400px',
         scrollX: true,
         scrollCollapse: true,
         // Element layout parameter
         dom: '<"toolbar"Bfr><t><lip>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
         buttons: { buttons: [
           {
-            text: "Reload",
-            action: function (e, dt, node, config) {
+            text: 'Reload',
+            action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
             }
           },
@@ -124,25 +122,41 @@ class SlurmWidget extends Widget {
             extend: 'selected',
             text: 'Kill Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/scancel", "DELETE", dt);
+              self._run_on_selected('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
             text: 'Hold Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/scontrol/hold", "PATCH", dt);
+              self._run_on_selected('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
             text: 'Release Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected("/scontrol/release", "PATCH", dt);
+              self._run_on_selected('/scontrol/release', 'PATCH', dt);
             }  
           },
           {
             extend: 'selectNone'
+          },
+          {
+            text: 'Submit SLURM Script via File Path',
+            action:  (e, dt, node, config) => {
+              var scriptPath = window.prompt('Enter a SLURM script file path on Cori');
+              self._submit_batch_script_path(scriptPath, dt)
+              alert(scriptPath);
+            }
+          },
+          {
+            text: 'Submit SLURM Script via File Contents',
+            action: (e, dt, node, config) => {
+              //var scriptContents = window.prompt('');
+              self._submit_batch_script_contents(dt);
+              //alert(scriptContents);
+            }
           }
        
         ],
@@ -164,18 +178,18 @@ class SlurmWidget extends Widget {
 
   private _reload_queue_table() {
     $('#queue').DataTable().ajax.reload(null, false);
-    console.log("searchable");
+    console.log('searchable');
     // console.log(<any>$("#selector").selectedIndex);
-  }
+  };
 
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
        let xhttp = new XMLHttpRequest();
        xhttp.open(requestType, cmd, true);
-       xhttp.setRequestHeader("Authorization", "token " + PageConfig.getToken());
-       xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
-       xhttp.send("jobID="+selected_data[i][this.JOBID_IDX]);
+       xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+       xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+       xhttp.send('jobID='+selected_data[i][this.JOBID_IDX]);
 
       //const settings = ServerConnection.makeSettings();
       //const url = cmd + '/' + selected_data[i][this.JOBID_IDX];
@@ -184,7 +198,38 @@ class SlurmWidget extends Widget {
       //console.log(selected_data[i][1]);
     }
     dt.ajax.reload(null, false);
+  };
+
+  private _submit_batch_script_path(script: string, dt: DataTables.Api) {
+    let xhttp = new XMLHttpRequest();
+    xhttp.open('POST', 'sbatch?scriptIs=path', true);
+    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhttp.send('script=' + encodeURIComponent(script));
+
+    dt.ajax.reload(null, false);
+  };
+
+  private _submit_batch_script_contents(dt: DataTables.Api) {
+    if ( $('#slurm_script').length == 0) {
+    // shamelessly ripped off from http://jsfiddle.net/Xtreu/297/
+    $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
+                               'Paste in the contents of a SLURM script file and submit them to Cori </span><br><br>' +
+                               '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
+    $('#slurm_script').after('<div id="slurm_buttons">'+
+                              '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
+                              '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
+                              '</div></div>');
+    var submitScript = $('#submit_script');
+    $('#submit_button').click( () => {// grab contents of text area, convert to string, then URI encode them
+                                      var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
+                                      alert(scriptContents);} );
+    $('#cancel_button').unbind().click( () => {submitScript.remove();} );
+    
+
+    dt.ajax.reload(null, false);
   }
+  };
 
   /**
   * Reloads the queue table by using DataTables
@@ -198,7 +243,7 @@ class SlurmWidget extends Widget {
   public onUpdateRequest(msg: Message) {
     // $('#queue').DataTable().ajax.reload(null, false);
     this._reload_queue_table();
-  }
+  };
 
 } // class SlurmWidget
 
