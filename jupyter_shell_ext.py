@@ -127,9 +127,6 @@ class SbatchHandler(ShellExecutionHandler):
             raise MissingArgumentError('scriptIs')
         
         jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        # self.log.debug("jobID: "+str(jobID))
-        # jobID_dict = {'jobID': jobID}
-        # self.finish(json.dumps(jobID_dict))
         self.finish(jobID)
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here

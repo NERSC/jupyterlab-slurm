@@ -174,74 +174,76 @@ class SlurmWidget extends Widget {
       });
   }
 
-
+  private _reload_data_table(dt: DataTables.Api) {
+    // reload the data table
+    dt.ajax.reload(null, false);
+  }
 
   private _reload_queue_table() {
-    $('#queue').DataTable().ajax.reload(null, false);
+    this._reload_data_table($('#queue').DataTable());
     console.log('searchable');
-    // console.log(<any>$("#selector").selectedIndex);
   };
+
+  private _set_headers(xhttp: XMLHttpRequest) {
+    // add Jupyter authorization (XRSF) token
+    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+    // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
+    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  }
+
+  private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
+    xhttp.onreadystatechange = () => {
+      // alert the user of the job's number after submitting
+      if (xhttp.readyState === xhttp.DONE) {
+        alert("Submitted batch job "+ xhttp.responseText.toString());
+      }
+    };
+  };
+
+  private _submit_request(cmd: string, requestType: string, body: string, addJobAlert: boolean) {
+    let xhttp = new XMLHttpRequest();
+    if (addJobAlert === true) {
+      this._add_job_completed_alert(xhttp); };
+    xhttp.open(requestType, cmd, true);
+    this._set_headers(xhttp);
+    xhttp.send(body);
+  }
 
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
-       let xhttp = new XMLHttpRequest();
-       xhttp.open(requestType, cmd, true);
-       xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-       xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-       xhttp.send('jobID='+selected_data[i][this.JOBID_IDX]);
-
-      //const settings = ServerConnection.makeSettings();
-      //const url = cmd + '/' + selected_data[i][this.JOBID_IDX];
-      //const init = {}; // fetch settings (see: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
-      //ServerConnection.makeRequest(url, init, settings).then(response => { console.log('got', response);});
-      //console.log(selected_data[i][1]);
+       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], false);
     }
-    dt.ajax.reload(null, false);
+    this._reload_data_table(dt);
   };
 
   private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-    let xhttp = new XMLHttpRequest();
-    xhttp.open('POST', 'sbatch?scriptIs=path', true);
-    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhttp.send('script=' + encodeURIComponent(script));
-
-    dt.ajax.reload(null, false);
+    this._submit_request('sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script), true);
+    this._reload_data_table(dt);
   };
 
   private _submit_batch_script_contents(dt: DataTables.Api) {
     if ( $('#slurm_script').length == 0) {
-    // shamelessly ripped off from http://jsfiddle.net/Xtreu/297/
+     // at the end of the main queue table area, append a prompt message and a form submission area
     $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
                                'Paste in the contents of a SLURM script file and submit them to Cori </span><br><br>' +
                                '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
+    // after the form submission area, insert a submit button and then a cancel button
     $('#slurm_script').after('<div id="slurm_buttons">'+
                               '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
                               '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
                               '</div></div>');
+    // message above textarea (form submission area), textarea itself, and the two buttons below
     var submitScript = $('#submit_script');
-    $('#submit_button').click( () => {// grab contents of text area, convert to string, then URI encode them
+    // do the callback after clicking on the submit button
+    $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
                                       var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      let xhttp = new XMLHttpRequest();
-
-                                      xhttp.onreadystatechange = () => {
-                                        if (xhttp.readyState === xhttp.DONE) {
-                                        alert("xhttp.response: "+ xhttp.response.toString());
-                                        alert("xhttp.responseText: "+ xhttp.responseText.toString());
-                                        alert("xhttp.responseType: "+ xhttp.responseType.toString());
-                                        }
-                                      }
-
-                                      xhttp.open('POST', 'sbatch?scriptIs=contents', true);
-                                      xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-                                      xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                      xhttp.send('script='+scriptContents);
-                                      alert(scriptContents);
-                                      
-                                      dt.ajax.reload(null, false);
+                                      this._submit_request('sbatch?scriptIs=contents', 'POST', 'script='+scriptContents, true);
+                                      this._reload_data_table(dt);
+                                      // remove the submit script prompt area
                                       submitScript.remove();
                                       } );
+    // remove the submit script prompt area after clicking the cancel button
     $('#cancel_button').unbind().click( () => {submitScript.remove();} );
     
   }
