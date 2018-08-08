@@ -1,1 +1,0 @@
-PYTHONPATH=$(pwd):$PYTHONPATH jupyter notebook --NotebookApp.nbserver_extensions="{'jupyter_shell_ext':True}"

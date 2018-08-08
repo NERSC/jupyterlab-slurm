@@ -1,5 +1,3 @@
-// import {  ServerConnection } from '@jupyterlab/services';
-
 import { PageConfig } from '@jupyterlab/coreutils';
 
 import {
@@ -24,27 +22,25 @@ import {
 
 import * as $ from 'jquery';
 import 'datatables.net';
-// import 'datatables.net-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
 import 'datatables.net-dt/css/jquery.dataTables.css';
-// import 'datatables.net/1.10.19/css/jquery.dataTables.css';
 
 import '../style/index.css';
 
 class SlurmWidget extends Widget {
   /**
-  * The table element containing SLURM queue data. */ 
+  * The table element containing Slurm queue data. */ 
   private queue_table: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
 
-  /* Construct a new SLURM widget. */
+  /* Construct a new Slurm widget. */
   constructor() {
     super();
     console.log('constructor called');
-    this.id = 'nersc-hpc-jupyterlab';
-    this.title.label = 'SLURM Queue Manager';
+    this.id = 'jupyterlab-slurm';
+    this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
     this.addClass('jp-queueWidget');
 
@@ -143,15 +139,15 @@ class SlurmWidget extends Widget {
             extend: 'selectNone'
           },
           {
-            text: 'Submit SLURM Script via File Path',
+            text: 'Submit Slurm Script via File Path',
             action:  (e, dt, node, config) => {
-              var scriptPath = window.prompt('Enter a SLURM script file path on Cori');
+              var scriptPath = window.prompt('Enter a Slurm script file path');
               self._submit_batch_script_path(scriptPath, dt)
               alert(scriptPath);
             }
           },
           {
-            text: 'Submit SLURM Script via File Contents',
+            text: 'Submit Slurm Script via File Contents',
             action: (e, dt, node, config) => {
               //var scriptContents = window.prompt('');
               self._submit_batch_script_contents(dt);
@@ -226,7 +222,7 @@ class SlurmWidget extends Widget {
     if ( $('#slurm_script').length == 0) {
      // at the end of the main queue table area, append a prompt message and a form submission area
     $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
-                               'Paste in the contents of a SLURM script file and submit them to Cori </span><br><br>' +
+                               'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
                                '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
     // after the form submission area, insert a submit button and then a cancel button
     $('#slurm_script').after('<div id="slurm_buttons">'+
@@ -267,18 +263,18 @@ class SlurmWidget extends Widget {
 
 
 /**
- * Activate the SLURM widget extension.
+ * Activate the Slurm widget extension.
  */
 function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRestorer) {
-  console.log('JupyterLab extension jupyterlab_hpc is activated!');
+  console.log('JupyterLab extension jupyterlab-slurm is activated!');
 
-  // Declare a SLURM widget variable
+  // Declare a Slurm widget variable
   let widget: SlurmWidget; 
 
   // Add an application command
   const command: string = 'hpc:open';
   app.commands.addCommand(command, {
-    label: 'SLURM Queue Manager',
+    label: 'Slurm Queue Manager',
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
@@ -317,10 +313,10 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
 } // activate
 
 /**
- * Initialization data for the jupyterlab_hpc extension.
+ * Initialization data for the jupyterlab-slurm extension.
  */
 const extension: JupyterLabPlugin<void> = {
-  id: 'jupyterlab_slurm_ext',
+  id: 'jupyterlab-slurm',
   autoStart: true,
   requires: [ICommandPalette, ILayoutRestorer],
   activate: activate

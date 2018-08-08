@@ -1,17 +1,15 @@
-#import subprocess
 import json
 import re
 import shlex
 import asyncio
 
-from notebook.utils import url_path_join
 from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
 
 class ShellExecutionHandler(IPythonHandler):
     async def run_command(self, command=None, stdin=None):
-        self.log.debug("command: "+str(command))
-        self.log.debug("stdin: "+str(stdin))
+        self.log.debug('command: '+str(command))
+        self.log.debug('stdin: '+str(stdin))
         def split_into_arguments(command):
             commands = shlex.split(command)
             #commands = command.strip().split(' ')
@@ -27,7 +25,7 @@ class ShellExecutionHandler(IPythonHandler):
             self.log.debug('Return code: ' + str(returncode))
 
         commands = split_into_arguments(command)
-        self.log.debug("commands: "+str(commands))
+        self.log.debug('commands: '+str(commands))
 
         process = await asyncio.create_subprocess_exec(*commands,
                                                            stdout=asyncio.subprocess.PIPE,
@@ -50,15 +48,15 @@ class ShellExecutionHandler(IPythonHandler):
         return (bytes_to_strings(stdout), bytes_to_strings(stderr))
 
     def request_log_function(self):
-        self.log.debug("self.request.body_arguments: "+str(self.request.body_arguments))
-        self.log.debug("self.request.body: "+str(self.request.body))
-        self.log.debug("self.request.query_arguments: "+str(self.request.query_arguments))
-        self.log.debug("self.request.query: "+str(self.request.query))
-        self.log.debug("self.request.headers: "+str(self.request.headers))
-        self.log.debug("self.request.path: "+str(self.request.path))
-        self.log.debug("self.request.uri: "+str(self.request.uri))
-        self.log.debug("self.request.method: "+str(self.request.method))
-        self.log.debug("self.request.arguments: "+str(self.request.arguments))
+        self.log.debug('self.request.body_arguments: '+str(self.request.body_arguments))
+        self.log.debug('self.request.body: '+str(self.request.body))
+        self.log.debug('self.request.query_arguments: '+str(self.request.query_arguments))
+        self.log.debug('self.request.query: '+str(self.request.query))
+        self.log.debug('self.request.headers: '+str(self.request.headers))
+        self.log.debug('self.request.path: '+str(self.request.path))
+        self.log.debug('self.request.uri: '+str(self.request.uri))
+        self.log.debug('self.request.method: '+str(self.request.method))
+        self.log.debug('self.request.arguments: '+str(self.request.arguments))
 
 ### Conventions:
 ## Query arguments: always settings for how to use or options provided by a SLURM command.
@@ -73,8 +71,8 @@ class ScancelHandler(ShellExecutionHandler):
     async def delete(self):
         self.request_log_function()
         jobIDs = self.get_body_arguments('jobID')
-        self.log.debug("jobIDs: "+str(jobIDs))
-        self.log.debug("command before joining: "+str(['scancel'] + jobIDs))
+        self.log.debug('jobIDs: '+str(jobIDs))
+        self.log.debug('command before joining: '+str(['scancel'] + jobIDs))
         stdout, stderr = await self.run_command(' '.join(['scancel'] + jobIDs))
         self.finish()
 
@@ -84,7 +82,7 @@ class ScontrolHandler(ShellExecutionHandler):
     async def patch(self, command):
         self.request_log_function()
         job_list = ','.join(self.get_body_arguments('jobID'))
-        self.log.debug("job_list: "+str(job_list))
+        self.log.debug('job_list: '+str(job_list))
         if command == 'hold' or command == 'release':
             stdout, stderr = await self.run_command(' '.join(['scontrol', command, job_list]))
             self.finish()
@@ -109,21 +107,21 @@ class SbatchHandler(ShellExecutionHandler):
                 script_path = self.get_body_argument('script')
                 stdout, stderr = await self.run_command('sbatch '+script_path)
             elif scriptIs == 'contents':
-                self.log.debug("Body arguments: "+str(self.request.body_arguments))
+                self.log.debug('Body arguments: '+str(self.request.body_arguments))
                 script_contents = self.get_body_argument('script')
-                self.log.debug("script_contents: "+script_contents)
+                self.log.debug('script_contents: '+script_contents)
                 string_to_file(script_contents)
                 stdout, stderr = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
                 import os
                 os.remove('temporary_file.temporary')
             else:
-                self.log.debug("Body arguments: "+str(self.request.body_arguments))
-                self.log.debug("Query arguments: "+str(self.request.query_arguments))
+                self.log.debug('Body arguments: '+str(self.request.body_arguments))
+                self.log.debug('Query arguments: '+str(self.request.query_arguments))
                 raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
 
         else:
-            self.log.debug("Body arguments: "+str(self.request.body_arguments))
-            self.log.debug("Query arguments: "+str(self.request.query_arguments))
+            self.log.debug('Body arguments: '+str(self.request.body_arguments))
+            self.log.debug('Query arguments: '+str(self.request.query_arguments))
             raise MissingArgumentError('scriptIs')
         
         jobID = re.compile('([0-9]+)$').search(stdout).group(1)
@@ -138,6 +136,7 @@ class SqueueHandler(ShellExecutionHandler):
         # elif (userOnly == 'false'):
         #    data, stderr = await self.run_command('squeue')
         data, stderr = await self.run_command('squeue')
+
         self.log.debug('stderr: '+str(stderr))
         lines = data.split('\n')[1:] # exclude header row
         data_dict = {}
@@ -148,29 +147,3 @@ class SqueueHandler(ShellExecutionHandler):
         # finish(chunk) writes chunk (any?) to the output 
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))
-        
-def load_jupyter_server_extension(nb_server_app):
-    """
-    Called when the extension is loaded.
-
-    Args:
-        nb_server_app (NotebookWebApplication): handle to the Notebook webserver instance.
-    """
-    print('Server extension loaded!')
-    web_app = nb_server_app.web_app
-    host_pattern = '.*$'
-
-    def create_full_route_pattern_from(end_of_url_pattern):
-        return url_path_join(web_app.settings['base_url'], end_of_url_pattern)
-    
-    scancel_route_pattern = create_full_route_pattern_from('/scancel')
-    scontrol_route_pattern = create_full_route_pattern_from('/scontrol/(?P<command>.*)')
-    sbatch_route_pattern = create_full_route_pattern_from('/sbatch')
-    squeue_route_pattern = create_full_route_pattern_from('/squeue')
-
-    web_app.add_handlers(host_pattern, [
-        (scancel_route_pattern, ScancelHandler),
-        (scontrol_route_pattern, ScontrolHandler),
-        (sbatch_route_pattern, SbatchHandler),
-        (squeue_route_pattern, SqueueHandler),
-        ])
