@@ -73,6 +73,7 @@ class SlurmWidget extends Widget {
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
+        // in JupyterLabHub, this will automatically become /hub/squeue (I think)
         ajax: '/squeue',
         select: {
           style: 'multi',

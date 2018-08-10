@@ -131,20 +131,26 @@ class SbatchHandler(ShellExecutionHandler):
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
     async def get(self):
+        # what to keep in the mind if we want to add a view user's jobs only button -- it would just add the -u flag to the command
         # userOnly = self.get_query_argument('userOnly')
         # if (userOnly == 'true'):
-        #    data, stderr = await self.run_command('squeue -u $USER')
+        #    data, stderr = await self.run_command('squeue -u $USER -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
         # elif (userOnly == 'false'):
-        #    data, stderr = await self.run_command('squeue')
-        data, stderr = await self.run_command('squeue')
+        #    data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        
+        # squeue -h automatically removes the header row
+        # -o <format string> ensures that the output is in a format expected by the extension
+        # Hard-coding this is not great -- ideally we would allow the user to customize this, or have the default output be the user's output
+        # Figuring out how to do that would require more time spent learning the details of the DataTables API than is currently available.
+        data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
 
         self.log.debug('stderr: '+str(stderr))
-        lines = data.splitlines()[1:] # exclude header row
+        lines = data.splitlines()
         data_dict = {}
         data_list = []
         for line in lines:
-            # maxsplit=7 so we can still display squeue entries like:
-            # 14058444     debug bb_test_  pbrohan PD       0:00      1 (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] - ask a system administrator to consult the dwmd log for more information
+            # maxsplit=7 so we can still display squeue entries with final columns with spaces like the following:
+            # (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] - ask a system administrator to consult the dwmd log for more information
             if len(line.split(maxsplit=7)) == 8:
                 # html.escape because some job ID's might have '<'s and similar characters in them.
                 # Also, hypothetically we could be Bobbytable'd without html.escape here,
