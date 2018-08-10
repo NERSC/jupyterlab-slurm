@@ -2,6 +2,7 @@ import json
 import re
 import shlex
 import asyncio
+import html
 
 from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
@@ -138,11 +139,20 @@ class SqueueHandler(ShellExecutionHandler):
         data, stderr = await self.run_command('squeue')
 
         self.log.debug('stderr: '+str(stderr))
-        lines = data.split('\n')[1:] # exclude header row
+        lines = data.splitlines()[1:] # exclude header row
         data_dict = {}
         data_list = []
         for line in lines:
-            data_list += [[entry for entry in line.split()[:8]]]
+            # maxsplit=7 so we can still display squeue entries like:
+            # 14058444     debug bb_test_  pbrohan PD       0:00      1 (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] - ask a system administrator to consult the dwmd log for more information
+            if len(line.split(maxsplit=7)) == 8:
+                # html.escape because some job ID's might have '<'s and similar characters in them.
+                # Also, hypothetically we could be Bobbytable'd without html.escape here,
+                # e.g. if someone had as a jobname '<script>virus.js</script>'.
+                data_list += [[(html.escape(entry)).strip() for entry in line.split(maxsplit=7)]]
+            else:
+                self.log.debug('The following line from squeue appears to be invalid, and will not be printed in the table:\n'+line)
+                continue
         data_dict['data'] = data_list[:]
         # finish(chunk) writes chunk (any?) to the output 
         # buffer and ends the HTTP request
