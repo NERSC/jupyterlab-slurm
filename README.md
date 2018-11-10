@@ -1,14 +1,9 @@
 # jupyterlab-slurm
 
-A JupyterLab extension to interface with the Slurm workload manager.
+A JupyterLab extension to interface with the Slurm Workload Manager.
 
 
-## Prerequisites for Installation
-
-* JupyterLab
-* NodeJS
-
-## Prerequisites for running
+## Prerequisites
 
 * JupyterLab
 * NodeJS
@@ -21,6 +16,32 @@ Note that if you are using JupyterLabHub, currently (v0.1.0) the locations of th
 - Slurm installation
 
 all have to be the same as each other for this extension to work. [We are looking for a fix for this.](https://github.com/jupyterhub/jupyterlab-hub/issues/70) Suggestions are welcome.
+
+## Installation
+
+### Create a conda environment with the prerequisites
+```
+conda create -n jupyterlab-slurm jupyterlab nodejs 
+source activate jupyterlab-slurm
+```
+*Note: If ```source activate``` doesn't work on your system, try ```conda activate```*
+
+### Get the code
+```
+git clone https://github.com/NERSC/jupyterlab-slurm.git
+```
+
+### Install the JupyterLab extension
+```
+jupyter labextension install jupyterlab-slurm
+```
+
+### Install the Jupyter Notebook server extension
+```
+cd jupyterlab-slurm
+pip install .                      
+jupyter serverextension enable --py jupyterlab-slurm --sys-prefix
+```
 
 ## (Development) Installation
 
