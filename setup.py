@@ -2,7 +2,7 @@ from distutils.core import setup
 from setuptools import find_packages
 
 setup(
-    name='jupyterlab-slurm',
+    name='nb-slurm',
     version='0.1.0',
     description='A Jupyter Notebook server extension to interface with common Slurm commands.',
     packages=find_packages(),
