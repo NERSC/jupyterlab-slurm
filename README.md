@@ -24,7 +24,7 @@ all have to be the same as each other for this extension to work. [We are lookin
 conda create -n jupyterlab-slurm jupyterlab nodejs 
 source activate jupyterlab-slurm
 ```
-*Note: If ```source activate``` doesn't work on your system, try ```conda activate```*
+Note: If ```source activate``` doesn't work on your system, try ```conda activate```
 
 ### Get the code
 ```
@@ -42,6 +42,10 @@ cd jupyterlab-slurm
 pip install .                      
 jupyter serverextension enable --py jupyterlab-slurm --sys-prefix
 ```
+
+After launching JupyterLab, the extension can be found in the command palette under
+the name ```Slurm Queue Manager```, and is listed under the ```HPC TOOLS``` section
+of the palette. 
 
 
 ## Development
