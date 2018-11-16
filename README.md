@@ -45,7 +45,7 @@ jupyter serverextension enable --py jupyterlab-slurm --sys-prefix
 
 After launching JupyterLab, the extension can be found in the command palette under
 the name ```Slurm Queue Manager```, and is listed under the ```HPC TOOLS``` section
-of the palette. 
+of the palette. A launcher icon for this extension is coming soon.
 
 
 ## Development
