@@ -38,7 +38,7 @@ import '../style/index.css';
 /**
  * The class name for the terminal icon in the default theme.
  */
-const SLURM_ICON_CLASS = 'jp-ImageIcon';
+const SLURM_ICON_CLASS = ('jp-NerscIcon', 'jp-JupyterIcon');
 
 
 class SlurmWidget extends Widget {
@@ -55,7 +55,7 @@ class SlurmWidget extends Widget {
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
-    this.addClass('jp-queueWidget');
+    this.addClass('jp-SlurmWidget');
 
     this.queue_table = document.createElement('table');
     this.queue_table.setAttribute('id', 'queue');
@@ -205,7 +205,7 @@ class SlurmWidget extends Widget {
     xhttp.onreadystatechange = () => {
       // alert the user of the job's number after submitting
       if (xhttp.readyState === xhttp.DONE) {
-        alert("Submitted batch job "+ xhttp.responseText.toString());
+        alert("Submitted batch job " + xhttp.responseText.toString());
       }
     };
   };
