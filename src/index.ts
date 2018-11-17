@@ -38,7 +38,7 @@ import '../style/index.css';
 /**
  * The class name for the terminal icon in the default theme.
  */
-const SLURM_ICON_CLASS = ('jp-NerscIcon', 'jp-JupyterIcon');
+const SLURM_ICON_CLASS = 'jp-NerscIcon';
 
 
 class SlurmWidget extends Widget {
@@ -297,7 +297,7 @@ function activate(
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
-        widget.title.icon = SLURM_ICON_CLASS;
+        widget.title.icon = SLURM_ICON_CLASS, 'jp-MaterialIcon';
         // Reload table every 60 seconds
         setInterval(() => widget.update(), 60000);
       }
