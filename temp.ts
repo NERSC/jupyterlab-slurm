@@ -286,7 +286,6 @@ function activate(
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
     label: 'Slurm Queue Manager',
-    iconClass: 'jp-ImageIcon',
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
