@@ -35,6 +35,12 @@ import 'datatables.net-dt/css/jquery.dataTables.css';
 
 import '../style/index.css';
 
+/**
+ * The class name for the terminal icon in the default theme.
+ */
+const SLURM_ICON_CLASS = 'jp-ImageIcon';
+
+
 class SlurmWidget extends Widget {
   /**
   * The table element containing Slurm queue data. */ 
@@ -285,13 +291,13 @@ function activate(
   // Add an application command
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
-    label: 'Slurm Queue Manager',
-    iconClass: 'jp-ImageIcon',
+    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue Manager',
+    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS,
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
-        widget.title.icon = 'jp-ImageIcon';
+        // widget.title.icon = SLURM_ICON_CLASS;
         // Reload table every 60 seconds
         setInterval(() => widget.update(), 60000);
       }
