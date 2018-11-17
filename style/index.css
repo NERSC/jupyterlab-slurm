@@ -8,8 +8,12 @@
     overflow: auto;
 }
 
-.jp-NerscIcon {
+.jp-NerscLaunchIcon {
   background-image: url("nersc_icon.png");
+}
+
+.jp-NerscTabIcon {
+  background-image: url("nersc_icon_small.png");
 }
 
 /* basically all of the substance/content of the widget */
