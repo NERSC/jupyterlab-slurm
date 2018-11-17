@@ -327,7 +327,7 @@ function activate(
     launcher.add({
       command: 'slurm:open',
       rank: 1,
-      category: 'Other'
+      category: 'HPC Tools'
     });
   }
 
