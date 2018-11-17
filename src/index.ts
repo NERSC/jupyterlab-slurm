@@ -83,7 +83,7 @@ class SlurmWidget extends Widget {
         // in JupyterLabHub, this will automatically become /hub/squeue (I think)
         ajax: '/squeue',
         select: {
-          style: 'multi',
+          style: 'os',
         },
         deferRender: true,        
         pageLength: 15,
