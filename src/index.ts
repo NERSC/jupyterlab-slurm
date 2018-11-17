@@ -36,9 +36,11 @@ import 'datatables.net-dt/css/jquery.dataTables.css';
 import '../style/index.css';
 
 /**
- * The class name for the terminal icon in the default theme.
+ * The class names for the Slurm extension icon, for launcher and
+ * tab, respectively
  */
-const SLURM_ICON_CLASS = 'jp-NerscIcon';
+const SLURM_ICON_CLASS_L = 'jp-NerscLaunchIcon';
+const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 
 
 class SlurmWidget extends Widget {
@@ -292,12 +294,12 @@ function activate(
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
     label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue Manager'),
-    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS),
+    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS_L),
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
-        widget.title.icon = SLURM_ICON_CLASS;
+        widget.title.icon = SLURM_ICON_CLASS_T;
         // Reload table every 60 seconds
         setInterval(() => widget.update(), 60000);
       }
