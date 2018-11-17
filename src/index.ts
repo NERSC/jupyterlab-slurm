@@ -280,6 +280,7 @@ function activate(app: JupyterLab, palette: ICommandPalette, restorer: ILayoutRe
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
+	widget.title.icon = 'jp-ImageIcon';
         // Reload table every 60 seconds
         // DEBUG: comment this out so output in Chrome developer tools not constantly changing
         //setInterval(() => widget.update(), 60000);
