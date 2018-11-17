@@ -291,8 +291,8 @@ function activate(
   // Add an application command
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
-    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue Manager',
-    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS,
+    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue Manager'),
+    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS),
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
