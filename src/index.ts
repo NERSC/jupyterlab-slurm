@@ -293,7 +293,7 @@ function activate(
   // Add an application command
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
-    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue Manager'),
+    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue'),
     iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS_L),
     execute: () => {
       if (!widget) {
