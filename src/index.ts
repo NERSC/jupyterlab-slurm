@@ -297,7 +297,7 @@ function activate(
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
-        // widget.title.icon = SLURM_ICON_CLASS;
+        widget.title.icon = SLURM_ICON_CLASS;
         // Reload table every 60 seconds
         setInterval(() => widget.update(), 60000);
       }
@@ -318,7 +318,7 @@ function activate(
   });
 
   // Add the command to the palette.
-  palette.addItem({command, category: 'HPC Tools'})
+  palette.addItem({command, category: 'HPC Tools', args: { isPalette: true } })
 
   // Track and restore the widget state
   let tracker = new InstanceTracker<Widget>({ namespace: 'slurm'});
