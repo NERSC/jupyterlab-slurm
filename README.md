@@ -1,73 +1,74 @@
 # jupyterlab-slurm
 
-A JupyterLab extension to interface with the Slurm workload manager.
+A JupyterLab extension to interface with the Slurm Workload Manager.
 
 
-## Prerequisites for Installation
-
-* JupyterLab
-* NodeJS
-
-## Prerequisites for running
+## Prerequisites
 
 * JupyterLab
 * NodeJS
 * Slurm
 
-Note that if you are using JupyterLabHub, currently (v0.1.0) the locations of the:
 
+Note that if you are using JupyterLabHub, currently (v0.1.0) the locations of the:
 - hub server
 - single-user JupyterLab servers
 - Slurm installation
 
 all have to be the same as each other for this extension to work. [We are looking for a fix for this.](https://github.com/jupyterhub/jupyterlab-hub/issues/70) Suggestions are welcome.
 
-## (Development) Installation
+## Installation
 
-### Notebook server extension (permanent)
-To install the notebook server extension, do the following in the repository directory:
+### Create a conda environment with the prerequisites
+```
+conda create -n jupyterlab-slurm jupyterlab nodejs 
+source activate jupyterlab-slurm
+```
+Note: If ```source activate``` doesn't work on your system, try ```conda activate```
 
-```bash
-pip install .
+### Get the code
+```
+git clone https://github.com/NERSC/jupyterlab-slurm.git
+```
+
+### Install the JupyterLab extension
+```
+jupyter labextension install jupyterlab-slurm
+```
+
+### Install the Jupyter Notebook server extension
+```
+cd jupyterlab-slurm
+pip install .                      
 jupyter serverextension enable --py jupyterlab-slurm --sys-prefix
 ```
 
-Ostensibly it should be sufficient to do the following to uninstall the server extension:
+After launching JupyterLab, the extension can be found in the command palette under
+the name ```Slurm Queue Manager```, and is listed under the ```HPC TOOLS``` section
+of the palette. A launcher icon for this extension is coming soon.
 
-```bash
-jupyter serverextension disable jupyterlab-slurm
-pip uninstall jupyterlab-slurm
-```
 
-However, it has seemed necessary at times to uninstall and then reinstall Jupyter altogether (with conda `conda uninstall jupyter_core`), since `serverextension disable` does not seem to delete or remove the extension. Thus, even after sourcing a newer version of the server extension, doing `serverextension enable` would just re-enable the old version (rather than installing the newer version). (Plus having the output of `jupyter serverextension list` cluttered by no longer existing extensions is unpleasant.)
+## Development
 
-### Notebook server extension (temporary)
-A less permanent way to enable the notebook extension during development would be to add the following flag when starting JupyterLab:
-
-```bash
---NotebookApp.nbserver_extensions="{'jupyterlab-slurm':True}"
-```
-
-### JupyterLab extension
-To install the "JupyterLab extension" (i.e. the TypeScript/Javascript part), do the following in the repository directory (requires NodeJS v. 4.0 or higher):
+For a development install (requires npm version 4 or later), do the following in the repository directory:
 
 ```bash
 npm install
 npm run build
-jupyter labextension install .
+jupyter labextension link .
 ```
 
-To reload after updating or changing the Javascript part of the extension, it is necessary to do the following:
+To rebuild the package and the JupyterLab app (run these commands after making changes to the extension during development):
 
 ```bash
 npm run build
 jupyter lab build
 ```
 
-(This assumes you haven't added any npm dependencies to `package.json`; if you have, then it is necessary to run `npm install` before `npm run build`.)
-
-To uninstall the Javascript part of the extension entirely, it suffices to do
+During development it is best to leave the server extension uninstalled. Instead, temporarily enable it when starting up JupyterLab for testing. To do this, use the following command to start JupyterLab:
 
 ```bash
-jupyter labextension uninstall jupyterlab-slurm
+jupyter lab --NotebookApp.nbserver_extensions="{'jupyterlab-slurm':True}"
 ```
+It's handy to have this command in a .sh file during development.
+
