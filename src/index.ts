@@ -255,6 +255,7 @@ class SlurmWidget extends Widget {
   };
 
   private _submit_batch_script_contents(dt: DataTables.Api) {
+    // TODO: clean up
     if ( $('#slurm_script').length == 0) {
      // at the end of the main queue table area, append a prompt message and a form submission area
     $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
@@ -289,6 +290,7 @@ class SlurmWidget extends Widget {
   // };
 
   private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
+    // TODO: change to _set_job_completed_message(request, message)
     xhttp.onreadystatechange = () => {
       // alert the user of the job's number after submitting
       if (xhttp.readyState === xhttp.DONE) {
