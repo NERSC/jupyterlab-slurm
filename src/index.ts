@@ -195,33 +195,6 @@ class SlurmWidget extends Widget {
     dt.ajax.reload(null, false);
   }
 
-<<<<<<< HEAD
-  private _reload_queue_table() {
-    this._reload_data_table($('#queue').DataTable());
-    console.log('searchable');
-  };
-
-  private _set_headers(xhttp: XMLHttpRequest) {
-    // add Jupyter authorization (XRSF) token
-    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-    // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
-    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-  }
-
-  private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
-    xhttp.onreadystatechange = () => {
-      // alert the user of the job's number after submitting
-      if (xhttp.readyState === xhttp.DONE) {
-        alert("Submitted batch job " + xhttp.responseText.toString());
-      }
-    };
-  };
-=======
-  // private _reload_queue_table() {
-  //   this._reload_data_table($('#queue').DataTable());
-  //   console.log('searchable');
-  // };
->>>>>>> Prepended all request endpoints with the base url, which will allow usage on jupyterhub if implemented correctly
 
   private _submit_request(cmd: string, requestType: string, body: string, addJobAlert: boolean) {
     let xhttp = new XMLHttpRequest();
@@ -231,7 +204,6 @@ class SlurmWidget extends Widget {
     // Prepend command with the base URL to yield the final endpoint
     endpoint = URLExt.join(baseUrl, cmd);
     xhttp.open(requestType, endpoint, true);
-    // this._set_headers(xhttp);
     // add Jupyter authorization (XRSF) token to request header
     xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
     // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
@@ -281,13 +253,6 @@ class SlurmWidget extends Widget {
     
     }
   };
-
-  // private _set_headers(xhttp: XMLHttpRequest) {
-  //   // add Jupyter authorization (XRSF) token
-  //   xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-  //   // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
-  //   xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-  // };
 
   private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
     // TODO: change to _set_job_completed_message(request, message)

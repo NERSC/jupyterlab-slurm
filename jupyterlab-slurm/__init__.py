@@ -32,26 +32,3 @@ def load_jupyter_server_extension(nb_server_app):
         (url_path_join(base_url, '/sbatch'), SbatchHandler)
         ])
 
-
-    # def create_full_route_pattern_from(end_of_url_pattern):
-    #     return url_path_join(web_app.settings['base_url'], end_of_url_pattern)
-    
-    # scancel_route_pattern =      create_full_route_pattern_from('/scancel')
-    # scancel_hub_route_pattern1 = create_full_route_pattern_from('/hub/scancel')
-    # scancel_hub_route_pattern2 = create_full_route_pattern_from('/lab/user/scancel')
-    # scancel_hub_route_pattern3 = create_full_route_pattern_from('/lab/scancel')
-    
-    # scontrol_route_pattern =     create_full_route_pattern_from('/scontrol/(?P<command>.*)')
-    # scontrol_hub_route_pattern1 =create_full_route_pattern_from('/hub/scontrol/(?P<command>.*)')
-    # scontrol_hub_route_pattern2 =create_full_route_pattern_from('/lab/user/scontrol/(?P<command>.*)')
-    # scontrol_hub_route_pattern3 =create_full_route_pattern_from('/lab/scontrol/(?P<command>.*)')
-    
-    # sbatch_route_pattern =       create_full_route_pattern_from('/sbatch')
-    # sbatch_hub_route_pattern1 =  create_full_route_pattern_from('/hub/sbatch')
-    # sbatch_hub_route_pattern2 =  create_full_route_pattern_from('/lab/user/sbatch')
-    # sbatch_hub_route_pattern3 =  create_full_route_pattern_from('/lab/sbatch')
-    
-    # squeue_route_pattern =       create_full_route_pattern_from('/squeue')
-    # squeue_hub_route_pattern1 =  create_full_route_pattern_from('/hub/squeue')
-    # squeue_hub_route_pattern2 =  create_full_route_pattern_from('/lab/user/squeue')
-    # squeue_hub_route_pattern3 =  create_full_route_pattern_from('/lab/squeue')
