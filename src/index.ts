@@ -16,6 +16,10 @@ import {
 } from '@jupyterlab/launcher';
 
 import {
+  PageConfig, URLExt
+} from '@jupyterlab/coreutils';
+
+import {
   JSONExt 
 } from '@phosphor/coreutils';
 
@@ -54,6 +58,7 @@ class SlurmWidget extends Widget {
   constructor() {
     super();
     console.log('constructor called');
+    console.log('testing!');
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
@@ -84,12 +89,13 @@ class SlurmWidget extends Widget {
 
     // reference to this object for use in the jquery func below
     var self = this;
+    // The base URL that prepends commands -- necessary for hub functionality
+    var baseUrl = PageConfig.getOption('baseUrl');
 
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        // in JupyterLabHub, this will automatically become /hub/squeue (I think)
-        ajax: '/squeue',
+        ajax: URLExt.join(baseUrl, '/squeue'),
         select: {
           style: 'os',
         },
@@ -122,7 +128,7 @@ class SlurmWidget extends Widget {
         scrollX: true,
         scrollCollapse: true,
         // Element layout parameter
-        dom: '<"toolbar"Bfr><t><lip>',//'<"top"Bf>lrt<"bottom"pi><"clear">',//'Bfrtip',
+        dom: '<"toolbar"Bfr><t><lip>',
         buttons: { buttons: [
           {
             text: 'Reload',
@@ -165,9 +171,7 @@ class SlurmWidget extends Widget {
           {
             text: 'Submit Slurm Script via File Contents',
             action: (e, dt, node, config) => {
-              //var scriptContents = window.prompt('');
               self._submit_batch_script_contents(dt);
-              //alert(scriptContents);
             }
           }
        
@@ -191,6 +195,7 @@ class SlurmWidget extends Widget {
     dt.ajax.reload(null, false);
   }
 
+<<<<<<< HEAD
   private _reload_queue_table() {
     this._reload_data_table($('#queue').DataTable());
     console.log('searchable');
@@ -211,17 +216,32 @@ class SlurmWidget extends Widget {
       }
     };
   };
+=======
+  // private _reload_queue_table() {
+  //   this._reload_data_table($('#queue').DataTable());
+  //   console.log('searchable');
+  // };
+>>>>>>> Prepended all request endpoints with the base url, which will allow usage on jupyterhub if implemented correctly
 
   private _submit_request(cmd: string, requestType: string, body: string, addJobAlert: boolean) {
     let xhttp = new XMLHttpRequest();
     if (addJobAlert === true) {
-      this._add_job_completed_alert(xhttp); };
-    xhttp.open(requestType, cmd, true);
-    this._set_headers(xhttp);
+      this._add_job_completed_alert(xhttp); 
+    };
+    // Prepend command with the base URL to yield the final endpoint
+    endpoint = URLExt.join(baseUrl, cmd);
+    xhttp.open(requestType, endpoint, true);
+    // this._set_headers(xhttp);
+    // add Jupyter authorization (XRSF) token to request header
+    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+    // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
+    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     xhttp.send(body);
   }
 
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
+    // Run CMD on all selected rows, by submitting a unique request for each 
+    // selected row
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
        this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], false);
@@ -230,7 +250,7 @@ class SlurmWidget extends Widget {
   };
 
   private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-    this._submit_request('sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script), true);
+    this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script), true);
     this._reload_data_table(dt);
   };
 
@@ -250,7 +270,7 @@ class SlurmWidget extends Widget {
     // do the callback after clicking on the submit button
     $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
                                       var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      this._submit_request('sbatch?scriptIs=contents', 'POST', 'script='+scriptContents, true);
+                                      this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents, true);
                                       this._reload_data_table(dt);
                                       // remove the submit script prompt area
                                       submitScript.remove();
@@ -258,21 +278,37 @@ class SlurmWidget extends Widget {
     // remove the submit script prompt area after clicking the cancel button
     $('#cancel_button').unbind().click( () => {submitScript.remove();} );
     
-  }
+    }
   };
+
+  // private _set_headers(xhttp: XMLHttpRequest) {
+  //   // add Jupyter authorization (XRSF) token
+  //   xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
+  //   // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
+  //   xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  // };
+
+  private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
+    xhttp.onreadystatechange = () => {
+      // alert the user of the job's number after submitting
+      if (xhttp.readyState === xhttp.DONE) {
+        alert("Submitted batch job "+ xhttp.responseText.toString());
+      }
+    };
+  };
+
 
   /**
   * Reloads the queue table by using DataTables
   * AJAX functionality, which reloads only the data that 
-  * is needed. IMPORTANT: This method is called
-  * when widget.update() is called, and . The false
+  * is needed. NOTE: This method is called
+  * when widget.update() is called, and the false
   * param passed to ajax.reload(..) indicates that the table's
   * pagination will not be reset upon reload, which does 
   * require some overhead due to sorting, etc.
   */
   public onUpdateRequest(msg: Message) {
-    // $('#queue').DataTable().ajax.reload(null, false);
-    this._reload_queue_table();
+    this._reload_data_table($('#queue').DataTable());
   };
 
 } // class SlurmWidget
