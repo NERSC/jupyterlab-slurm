@@ -19,7 +19,7 @@ def load_jupyter_server_extension(nb_server_app):
     Args:
         nb_server_app (NotebookWebApplication): handle to the Notebook webserver instance.
     """
-    print('Server extension loaded!')
+    print('Jupyterlab-slurm server extension loaded!')
     web_app = nb_server_app.web_app
     host_pattern = '.*$'
 
