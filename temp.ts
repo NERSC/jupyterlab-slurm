@@ -35,14 +35,6 @@ import 'datatables.net-dt/css/jquery.dataTables.css';
 
 import '../style/index.css';
 
-/**
- * The class names for the Slurm extension icon, for launcher and
- * tab, respectively
- */
-const SLURM_ICON_CLASS_L = 'jp-NerscLaunchIcon';
-const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
-
-
 class SlurmWidget extends Widget {
   /**
   * The table element containing Slurm queue data. */ 
@@ -57,7 +49,7 @@ class SlurmWidget extends Widget {
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
-    this.addClass('jp-SlurmWidget');
+    this.addClass('jp-queueWidget');
 
     this.queue_table = document.createElement('table');
     this.queue_table.setAttribute('id', 'queue');
@@ -91,7 +83,7 @@ class SlurmWidget extends Widget {
         // in JupyterLabHub, this will automatically become /hub/squeue (I think)
         ajax: '/squeue',
         select: {
-          style: 'os',
+          style: 'multi',
         },
         deferRender: true,        
         pageLength: 15,
@@ -207,7 +199,7 @@ class SlurmWidget extends Widget {
     xhttp.onreadystatechange = () => {
       // alert the user of the job's number after submitting
       if (xhttp.readyState === xhttp.DONE) {
-        alert("Submitted batch job " + xhttp.responseText.toString());
+        alert("Submitted batch job "+ xhttp.responseText.toString());
       }
     };
   };
@@ -293,13 +285,12 @@ function activate(
   // Add an application command
   const command: string = 'slurm:open';
   app.commands.addCommand(command, {
-    label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue'),
-    iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS_L),
+    label: 'Slurm Queue Manager',
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
-        widget.title.icon = SLURM_ICON_CLASS_T;
+        widget.title.icon = 'jp-ImageIcon';
         // Reload table every 60 seconds
         setInterval(() => widget.update(), 60000);
       }
@@ -320,7 +311,7 @@ function activate(
   });
 
   // Add the command to the palette.
-  palette.addItem({command, category: 'HPC Tools', args: { isPalette: true } })
+  palette.addItem({command, category: 'HPC Tools'})
 
   // Track and restore the widget state
   let tracker = new InstanceTracker<Widget>({ namespace: 'slurm'});
@@ -335,7 +326,7 @@ function activate(
     launcher.add({
       command: 'slurm:open',
       rank: 1,
-      category: 'HPC Tools'
+      category: 'Other'
     });
   }
 

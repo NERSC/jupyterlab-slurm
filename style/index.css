@@ -1,11 +1,19 @@
 /* ordering of stylesheet corresponds approximately to locations on page: */
 /* first priority: top to bottom direction, second priority: left to right direction */
 
-.jp-queueWidget {
+.jp-SlurmWidget {
     display: inline-block;
     background-color: var(--jp-layout-color1);
     flex-direction: column;
     overflow: auto;
+}
+
+.jp-NerscLaunchIcon {
+  background-image: url("nersc_icon.png");
+}
+
+.jp-NerscTabIcon {
+  background-image: url("nersc_icon_small.png");
 }
 
 /* basically all of the substance/content of the widget */
