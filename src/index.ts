@@ -1,5 +1,3 @@
-import { PageConfig } from '@jupyterlab/coreutils';
-
 import {
   JupyterLab, 
   JupyterLabPlugin, 
@@ -201,8 +199,10 @@ class SlurmWidget extends Widget {
     if (addJobAlert === true) {
       this._add_job_completed_alert(xhttp); 
     };
+    // The base URL that prepends the command path -- necessary for hub functionality
+    let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
-    endpoint = URLExt.join(baseUrl, cmd);
+    let endpoint = URLExt.join(baseUrl, cmd);
     xhttp.open(requestType, endpoint, true);
     // add Jupyter authorization (XRSF) token to request header
     xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
