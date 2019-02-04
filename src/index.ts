@@ -34,7 +34,9 @@ import 'datatables.net';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
 import 'datatables.net-dt/css/jquery.dataTables.css';
-import 'bootstrap.js';
+
+import 'bootstrap/dist/css/bootstrap.css';
+import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
 
@@ -185,13 +187,22 @@ class SlurmWidget extends Widget {
         }  }
       });
 
-      let alertContainer = document.createElement('div', { class: "container" });
-      let testAlert = document.createElement('div', { class: "alert alert-success" });
+      let alertContainer = document.createElement('div');
+      alertContainer.classList.add('container');
+
+      let testAlert = document.createElement('div');
+      alertContainer.classList.add('alert', 'alert-success');
+
+      let temp = document.createElement('div');
+      let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
+      temp.innerHTML = closeLink;
+      testAlert.appendChild(temp.firstChild);
+
       let alertText = document.createTextNode("This is a test alert!");
       testAlert.appendChild(alertText);
       alertContainer.appendChild(testAlert);
 
-      $('#queue_wrapper').append(alertContainer);
+      $('#jupyterlab-slurm').append(alertContainer);
 
 
       });
