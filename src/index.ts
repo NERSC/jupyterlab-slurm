@@ -166,7 +166,6 @@ class SlurmWidget extends Widget {
             action:  (e, dt, node, config) => {
               var scriptPath = window.prompt('Enter a Slurm script file path');
               self._submit_batch_script_path(scriptPath, dt)
-              alert(scriptPath);
             }
           },
           {
@@ -187,25 +186,14 @@ class SlurmWidget extends Widget {
         }  }
       });
 
+      // Set up and append the alert container -- an area for displaying request response 
+      // messages as color coded, dismissable, alerts
       let alertContainer = document.createElement('div');
-      alertContainer.classList.add('container');
-
-      let testAlert = document.createElement('div');
-      alertContainer.classList.add('alert', 'alert-success');
-
-      let temp = document.createElement('div');
-      let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
-      temp.innerHTML = closeLink;
-      testAlert.appendChild(temp.firstChild);
-
-      let alertText = document.createTextNode("This is a test alert!");
-      testAlert.appendChild(alertText);
-      alertContainer.appendChild(testAlert);
-
+      alertContainer.setAttribute("id", "alertContainer");
+      alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
-
-      });
+    });
   }
 
   private _reload_data_table(dt: DataTables.Api) {
@@ -214,11 +202,9 @@ class SlurmWidget extends Widget {
   }
 
 
-  private _submit_request(cmd: string, requestType: string, body: string, addJobAlert: boolean) {
+  private _submit_request(cmd: string, requestType: string, body: string) {
     let xhttp = new XMLHttpRequest();
-    if (addJobAlert === true) {
-      this._add_job_completed_alert(xhttp); 
-    };
+    this._set_job_completed_alert(xhttp);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -236,13 +222,13 @@ class SlurmWidget extends Widget {
     // selected row
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
-       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], false);
+       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX]);
     }
     this._reload_data_table(dt);
   };
 
   private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-    this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script), true);
+    this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
     this._reload_data_table(dt);
   };
 
@@ -263,7 +249,7 @@ class SlurmWidget extends Widget {
     // do the callback after clicking on the submit button
     $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
                                       var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents, true);
+                                      this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
                                       this._reload_data_table(dt);
                                       // remove the submit script prompt area
                                       submitScript.remove();
@@ -274,12 +260,26 @@ class SlurmWidget extends Widget {
     }
   };
 
-  private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
-    // TODO: change to _set_job_completed_message(request, message)
+  private _set_job_completed_alert(xhttp: XMLHttpRequest) {
     xhttp.onreadystatechange = () => {
-      // alert the user of the job's number after submitting
-      if (xhttp.readyState === xhttp.DONE) {
-        alert("Submitted batch job "+ xhttp.responseText.toString());
+      if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
+        let response = JSON.parse(xhttp.responseText);
+        let alert = document.createElement('div');
+        if (response.returncode == 0) {
+          alert.classList.add('alert', 'alert-success', 'alert-dismissable');
+        }
+        else {
+          alert.classList.add('alert', 'alert-danger', 'alert-dismissable');
+        }
+        let temp = document.createElement('div');
+        let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
+        temp.innerHTML = closeLink;
+        alert.appendChild(temp.firstChild);
+
+        let alertText = document.createTextNode(response.responseMessage);
+        alert.appendChild(alertText);
+        $('#alertContainer').append(alert);
+
       }
     };
   };

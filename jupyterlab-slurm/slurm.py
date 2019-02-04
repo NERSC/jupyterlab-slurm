@@ -16,8 +16,8 @@ class ShellExecutionHandler(IPythonHandler):
                                                            stderr=asyncio.subprocess.PIPE,
                                                            stdin=stdin)
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0) 
-        # decode stdout and stderr from bytes to str, and return   
-        return (stdout.decode().strip(), stderr.decode().strip())
+        # decode stdout and from bytes to str, and return stdout, stderr, and returncode  
+        return (stdout.decode().strip(), stderr.decode().strip(), process.returncode)
 
 
 ### Conventions:
@@ -32,14 +32,15 @@ class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
         jobIDs = self.get_body_arguments('jobID')
-        stdout, stderr = await self.run_command(' '.join(['scancel'] + jobIDs))
+        stdout, stderr, returncode = await self.run_command(' '.join(['scancel'] + jobIDs))
         print("SDOUT: ", stdout)
         print("STDERR: ", stderr)
+        print("returncode: ", returncode)
         if stdout:
-            response_message = stdout
+            responseMessage = stdout
         else:
-            response_message = stderr
-        self.finish(response_message)
+            responseMessage = stderr
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties, so POST also is not ideal
@@ -47,14 +48,14 @@ class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
         job_list = ','.join(self.get_body_arguments('jobID'))
-        stdout, stderr = await self.run_command(' '.join(['scontrol', command, job_list]))
+        stdout, stderr, returncode = await self.run_command(' '.join(['scontrol', command, job_list]))
         print("SDOUT: ", stdout)
         print("STDERR: ", stderr)
         if stdout:
-            response_message = stdout
+            responseMessage = stdout
         else:
-            response_message = stderr
-        self.finish(response_message)
+            responseMessage = stderr
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
 class SbatchHandler(ShellExecutionHandler):
@@ -74,7 +75,7 @@ class SbatchHandler(ShellExecutionHandler):
             elif scriptIs == 'contents':
                 script_contents = self.get_body_argument('script')
                 string_to_file(script_contents)
-                stdout, stderr = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
+                stdout, stderr, returncode = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
                 os.remove('temporary_file.temporary')
             else:
                 raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
@@ -83,11 +84,11 @@ class SbatchHandler(ShellExecutionHandler):
         print("SDOUT: ", stdout)
         print("STDERR: ", stderr)
         if stdout:
-            response_message = stdout
+            responseMessage = stdout
         else:
-            response_message = stderr
+            responseMessage = stderr
     # jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        self.finish(response_message)
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
