@@ -8,45 +8,15 @@ from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
 
 class ShellExecutionHandler(IPythonHandler):
-    async def run_command(self, command=None, stdin=None):
-        self.log.debug('command: '+str(command))
-        self.log.debug('stdin: '+str(stdin))
-        def split_into_arguments(command):
-            commands = shlex.split(command)
-            #commands = command.strip().split(' ')
-            return commands
-
-        def bytes_to_strings(bytes):
-            return bytes.decode().strip()
-        
-        def _log_function(self, message, stderr, stdout, returncode):
-            self.log.error(message)
-            self.log.error('STDERR: ' + bytes_to_strings(stderr))
-            self.log.debug('STDOUT: ' + bytes_to_strings(stdout))
-            self.log.debug('Return code: ' + str(returncode))
-
-        commands = split_into_arguments(command)
-        self.log.debug('commands: '+str(commands))
-
+    async def run_command(self, command, stdin=None):
+        commands = shlex.split(command)
         process = await asyncio.create_subprocess_exec(*commands,
                                                            stdout=asyncio.subprocess.PIPE,
                                                            stderr=asyncio.subprocess.PIPE,
                                                            stdin=stdin)
-        
-        try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
-
-        except Exception as e:
-            process.kill()
-            stdout, stderr = await process.communicate()
-            _log_function(self, 'Process failed to execute.', stderr, stdout, process.returncode)
-            raise e
-        else:
-            if process.returncode != 0:
-                _log_function(self, 'Process exited with return code that was non-zero.', stderr, stdout, process.returncode)
-                raise
-            
-        return (bytes_to_strings(stdout), bytes_to_strings(stderr))
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0) 
+        # decode stdout and stderr from bytes to str, and return   
+        return (stdout.decode().strip(), stderr.decode().strip())
 
     def request_log_function(self):
         self.log.debug('self.request.body_arguments: '+str(self.request.body_arguments))
