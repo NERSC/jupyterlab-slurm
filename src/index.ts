@@ -191,7 +191,7 @@ class SlurmWidget extends Widget {
       testAlert.appendChild(alertText);
       alertContainer.appendChild(testAlert);
 
-      $('#queue_wrapper').appendChild(alertContainer);
+      $('#queue_wrapper').append(alertContainer);
 
 
       });
