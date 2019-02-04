@@ -20,12 +20,18 @@
 .alert-container {
   margin-top: 20px;
   margin-left: 10px;
-  width: 50%;
+  width: 70%;
 }
+
 
 /* The alert itself -- this class is originally defined by bootstrap */
 .alert {
-  height: 3em;
+  height: 1.5em;
+  line-height: 1.4;
+  padding: 0px 7.5px 0px 15px;
+  margin-bottom: .25em;
+  font-size: .9em;
+  /* vertical-align: middle; */
 }
 
 /* basically all of the substance/content of the widget */

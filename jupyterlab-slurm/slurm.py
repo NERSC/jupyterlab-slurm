@@ -103,18 +103,18 @@ class SqueueHandler(ShellExecutionHandler):
         # squeue -h automatically removes the header row
         # -o <format string> ensures that the output is in a format expected by the extension
         # Hard-coding this is not great -- ideally we would allow the user to customize this, or have the default output be the user's output
-        data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-        lines = data.splitlines()
+        stdout, stderr, _ = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        data = stdout.splitlines()
         data_dict = {}
         data_list = []
-        for line in lines:
+        for row in data:
             # maxsplit=7 so we can still display squeue entries with final columns with spaces like the following:
             # (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] - ask a system administrator to consult the dwmd log for more information
-            if len(line.split(maxsplit=7)) == 8:
+            if len(row.split(maxsplit=7)) == 8:
                 # html.escape because some job ID's might have '<'s and similar characters in them.
                 # Also, hypothetically we could be Bobbytable'd without html.escape here,
                 # e.g. if someone had as a jobname '<script>virus.js</script>'.
-                data_list += [[(html.escape(entry)).strip() for entry in line.split(maxsplit=7)]]
+                data_list += [[(html.escape(entry)).strip() for entry in row.split(maxsplit=7)]]
             else:
                 continue
         data_dict['data'] = data_list[:]
