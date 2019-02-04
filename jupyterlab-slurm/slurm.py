@@ -18,16 +18,6 @@ class ShellExecutionHandler(IPythonHandler):
         # decode stdout and stderr from bytes to str, and return   
         return (stdout.decode().strip(), stderr.decode().strip())
 
-    def request_log_function(self):
-        self.log.debug('self.request.body_arguments: '+str(self.request.body_arguments))
-        self.log.debug('self.request.body: '+str(self.request.body))
-        self.log.debug('self.request.query_arguments: '+str(self.request.query_arguments))
-        self.log.debug('self.request.query: '+str(self.request.query))
-        self.log.debug('self.request.headers: '+str(self.request.headers))
-        self.log.debug('self.request.path: '+str(self.request.path))
-        self.log.debug('self.request.uri: '+str(self.request.uri))
-        self.log.debug('self.request.method: '+str(self.request.method))
-        self.log.debug('self.request.arguments: '+str(self.request.arguments))
 
 ### Conventions:
 ## Query arguments: always settings for how to use or options provided by a SLURM command.
@@ -40,25 +30,30 @@ class ShellExecutionHandler(IPythonHandler):
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
-        self.request_log_function()
         jobIDs = self.get_body_arguments('jobID')
-        self.log.debug('jobIDs: '+str(jobIDs))
-        self.log.debug('command before joining: '+str(['scancel'] + jobIDs))
         stdout, stderr = await self.run_command(' '.join(['scancel'] + jobIDs))
-        self.finish()
+        print("SDOUT: ", stdout)
+        print("STDERR: ", stderr)
+        if stdout:
+            response_message = stdout
+        else:
+            response_message = stderr
+        self.finish(response_message)
+
 
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties, so POST also is not ideal
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
-        self.request_log_function()
         job_list = ','.join(self.get_body_arguments('jobID'))
-        self.log.debug('job_list: '+str(job_list))
-        if command == 'hold' or command == 'release':
-            stdout, stderr = await self.run_command(' '.join(['scontrol', command, job_list]))
-            self.finish()
+        stdout, stderr = await self.run_command(' '.join(['scontrol', command, job_list]))
+        print("SDOUT: ", stdout)
+        print("STDERR: ", stderr)
+        if stdout:
+            response_message = stdout
         else:
-            raise NotImplementedError
+            response_message = stderr
+        self.finish(response_message)
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
 class SbatchHandler(ShellExecutionHandler):
@@ -114,7 +109,7 @@ class SqueueHandler(ShellExecutionHandler):
         # Figuring out how to do that would require more time spent learning the details of the DataTables API than is currently available.
         data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
 
-        self.log.debug('stderr: '+str(stderr))
+        
         lines = data.splitlines()
         data_dict = {}
         data_list = []
@@ -127,9 +122,9 @@ class SqueueHandler(ShellExecutionHandler):
                 # e.g. if someone had as a jobname '<script>virus.js</script>'.
                 data_list += [[(html.escape(entry)).strip() for entry in line.split(maxsplit=7)]]
             else:
-                self.log.debug('The following line from squeue appears to be invalid, and will not be printed in the table:\n'+line)
+                
                 continue
         data_dict['data'] = data_list[:]
-        # finish(chunk) writes chunk (any?) to the output 
+        # finish(chunk) writes chunk to the output 
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))
