@@ -161,18 +161,19 @@ class SlurmWidget extends Widget {
           {
             extend: 'selectNone'
           },
-          {
-            text: 'Submit Slurm Script via File Path',
-            action:  (e, dt, node, config) => {
-              var scriptPath = window.prompt('Enter a Slurm script file path');
-              self._submit_batch_script_path(scriptPath, dt)
-            }
-          },
-          {
-            text: 'Submit Slurm Script via File Contents',
-            action: (e, dt, node, config) => {
-              self._submit_batch_script_contents(dt);
-            }
+          // Job submission temporarily disabled
+          // {
+          //   text: 'Submit Slurm Script via File Path',
+          //   action:  (e, dt, node, config) => {
+          //     var scriptPath = window.prompt('Enter a Slurm script file path');
+          //     self._submit_batch_script_path(scriptPath, dt)
+          //   }
+          // },
+          // {
+          //   text: 'Submit Slurm Script via File Contents',
+          //   action: (e, dt, node, config) => {
+          //     self._submit_batch_script_contents(dt);
+          //   }
           }
        
         ],
@@ -227,38 +228,39 @@ class SlurmWidget extends Widget {
     this._reload_data_table(dt);
   };
 
-  private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-    this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
-    this._reload_data_table(dt);
-  };
+  // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
+  // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
+  //   this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
+  //   this._reload_data_table(dt);
+  // };
 
-  private _submit_batch_script_contents(dt: DataTables.Api) {
-    // TODO: clean up
-    if ( $('#slurm_script').length == 0) {
-     // at the end of the main queue table area, append a prompt message and a form submission area
-    $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
-                               'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
-                               '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
-    // after the form submission area, insert a submit button and then a cancel button
-    $('#slurm_script').after('<div id="slurm_buttons">'+
-                              '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
-                              '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
-                              '</div></div>');
-    // message above textarea (form submission area), textarea itself, and the two buttons below
-    var submitScript = $('#submit_script');
-    // do the callback after clicking on the submit button
-    $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
-                                      var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
-                                      this._reload_data_table(dt);
-                                      // remove the submit script prompt area
-                                      submitScript.remove();
-                                      } );
-    // remove the submit script prompt area after clicking the cancel button
-    $('#cancel_button').unbind().click( () => {submitScript.remove();} );
+  // private _submit_batch_script_contents(dt: DataTables.Api) {
+  //   // TODO: clean up
+  //   if ( $('#slurm_script').length == 0) {
+  //    // at the end of the main queue table area, append a prompt message and a form submission area
+  //   $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
+  //                              'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
+  //                              '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
+  //   // after the form submission area, insert a submit button and then a cancel button
+  //   $('#slurm_script').after('<div id="slurm_buttons">'+
+  //                             '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
+  //                             '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
+  //                             '</div></div>');
+  //   // message above textarea (form submission area), textarea itself, and the two buttons below
+  //   var submitScript = $('#submit_script');
+  //   // do the callback after clicking on the submit button
+  //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
+  //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
+  //                                     this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
+  //                                     this._reload_data_table(dt);
+  //                                     // remove the submit script prompt area
+  //                                     submitScript.remove();
+  //                                     } );
+  //   // remove the submit script prompt area after clicking the cancel button
+  //   $('#cancel_button').unbind().click( () => {submitScript.remove();} );
     
-    }
-  };
+  //   }
+  // };
 
   private _set_job_completed_alert(xhttp: XMLHttpRequest) {
     xhttp.onreadystatechange = () => {
