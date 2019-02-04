@@ -3,6 +3,7 @@ import re
 import shlex
 import asyncio
 import html
+import os
 
 from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
@@ -64,8 +65,6 @@ class SbatchHandler(ShellExecutionHandler):
             file_object.write(string)
             file_object.close()
             return
-        
-        self.request_log_function()
         scriptIs = self.get_query_argument('scriptIs')
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if scriptIs:
@@ -73,25 +72,22 @@ class SbatchHandler(ShellExecutionHandler):
                 script_path = self.get_body_argument('script')
                 stdout, stderr = await self.run_command('sbatch '+script_path)
             elif scriptIs == 'contents':
-                self.log.debug('Body arguments: '+str(self.request.body_arguments))
                 script_contents = self.get_body_argument('script')
-                self.log.debug('script_contents: '+script_contents)
                 string_to_file(script_contents)
                 stdout, stderr = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
-                import os
                 os.remove('temporary_file.temporary')
             else:
-                self.log.debug('Body arguments: '+str(self.request.body_arguments))
-                self.log.debug('Query arguments: '+str(self.request.query_arguments))
                 raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
-
         else:
-            self.log.debug('Body arguments: '+str(self.request.body_arguments))
-            self.log.debug('Query arguments: '+str(self.request.query_arguments))
             raise MissingArgumentError('scriptIs')
-        
-        jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        self.finish(jobID)
+        print("SDOUT: ", stdout)
+        print("STDERR: ", stderr)
+        if stdout:
+            response_message = stdout
+        else:
+            response_message = stderr
+    # jobID = re.compile('([0-9]+)$').search(stdout).group(1)
+        self.finish(response_message)
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
@@ -106,10 +102,7 @@ class SqueueHandler(ShellExecutionHandler):
         # squeue -h automatically removes the header row
         # -o <format string> ensures that the output is in a format expected by the extension
         # Hard-coding this is not great -- ideally we would allow the user to customize this, or have the default output be the user's output
-        # Figuring out how to do that would require more time spent learning the details of the DataTables API than is currently available.
         data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-
-        
         lines = data.splitlines()
         data_dict = {}
         data_list = []
@@ -122,7 +115,6 @@ class SqueueHandler(ShellExecutionHandler):
                 # e.g. if someone had as a jobname '<script>virus.js</script>'.
                 data_list += [[(html.escape(entry)).strip() for entry in line.split(maxsplit=7)]]
             else:
-                
                 continue
         data_dict['data'] = data_list[:]
         # finish(chunk) writes chunk to the output 
