@@ -42,7 +42,7 @@
     "@types/datatables.net-select": "^1.2.4",
     "@types/jquery": "^3.3.4",
     "bootstrap": "^4.2.1",
-    "datatables.net-buttons-dt": "^1.4.0",
+    "datatables.net-buttons-dt": "^1.5.4",
     "datatables.net-dt": "^1.10.19",
     "datatables.net-select-dt": "^1.2.4",
     "jquery": "^3.3.1",
