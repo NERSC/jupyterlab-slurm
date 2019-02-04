@@ -31,6 +31,7 @@ import {
 
 import * as $ from 'jquery';
 import 'datatables.net';
+import 'datatables.net-buttons-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
 import 'datatables.net-dt/css/jquery.dataTables.css';
@@ -174,7 +175,7 @@ class SlurmWidget extends Widget {
           //   action: (e, dt, node, config) => {
           //     self._submit_batch_script_contents(dt);
           //   }
-          }
+	  // }
        
         ],
         // https://datatables.net/reference/option/buttons.dom.button
@@ -268,10 +269,10 @@ class SlurmWidget extends Widget {
         let response = JSON.parse(xhttp.responseText);
         let alert = document.createElement('div');
         if (response.returncode == 0) {
-          alert.classList.add('alert', 'alert-success', 'alert-dismissable');
+          alert.classList.add('alert', 'alert-success', 'alert-dismissable', 'fade', 'show');
         }
         else {
-          alert.classList.add('alert', 'alert-danger', 'alert-dismissable');
+          alert.classList.add('alert', 'alert-danger', 'alert-dismissable', 'fade', 'show');
         }
         let temp = document.createElement('div');
         let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
