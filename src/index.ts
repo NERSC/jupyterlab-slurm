@@ -34,6 +34,7 @@ import 'datatables.net';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
 import 'datatables.net-dt/css/jquery.dataTables.css';
+import 'bootstrap.js';
 
 import '../style/index.css';
 
@@ -183,6 +184,14 @@ class SlurmWidget extends Widget {
           }
         }  }
       });
+
+      let alertContainer = document.createElement('div', { class: "container" });
+      let testAlert = document.createElement('div', { class: "alert alert-success" });
+      let alertText = document.createTextNode("This is a test alert!");
+      testAlert.appendChild(alertText);
+      alertContainer.appendChild(testAlert);
+
+      $('#queue_wrapper').appendChild(alertContainer);
 
 
       });
