@@ -30,11 +30,12 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
+import 'datatables.net-dt/css/jquery.dataTables.css';
 import 'datatables.net';
 import 'datatables.net-buttons-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
-import 'datatables.net-dt/css/jquery.dataTables.css';
+
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/dist/js/bootstrap.js';
@@ -145,10 +146,11 @@ class SlurmWidget extends Widget {
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
+	      console.log("Reload button clicked");
               // Disable the button to avoid overloading Slurm with calls to squeue
               // TODO: Make sure this refresh limiting functionality persists across
               // a browser window refresh
-              dt.button( 'reload:name' ).disable();
+              dt.button( 'Reload:name' ).disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
               setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
