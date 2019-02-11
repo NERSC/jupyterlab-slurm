@@ -105,7 +105,10 @@ class SlurmWidget extends Widget {
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        ajax: URLExt.join(baseUrl, '/squeue'),
+        ajax: {
+          url: URLExt.join(baseUrl, '/squeue'),
+          global: false
+        },
         select: {
           style: 'os',
         },
@@ -147,9 +150,9 @@ class SlurmWidget extends Widget {
               // Disable the button to avoid overloading Slurm with calls to squeue
               // TODO: Make sure this refresh limiting functionality persists across
               // a browser window refresh
-              this.disable();
+              // this.disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              setTimeout(function() { this.enable() }, USER_SQUEUE_LIMIT);
+              // setTimeout(function() { this.enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
@@ -210,10 +213,10 @@ class SlurmWidget extends Widget {
       $('#jupyterlab-slurm').append(alertContainer);
 
 
-      $(document).ajaxStop(function() { 
-        $('#queue').DataTable().ajax.reload(null, false));
-        console.log("All ajax jobs complete!");
-      });
+      // $(document).ajaxStop(function() { 
+      //   $('#queue').DataTable().ajax.reload(null, false);
+      //   console.log("All ajax jobs complete!");
+      // });
 
     });
   }
@@ -248,7 +251,13 @@ class SlurmWidget extends Widget {
        console.log("Finished job: ", i);
     }
     console.log("Finished running selected jobs");
-    this._reload_data_table(dt);
+
+    $(document).ajaxStop(function() { 
+      $('#queue').DataTable().ajax.reload(null, false);
+      console.log("All ajax jobs complete!");
+    });
+    
+    // this._reload_data_table(dt);
   };
 
   // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
