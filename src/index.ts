@@ -51,7 +51,7 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 // The number of milliseconds a user must wait in between Refresh requests
 // This limits the number of times squeue is called, in order to avoid
 // overloading the Slurm workload manager
-const USER_SQUEUE_LIMIT = 60000;
+// const USER_SQUEUE_LIMIT = 60000;
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
 const AUTO_SQUEUE_LIMIT = 60000;
@@ -105,10 +105,7 @@ class SlurmWidget extends Widget {
     // Render table using DataTable's API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        ajax: {
-          url: URLExt.join(baseUrl, '/squeue'),
-          global: false
-        },
+        ajax: URLExt.join(baseUrl, '/squeue'),
         select: {
           style: 'os',
         },
@@ -212,12 +209,6 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
-
-      // $(document).ajaxStop(function() { 
-      //   $('#queue').DataTable().ajax.reload(null, false);
-      //   console.log("All ajax jobs complete!");
-      // });
-
     });
   }
 
@@ -227,9 +218,9 @@ class SlurmWidget extends Widget {
   }
 
 
-  private _submit_request(cmd: string, requestType: string, body: string) {
+  private _submit_request(cmd: string, requestType: string, body: string, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    this._set_job_completed_alert(xhttp);
+    this._set_job_completed_tasks(xhttp, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -245,19 +236,15 @@ class SlurmWidget extends Widget {
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
     // selected row
+
     let selected_data = dt.rows( { selected: true } ).data().toArray();
+    let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX]);
+       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
        console.log("Finished job: ", i);
     }
-    console.log("Finished running selected jobs");
-
-    $(document).ajaxStop(function() { 
-      $('#queue').DataTable().ajax.reload(null, false);
-      console.log("All ajax jobs complete!");
-    });
     
-    // this._reload_data_table(dt);
+    
   };
 
   // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
@@ -294,7 +281,7 @@ class SlurmWidget extends Widget {
   //   }
   // };
 
-  private _set_job_completed_alert(xhttp: XMLHttpRequest) {
+  private _set_job_completed_tasks(xhttp: XMLHttpRequest, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
         let response = JSON.parse(xhttp.responseText);
@@ -314,6 +301,23 @@ class SlurmWidget extends Widget {
         alert.appendChild(alertText);
         $('#alertContainer').append(alert);
 
+        // If all current jobs have finished executing, 
+        // reload the queue (using squeue)
+        if (jobCount) {
+          if (jobCount.numJobs === jobCount.count) {
+            this._reload_data_table($('#queue').DataTable());
+            console.log("Finished running selected jobs");
+          }
+          else {
+            // By the nature of javascript's sequential function execution,
+            // this will not cause a data race (not atomic, but still ok) 
+            jobCount.count++;
+          }
+        }
+        else {
+           this._reload_data_table($('#queue').DataTable());
+           console.log("Finished running selected jobs");
+        }
       }
     };
   };
