@@ -48,6 +48,14 @@ import '../style/index.css';
 const SLURM_ICON_CLASS_L = 'jp-NerscLaunchIcon';
 const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 
+// The number of milliseconds a user must wait in between Refresh requests
+// This limits the number of times squeue is called, in order to avoid
+// overloading the Slurm workload manager
+const USER_SQUEUE_LIMIT = 60000;
+// The interval (milliseconds) in which the queue data automatically reloads
+// by calling squeue
+const AUTO_SQUEUE_LIMIT = 60000;
+
 
 class SlurmWidget extends Widget {
   /**
@@ -136,6 +144,12 @@ class SlurmWidget extends Widget {
             text: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
+              // Disable the button to avoid overloading Slurm with calls to squeue
+              // TODO: Make sure this refresh limiting functionality persists across
+              // a browser window refresh
+              this.disable();
+              // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
+              setTimeout(function() { this.enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
@@ -225,7 +239,9 @@ class SlurmWidget extends Widget {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     for (let i = 0; i < selected_data.length; i++) {
        this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX]);
+       console.log("Finished job: ", i);
     }
+    console.log("Finished running selected jobs");
     this._reload_data_table(dt);
   };
 
@@ -327,7 +343,7 @@ function activate(
         widget = new SlurmWidget(); 
         widget.title.icon = SLURM_ICON_CLASS_T;
         // Reload table every 60 seconds
-        setInterval(() => widget.update(), 60000);
+        setInterval(() => widget.update(), AUTO_SQUEUE_LIMIT);
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
