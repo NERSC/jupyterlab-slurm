@@ -32,6 +32,9 @@
   margin-bottom: .25em;
   font-size: .9em;
   /* vertical-align: middle; */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* basically all of the substance/content of the widget */
