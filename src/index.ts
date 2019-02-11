@@ -304,18 +304,16 @@ class SlurmWidget extends Widget {
         // If all current jobs have finished executing, 
         // reload the queue (using squeue)
         if (jobCount) {
+          // By the nature of javascript's sequential function execution,
+          // this will not cause a data race (not atomic, but still ok) 
+          jobCount.count++;
+          console.log("numjobs: ", jobCount.numJobs);
+          console.log("count: ", jobCount.count);
+          console.log("result: ", jobCount.numJobs == jobCount.count);
           if (jobCount.numJobs == jobCount.count) {
-	    console.log("ENTERED!");
+      	    console.log("ENTERED!");
             this._reload_data_table($('#queue').DataTable());
             console.log("Finished running selected jobs");
-          }
-          else {
-            // By the nature of javascript's sequential function execution,
-            // this will not cause a data race (not atomic, but still ok) 
-            jobCount.count++;
-	    console.log("numjobs: ", jobCount.numJobs);
-	    console.log("count: ", jobCount.count);
-	    console.log("result: ", jobCount.numJobs == jobCount.count);
           }
         }
         else {
