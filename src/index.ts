@@ -97,7 +97,7 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
-    // reference to this object for use in the jquery func below
+    // reference to this SlurmWidget object for use in the jquery func below
     var self = this;
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
@@ -208,6 +208,12 @@ class SlurmWidget extends Widget {
       alertContainer.setAttribute("id", "alertContainer");
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
+
+
+      $(document).ajaxStop(function() { 
+        $('#queue').DataTable().ajax.reload(null, false));
+        console.log("All ajax jobs complete!");
+      });
 
     });
   }
