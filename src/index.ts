@@ -51,7 +51,7 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 // The number of milliseconds a user must wait in between Refresh requests
 // This limits the number of times squeue is called, in order to avoid
 // overloading the Slurm workload manager
-// const USER_SQUEUE_LIMIT = 60000;
+const USER_SQUEUE_LIMIT = 60000;
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
 const AUTO_SQUEUE_LIMIT = 60000;
@@ -142,14 +142,15 @@ class SlurmWidget extends Widget {
         buttons: { buttons: [
           {
             text: 'Reload',
+            name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
               // Disable the button to avoid overloading Slurm with calls to squeue
               // TODO: Make sure this refresh limiting functionality persists across
               // a browser window refresh
-              // this.disable();
+              dt.button( 'reload:name' ).disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              // setTimeout(function() { this.enable() }, USER_SQUEUE_LIMIT);
+              setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
