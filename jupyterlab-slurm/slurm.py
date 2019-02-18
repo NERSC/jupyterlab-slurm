@@ -31,8 +31,8 @@ class ShellExecutionHandler(IPythonHandler):
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
-        jobID = self.get_body_arguments('jobID')
-        stdout, stderr, returncode = await self.run_command(' '.join(['scancel'] + jobIDs))
+        jobID = self.get_body_arguments('jobID')[0]
+        stdout, stderr, returncode = await self.run_command("scancel " + jobID)
         if stderr:
             responseMessage = stderr
         else:
@@ -45,14 +45,15 @@ class ScancelHandler(ShellExecutionHandler):
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
-        job_list = ','.join(self.get_body_arguments('jobID'))
-        stdout, stderr, returncode = await self.run_command(' '.join(['scontrol', command, job_list]))
+        jobID = self.get_body_arguments('jobID')[0]
+        stdout, stderr, returncode = await self.run_command("scontrol " + command + " " + jobID)
         if stderr:
             responseMessage = stderr
         else:
             # stdout will be empty on success -- hence the custom success message
-            responseMessage = "Success: " + command + " " + job_list
+            responseMessage = "Success: " + command + " " + jobID
         self.finish({"responseMessage": responseMessage, "returncode": returncode})
+
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
 class SbatchHandler(ShellExecutionHandler):
