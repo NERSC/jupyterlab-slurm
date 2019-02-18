@@ -3,61 +3,22 @@ import re
 import shlex
 import asyncio
 import html
+import os
 
 from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
 
 class ShellExecutionHandler(IPythonHandler):
-    async def run_command(self, command=None, stdin=None):
-        self.log.debug('command: '+str(command))
-        self.log.debug('stdin: '+str(stdin))
-        def split_into_arguments(command):
-            commands = shlex.split(command)
-            #commands = command.strip().split(' ')
-            return commands
-
-        def bytes_to_strings(bytes):
-            return bytes.decode().strip()
-        
-        def _log_function(self, message, stderr, stdout, returncode):
-            self.log.error(message)
-            self.log.error('STDERR: ' + bytes_to_strings(stderr))
-            self.log.debug('STDOUT: ' + bytes_to_strings(stdout))
-            self.log.debug('Return code: ' + str(returncode))
-
-        commands = split_into_arguments(command)
-        self.log.debug('commands: '+str(commands))
-
+    async def run_command(self, command, stdin=None):
+        commands = shlex.split(command)
         process = await asyncio.create_subprocess_exec(*commands,
                                                            stdout=asyncio.subprocess.PIPE,
                                                            stderr=asyncio.subprocess.PIPE,
                                                            stdin=stdin)
-        
-        try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0) 
+        # decode stdout and from bytes to str, and return stdout, stderr, and returncode  
+        return (stdout.decode().strip(), stderr.decode().strip(), process.returncode)
 
-        except Exception as e:
-            process.kill()
-            stdout, stderr = await process.communicate()
-            _log_function(self, 'Process failed to execute.', stderr, stdout, process.returncode)
-            raise e
-        else:
-            if process.returncode != 0:
-                _log_function(self, 'Process exited with return code that was non-zero.', stderr, stdout, process.returncode)
-                raise
-            
-        return (bytes_to_strings(stdout), bytes_to_strings(stderr))
-
-    def request_log_function(self):
-        self.log.debug('self.request.body_arguments: '+str(self.request.body_arguments))
-        self.log.debug('self.request.body: '+str(self.request.body))
-        self.log.debug('self.request.query_arguments: '+str(self.request.query_arguments))
-        self.log.debug('self.request.query: '+str(self.request.query))
-        self.log.debug('self.request.headers: '+str(self.request.headers))
-        self.log.debug('self.request.path: '+str(self.request.path))
-        self.log.debug('self.request.uri: '+str(self.request.uri))
-        self.log.debug('self.request.method: '+str(self.request.method))
-        self.log.debug('self.request.arguments: '+str(self.request.arguments))
 
 ### Conventions:
 ## Query arguments: always settings for how to use or options provided by a SLURM command.
@@ -70,25 +31,29 @@ class ShellExecutionHandler(IPythonHandler):
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
-        self.request_log_function()
-        jobIDs = self.get_body_arguments('jobID')
-        self.log.debug('jobIDs: '+str(jobIDs))
-        self.log.debug('command before joining: '+str(['scancel'] + jobIDs))
-        stdout, stderr = await self.run_command(' '.join(['scancel'] + jobIDs))
-        self.finish()
+        jobID = self.get_body_arguments('jobID')[0]
+        stdout, stderr, returncode = await self.run_command("scancel " + jobID)
+        if stderr:
+            responseMessage = stderr
+        else:
+            # stdout will be empty on success -- hence the custom success message
+            responseMessage = "Success: scancel " + jobID  
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
+
 
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties, so POST also is not ideal
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
-        self.request_log_function()
-        job_list = ','.join(self.get_body_arguments('jobID'))
-        self.log.debug('job_list: '+str(job_list))
-        if command == 'hold' or command == 'release':
-            stdout, stderr = await self.run_command(' '.join(['scontrol', command, job_list]))
-            self.finish()
+        jobID = self.get_body_arguments('jobID')[0]
+        stdout, stderr, returncode = await self.run_command("scontrol " + command + " " + jobID)
+        if stderr:
+            responseMessage = stderr
         else:
-            raise NotImplementedError
+            # stdout will be empty on success -- hence the custom success message
+            responseMessage = "Success: scontrol " + command + " " + jobID
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
+
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
 class SbatchHandler(ShellExecutionHandler):
@@ -99,8 +64,6 @@ class SbatchHandler(ShellExecutionHandler):
             file_object.write(string)
             file_object.close()
             return
-        
-        self.request_log_function()
         scriptIs = self.get_query_argument('scriptIs')
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if scriptIs:
@@ -108,25 +71,20 @@ class SbatchHandler(ShellExecutionHandler):
                 script_path = self.get_body_argument('script')
                 stdout, stderr = await self.run_command('sbatch '+script_path)
             elif scriptIs == 'contents':
-                self.log.debug('Body arguments: '+str(self.request.body_arguments))
                 script_contents = self.get_body_argument('script')
-                self.log.debug('script_contents: '+script_contents)
                 string_to_file(script_contents)
-                stdout, stderr = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
-                import os
+                stdout, stderr, returncode = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
                 os.remove('temporary_file.temporary')
             else:
-                self.log.debug('Body arguments: '+str(self.request.body_arguments))
-                self.log.debug('Query arguments: '+str(self.request.query_arguments))
                 raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
-
         else:
-            self.log.debug('Body arguments: '+str(self.request.body_arguments))
-            self.log.debug('Query arguments: '+str(self.request.query_arguments))
             raise MissingArgumentError('scriptIs')
-        
-        jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        self.finish(jobID)
+        if stdout:
+            responseMessage = stdout
+        else:
+            responseMessage = stderr
+    # jobID = re.compile('([0-9]+)$').search(stdout).group(1)
+        self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
@@ -141,25 +99,21 @@ class SqueueHandler(ShellExecutionHandler):
         # squeue -h automatically removes the header row
         # -o <format string> ensures that the output is in a format expected by the extension
         # Hard-coding this is not great -- ideally we would allow the user to customize this, or have the default output be the user's output
-        # Figuring out how to do that would require more time spent learning the details of the DataTables API than is currently available.
-        data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-
-        self.log.debug('stderr: '+str(stderr))
-        lines = data.splitlines()
+        stdout, stderr, _ = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        data = stdout.splitlines()
         data_dict = {}
         data_list = []
-        for line in lines:
+        for row in data:
             # maxsplit=7 so we can still display squeue entries with final columns with spaces like the following:
             # (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] - ask a system administrator to consult the dwmd log for more information
-            if len(line.split(maxsplit=7)) == 8:
+            if len(row.split(maxsplit=7)) == 8:
                 # html.escape because some job ID's might have '<'s and similar characters in them.
                 # Also, hypothetically we could be Bobbytable'd without html.escape here,
                 # e.g. if someone had as a jobname '<script>virus.js</script>'.
-                data_list += [[(html.escape(entry)).strip() for entry in line.split(maxsplit=7)]]
+                data_list += [[(html.escape(entry)).strip() for entry in row.split(maxsplit=7)]]
             else:
-                self.log.debug('The following line from squeue appears to be invalid, and will not be printed in the table:\n'+line)
                 continue
         data_dict['data'] = data_list[:]
-        # finish(chunk) writes chunk (any?) to the output 
+        # finish(chunk) writes chunk to the output 
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))

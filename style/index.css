@@ -16,6 +16,27 @@
   background-image: url("nersc_icon_small.png");
 }
 
+/* The message alerts container */
+.alert-container {
+  margin-top: 20px;
+  margin-left: 20px;
+  width: 50%;
+}
+
+
+/* The alert itself -- this class is originally defined by bootstrap */
+.alert {
+  height: 1.5em;
+  line-height: 1.4;
+  padding: 0px 7.5px 0px 15px;
+  margin-bottom: .25em;
+  font-size: .9em;
+  /* vertical-align: middle; */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 /* basically all of the substance/content of the widget */
 #queue_wrapper {
   margin-left: 3em;
@@ -146,7 +167,6 @@ table.dataTable.display tbody tr.selected > .sorting_3 {
 .dataTables_wrapper .dataTables_paginate .paginate_button.current,
 .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
   background-color: var(--jp-layout-color0);
-  /* what is wrong with these dataTables people?! */
   color: var(--jp-ui-font-color0) !important;
   background-image: none;
 }

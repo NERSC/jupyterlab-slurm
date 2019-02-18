@@ -30,10 +30,15 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
+import 'datatables.net-dt/css/jquery.dataTables.css';
 import 'datatables.net';
+import 'datatables.net-buttons-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
-import 'datatables.net-dt/css/jquery.dataTables.css';
+
+
+import 'bootstrap/dist/css/bootstrap.css';
+import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
 
@@ -43,6 +48,14 @@ import '../style/index.css';
  */
 const SLURM_ICON_CLASS_L = 'jp-NerscLaunchIcon';
 const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
+
+// The number of milliseconds a user must wait in between Refresh requests
+// This limits the number of times squeue is called, in order to avoid
+// overloading the Slurm workload manager
+const USER_SQUEUE_LIMIT = 60000;
+// The interval (milliseconds) in which the queue data automatically reloads
+// by calling squeue
+const AUTO_SQUEUE_LIMIT = 60000;
 
 
 class SlurmWidget extends Widget {
@@ -55,8 +68,6 @@ class SlurmWidget extends Widget {
   /* Construct a new Slurm widget. */
   constructor() {
     super();
-    console.log('constructor called');
-    console.log('testing!');
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
@@ -85,7 +96,7 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
-    // reference to this object for use in the jquery func below
+    // reference to this SlurmWidget object for use in the jquery func below
     var self = this;
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
@@ -130,8 +141,14 @@ class SlurmWidget extends Widget {
         buttons: { buttons: [
           {
             text: 'Reload',
+            name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
+              // Disable the button to avoid overloading Slurm with calls to squeue
+              // Note, this does not persist across a browser window refresh
+              dt.button( 'Reload:name' ).disable();
+              // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
+              setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
@@ -158,20 +175,20 @@ class SlurmWidget extends Widget {
           {
             extend: 'selectNone'
           },
-          {
-            text: 'Submit Slurm Script via File Path',
-            action:  (e, dt, node, config) => {
-              var scriptPath = window.prompt('Enter a Slurm script file path');
-              self._submit_batch_script_path(scriptPath, dt)
-              alert(scriptPath);
-            }
-          },
-          {
-            text: 'Submit Slurm Script via File Contents',
-            action: (e, dt, node, config) => {
-              self._submit_batch_script_contents(dt);
-            }
-          }
+          // Job submission temporarily disabled
+          // {
+          //   text: 'Submit Slurm Script via File Path',
+          //   action:  (e, dt, node, config) => {
+          //     var scriptPath = window.prompt('Enter a Slurm script file path');
+          //     self._submit_batch_script_path(scriptPath, dt)
+          //   }
+          // },
+          // {
+          //   text: 'Submit Slurm Script via File Contents',
+          //   action: (e, dt, node, config) => {
+          //     self._submit_batch_script_contents(dt);
+          //   }
+	  // }
        
         ],
         // https://datatables.net/reference/option/buttons.dom.button
@@ -184,8 +201,14 @@ class SlurmWidget extends Widget {
         }  }
       });
 
+      // Set up and append the alert container -- an area for displaying request response 
+      // messages as color coded, dismissable, alerts
+      let alertContainer = document.createElement('div');
+      alertContainer.setAttribute("id", "alertContainer");
+      alertContainer.classList.add('container', 'alert-container');
+      $('#jupyterlab-slurm').append(alertContainer);
 
-      });
+    });
   }
 
   private _reload_data_table(dt: DataTables.Api) {
@@ -194,11 +217,9 @@ class SlurmWidget extends Widget {
   }
 
 
-  private _submit_request(cmd: string, requestType: string, body: string, addJobAlert: boolean) {
+  private _submit_request(cmd: string, requestType: string, body: string, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    if (addJobAlert === true) {
-      this._add_job_completed_alert(xhttp); 
-    };
+    this._set_job_completed_tasks(xhttp, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -213,53 +234,86 @@ class SlurmWidget extends Widget {
 
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
-    // selected row
+    // selected row. Eventually we may want to change the logic for this functionality
+    // such that only one request is made with a list of Job IDs instead of one request
+    // per selected job. Changes will need to be made on the back end for this to work
+
     let selected_data = dt.rows( { selected: true } ).data().toArray();
+    let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], false);
+       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
     }
-    this._reload_data_table(dt);
-  };
-
-  private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-    this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script), true);
-    this._reload_data_table(dt);
-  };
-
-  private _submit_batch_script_contents(dt: DataTables.Api) {
-    // TODO: clean up
-    if ( $('#slurm_script').length == 0) {
-     // at the end of the main queue table area, append a prompt message and a form submission area
-    $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
-                               'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
-                               '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
-    // after the form submission area, insert a submit button and then a cancel button
-    $('#slurm_script').after('<div id="slurm_buttons">'+
-                              '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
-                              '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
-                              '</div></div>');
-    // message above textarea (form submission area), textarea itself, and the two buttons below
-    var submitScript = $('#submit_script');
-    // do the callback after clicking on the submit button
-    $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
-                                      var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-                                      this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents, true);
-                                      this._reload_data_table(dt);
-                                      // remove the submit script prompt area
-                                      submitScript.remove();
-                                      } );
-    // remove the submit script prompt area after clicking the cancel button
-    $('#cancel_button').unbind().click( () => {submitScript.remove();} );
     
-    }
+    
   };
 
-  private _add_job_completed_alert (xhttp: XMLHttpRequest) { 
-    // TODO: change to _set_job_completed_message(request, message)
+  // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
+  // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
+  //   this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
+  //   this._reload_data_table(dt);
+  // };
+
+  // private _submit_batch_script_contents(dt: DataTables.Api) {
+  //   // TODO: clean up
+  //   if ( $('#slurm_script').length == 0) {
+  //    // at the end of the main queue table area, append a prompt message and a form submission area
+  //   $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
+  //                              'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
+  //                              '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
+  //   // after the form submission area, insert a submit button and then a cancel button
+  //   $('#slurm_script').after('<div id="slurm_buttons">'+
+  //                             '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
+  //                             '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
+  //                             '</div></div>');
+  //   // message above textarea (form submission area), textarea itself, and the two buttons below
+  //   var submitScript = $('#submit_script');
+  //   // do the callback after clicking on the submit button
+  //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
+  //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
+  //                                     this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
+  //                                     this._reload_data_table(dt);
+  //                                     // remove the submit script prompt area
+  //                                     submitScript.remove();
+  //                                     } );
+  //   // remove the submit script prompt area after clicking the cancel button
+  //   $('#cancel_button').unbind().click( () => {submitScript.remove();} );
+    
+  //   }
+  // };
+
+  private _set_job_completed_tasks(xhttp: XMLHttpRequest, jobCount: any) {
     xhttp.onreadystatechange = () => {
-      // alert the user of the job's number after submitting
-      if (xhttp.readyState === xhttp.DONE) {
-        alert("Submitted batch job "+ xhttp.responseText.toString());
+      if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
+        let response = JSON.parse(xhttp.responseText);
+        let alert = document.createElement('div');
+        if (response.returncode == 0) {
+          alert.classList.add('alert', 'alert-success', 'alert-dismissable', 'fade', 'show');
+        }
+        else {
+          alert.classList.add('alert', 'alert-danger', 'alert-dismissable', 'fade', 'show');
+        }
+        let temp = document.createElement('div');
+        let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
+        temp.innerHTML = closeLink;
+        alert.appendChild(temp.firstChild);
+
+        let alertText = document.createTextNode(response.responseMessage);
+        alert.appendChild(alertText);
+        $('#alertContainer').append(alert);
+
+        // If all current jobs have finished executing, 
+        // reload the queue (using squeue)
+        if (jobCount) {
+          // By the nature of javascript's sequential function execution,
+          // this will not cause a data race (not atomic, but still ok) 
+          jobCount.count++;
+          if (jobCount.numJobs == jobCount.count) {
+            this._reload_data_table($('#queue').DataTable());
+          }
+        }
+        else {
+           this._reload_data_table($('#queue').DataTable());
+        }
       }
     };
   };
@@ -304,7 +358,7 @@ function activate(
         widget = new SlurmWidget(); 
         widget.title.icon = SLURM_ICON_CLASS_T;
         // Reload table every 60 seconds
-        setInterval(() => widget.update(), 60000);
+        setInterval(() => widget.update(), AUTO_SQUEUE_LIMIT);
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
