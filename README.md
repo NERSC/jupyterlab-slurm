@@ -10,13 +10,6 @@ A JupyterLab extension to interface with the Slurm Workload Manager.
 * Slurm
 
 
-Note that if you are using JupyterLabHub, currently (v0.1.0) the locations of the:
-- hub server
-- single-user JupyterLab servers
-- Slurm installation
-
-all have to be the same as each other for this extension to work. [We are looking for a fix for this.](https://github.com/jupyterhub/jupyterlab-hub/issues/70) Suggestions are welcome.
-
 ## Installation
 
 ### Create a conda environment with the prerequisites
@@ -65,10 +58,10 @@ npm run build
 jupyter lab build
 ```
 
-During development it is best to leave the server extension uninstalled. Instead, temporarily enable it when starting up JupyterLab for testing. To do this, use the following command to start JupyterLab:
 
-```bash
-jupyter lab --NotebookApp.nbserver_extensions="{'jupyterlab-slurm':True}"
-```
-It's handy to have this command in a .sh file during development.
-
+For a development install of the server extension (jupyterlab-slurm/slurm.py),
+follow the directions in the "Install the Jupyter Notebook server extension"
+section above. To see changes made to the server extension during development,
+the server extension will need to be reinstalled by running `pip install .` from
+within the main repo directory. Note, the server extension will not need to be enabled
+more than once.
