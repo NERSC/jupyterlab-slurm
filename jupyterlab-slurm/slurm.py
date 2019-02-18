@@ -31,15 +31,13 @@ class ShellExecutionHandler(IPythonHandler):
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
-        jobIDs = self.get_body_arguments('jobID')
+        jobID = self.get_body_arguments('jobID')
         stdout, stderr, returncode = await self.run_command(' '.join(['scancel'] + jobIDs))
-        print("SDOUT: ", stdout)
-        print("STDERR: ", stderr)
-        print("returncode: ", returncode)
-        if stdout:
-            responseMessage = stdout
-        else:
+        if stderr:
             responseMessage = stderr
+        else:
+            # stdout will be empty on success -- hence the custom success message
+            responseMessage = "Success: scancel " + jobID  
         self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 
@@ -49,12 +47,11 @@ class ScontrolHandler(ShellExecutionHandler):
     async def patch(self, command):
         job_list = ','.join(self.get_body_arguments('jobID'))
         stdout, stderr, returncode = await self.run_command(' '.join(['scontrol', command, job_list]))
-        print("SDOUT: ", stdout)
-        print("STDERR: ", stderr)
-        if stdout:
-            responseMessage = stdout
-        else:
+        if stderr:
             responseMessage = stderr
+        else:
+            # stdout will be empty on success -- hence the custom success message
+            responseMessage = "Success: " + command + " " + job_list
         self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
@@ -81,8 +78,6 @@ class SbatchHandler(ShellExecutionHandler):
                 raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
         else:
             raise MissingArgumentError('scriptIs')
-        print("SDOUT: ", stdout)
-        print("STDERR: ", stderr)
         if stdout:
             responseMessage = stdout
         else:
