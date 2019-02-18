@@ -51,7 +51,7 @@ class ScontrolHandler(ShellExecutionHandler):
             responseMessage = stderr
         else:
             # stdout will be empty on success -- hence the custom success message
-            responseMessage = "Success: " + command + " " + jobID
+            responseMessage = "Success: scontrol " + command + " " + jobID
         self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 
