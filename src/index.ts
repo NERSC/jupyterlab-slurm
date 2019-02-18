@@ -68,8 +68,6 @@ class SlurmWidget extends Widget {
   /* Construct a new Slurm widget. */
   constructor() {
     super();
-    console.log('constructor called');
-    console.log('testing!');
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
@@ -146,10 +144,8 @@ class SlurmWidget extends Widget {
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
-	      console.log("Reload button clicked");
               // Disable the button to avoid overloading Slurm with calls to squeue
-              // TODO: Make sure this refresh limiting functionality persists across
-              // a browser window refresh
+              // Note, this does not persist across a browser window refresh
               dt.button( 'Reload:name' ).disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
               setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
@@ -238,13 +234,14 @@ class SlurmWidget extends Widget {
 
   private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
-    // selected row
+    // selected row. Eventually we may want to change the logic for this functionality
+    // such that only one request is made with a list of Job IDs instead of one request
+    // per selected job. Changes will need to be made on the back end for this to work
 
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
        this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
-       console.log("Finished job: ", i);
     }
     
     
@@ -310,18 +307,12 @@ class SlurmWidget extends Widget {
           // By the nature of javascript's sequential function execution,
           // this will not cause a data race (not atomic, but still ok) 
           jobCount.count++;
-          console.log("numjobs: ", jobCount.numJobs);
-          console.log("count: ", jobCount.count);
-          console.log("result: ", jobCount.numJobs == jobCount.count);
           if (jobCount.numJobs == jobCount.count) {
-      	    console.log("ENTERED!");
             this._reload_data_table($('#queue').DataTable());
-            console.log("Finished running selected jobs");
           }
         }
         else {
            this._reload_data_table($('#queue').DataTable());
-           console.log("Finished running selected jobs");
         }
       }
     };
