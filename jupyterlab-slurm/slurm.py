@@ -119,9 +119,6 @@ class SqueueHandler(ShellExecutionHandler):
 
 # A simple request handler for retrieving the user name
 class UserFetchHandler(ShellExecutionHandler):
-    async def get(self):
-        stdout, stderr, _ = await self.run_command('echo $USER')
-        if stdout:
-            self.finish(stdout)
-        else:
-            self.finish(stderr)
+    def get(self):
+        username = os.environ.get('USER')
+        self.finish(username)
