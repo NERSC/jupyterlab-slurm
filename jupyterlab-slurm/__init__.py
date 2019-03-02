@@ -29,6 +29,7 @@ def load_jupyter_server_extension(nb_server_app):
         (url_path_join(base_url, '/squeue'), SqueueHandler),
         (url_path_join(base_url, '/scancel'), ScancelHandler),
         (url_path_join(base_url, '/scontrol/(?P<command>.*)'), ScontrolHandler),
-        (url_path_join(base_url, '/sbatch'), SbatchHandler)
+        (url_path_join(base_url, '/sbatch'), SbatchHandler),
+        (url_path_join(base_url, '/user'), UserFetchHandler)
         ])
 

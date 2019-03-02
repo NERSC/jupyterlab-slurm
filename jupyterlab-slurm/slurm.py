@@ -116,3 +116,12 @@ class SqueueHandler(ShellExecutionHandler):
         # finish(chunk) writes chunk to the output 
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))
+
+# A simple request handler for retrieving the user name
+class UserFetchHandler(ShellExecutionHandler):
+    async def get(self):
+        stdout, stderr, _ = await self.run_command('echo $USER')
+        if stdout:
+            self.finish(stdout)
+        else:
+            self.finish(stderr)

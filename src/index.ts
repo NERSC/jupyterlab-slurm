@@ -96,6 +96,14 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
+    // Fetch the user name from the server extension; used to filter table 
+    // entries to display the given user's jobs only
+    var user;
+    $.ajax({url: '/user', success: function(result) {
+      user = result;
+      console.log("user: ", user);
+    }})
+
     // reference to this SlurmWidget object for use in the jquery func below
     var self = this;
     // The base URL that prepends commands -- necessary for hub functionality
