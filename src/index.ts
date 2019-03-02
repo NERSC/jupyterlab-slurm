@@ -52,7 +52,7 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 // The number of milliseconds a user must wait in between Refresh requests
 // This limits the number of times squeue is called, in order to avoid
 // overloading the Slurm workload manager
-const USER_SQUEUE_LIMIT = 60000;
+
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
 const AUTO_SQUEUE_LIMIT = 60000;
@@ -101,10 +101,16 @@ class SlurmWidget extends Widget {
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
 
+    // The ajax request URL for calling squeue; changes depending on whether 
+    // we are in user view (default), or global view, as determined by the
+    // toggleSwitch, defined below.
+    var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly="true"');
+    var globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly="false"');
+
     // Render table using DataTable's API
     $(document).ready(function() {
-      $('#queue').DataTable( {
-        ajax: URLExt.join(baseUrl, '/squeue'),
+      var table = $('#queue').DataTable( {
+        ajax: userViewURL,
         select: {
           style: 'os',
         },
@@ -144,11 +150,12 @@ class SlurmWidget extends Widget {
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
+              // NOTE: currently not using this feature -- may use again in the future.
               // Disable the button to avoid overloading Slurm with calls to squeue
               // Note, this does not persist across a browser window refresh
-              dt.button( 'Reload:name' ).disable();
+              // dt.button( 'Reload:name' ).disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
+              // setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
@@ -210,16 +217,6 @@ class SlurmWidget extends Widget {
       toggleSwitch.setAttribute("type", "checkbox");
       toggleSwitch.setAttribute("id", "toggleSwitch");
       toggleSwitch.setAttribute("checked", "true");
-      // toggleSwitch.setAttribute("onchange", "self._toggle_user_view()");
-
-      $("#toggleSwitch").change(function () {
-        if ((<HTMLInputElement>this).checked) {
-          console.log("Toggle is checked!");
-        }
-        else {
-          console.log("Toggle is now unchecked!");
-        }
-      });
 
       let toggleLabel = document.createElement("label");
       toggleLabel.classList.add("custom-control-label");
@@ -229,6 +226,18 @@ class SlurmWidget extends Widget {
       toggleSwitch.appendChild(toggleLabel);
       toggleContainer.appendChild(toggleSwitch);
       $('#jupyterlab-slurm').append(toggleContainer);
+
+
+      $("#toggleSwitch").change(function () {
+        if ((<HTMLInputElement>this).checked) {
+          console.log("Toggle is checked!");
+          table.ajax.url(userViewURL).load(null, true);
+        }
+        else {
+          console.log("Toggle is now unchecked!");
+          table.ajax.url(globalViewURL).load(null, true);
+        }
+      });
 
 
       // Set up and append the alert container -- an area for displaying request response 

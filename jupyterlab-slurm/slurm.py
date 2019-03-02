@@ -90,16 +90,16 @@ class SbatchHandler(ShellExecutionHandler):
 class SqueueHandler(ShellExecutionHandler):
     async def get(self):
         # what to keep in the mind if we want to add a view user's jobs only button -- it would just add the -u flag to the command
-        # userOnly = self.get_query_argument('userOnly')
-        # if (userOnly == 'true'):
-        #    data, stderr = await self.run_command('squeue -u $USER -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-        # elif (userOnly == 'false'):
-        #    data, stderr = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        userOnly = self.get_query_argument('userOnly')
+        if (userOnly == 'true'):
+           stdout, stderr, _ = await self.run_command('squeue -u $USER -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        elif (userOnly == 'false'):
+           stdout, stderr, _ = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
         
         # squeue -h automatically removes the header row
         # -o <format string> ensures that the output is in a format expected by the extension
         # Hard-coding this is not great -- ideally we would allow the user to customize this, or have the default output be the user's output
-        stdout, stderr, _ = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        # stdout, stderr, _ = await self.run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
         data = stdout.splitlines()
         data_dict = {}
         data_list = []
