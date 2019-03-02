@@ -223,8 +223,8 @@ class SlurmWidget extends Widget {
       toggleLabel.setAttribute("for", "toggleSwitch");
       toggleLabel.textContent = "Show my jobs only";
 
-      toggleSwitch.appendChild(toggleLabel);
       toggleContainer.appendChild(toggleSwitch);
+      toggleContainer.appendChild(toggleLabel);
       $('#jupyterlab-slurm').append(toggleContainer);
 
 
