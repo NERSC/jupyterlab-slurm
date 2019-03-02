@@ -1,9 +1,10 @@
 """JupyterLab Slurm : view and manage Slurm queue from JupyterLab """
 
-from .slurm import ScancelHandler
+from slurm import ScancelHandler
 from .slurm import ScontrolHandler
 from .slurm import SbatchHandler
 from .slurm import SqueueHandler
+from .slurm import UserFetchHandler
 
 from notebook.utils import url_path_join
 
