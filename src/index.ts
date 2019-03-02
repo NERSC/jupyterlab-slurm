@@ -118,7 +118,7 @@ class SlurmWidget extends Widget {
     // Render table using DataTable's API
     $(document).ready(function() {
       var table = $('#queue').DataTable( {
-        ajax: userViewURL,
+        ajax: globalViewURL,
         select: {
           style: 'os',
         },
@@ -239,13 +239,19 @@ class SlurmWidget extends Widget {
       $("#toggleSwitch").change(function () {
         if ((<HTMLInputElement>this).checked) {
           console.log("Toggle is checked!");
-          table.ajax.url(userViewURL).load(null, true);
+          table.search(user).draw();
+          table.ajax.url(userViewURL);
         }
         else {
           console.log("Toggle is now unchecked!");
-          table.ajax.url(globalViewURL).load(null, true);
+          table.search('*').draw();
+          table.ajax.url(globalViewURL);
         }
       });
+
+      // Initial call to change to enable the default user view, after the entire 
+      // queue has been loaded in the DataTables initializer
+      $("#toggleSwitch").change();
 
 
       // Set up and append the alert container -- an area for displaying request response 
