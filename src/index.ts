@@ -209,7 +209,10 @@ class SlurmWidget extends Widget {
       $('#jupyterlab-slurm').append(alertContainer);
 
       // Add a switch that toggles between global and user queue (user by default)
-      $('#toolbar').html("<div class=\"custom-control custom-switch\"><input type=\"checkbox\" class=\"custom-control-input\" id=\"customSwitch1\" checked><label class=\"custom-control-label\" for=\"customSwitch1\">Toggle this switch element</label></div>");
+      let toggleSwitch = document.createElement('div');
+      let togHTML = "<div class=\"custom-control custom-switch\"><input type=\"checkbox\" class=\"custom-control-input\" id=\"customSwitch1\" checked><label class=\"custom-control-label\" for=\"customSwitch1\">Toggle this switch element</label></div>";
+      toggleSwitch.innerHTML = togHTML;
+      $('#toolbar').append(toggleSwitch);
     });
   }
 
