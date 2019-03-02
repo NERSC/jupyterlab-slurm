@@ -104,8 +104,8 @@ class SlurmWidget extends Widget {
     // The ajax request URL for calling squeue; changes depending on whether 
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
-    var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly="true"');
-    var globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly="false"');
+    var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
+    var globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
 
     // Render table using DataTable's API
     $(document).ready(function() {
