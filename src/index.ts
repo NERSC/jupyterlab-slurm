@@ -201,6 +201,36 @@ class SlurmWidget extends Widget {
         }  }
       });
 
+      // Add a switch that toggles between global and user queue (user by default)
+      let toggleContainer = document.createElement("div");
+      toggleContainer.classList.add("custom-control", "custom-switch");
+
+      let toggleSwitch = document.createElement("input");
+      toggleSwitch.classList.add("custom-control-input");
+      toggleSwitch.setAttribute("type", "checkbox");
+      toggleSwitch.setAttribute("id", "toggleSwitch");
+      toggleSwitch.setAttribute("checked", "true");
+      // toggleSwitch.setAttribute("onchange", "self._toggle_user_view()");
+
+      $("#toggleSwitch").change(function () {
+        if ((<HTMLInputElement>this).checked) {
+          console.log("Toggle is checked!");
+        }
+        else {
+          console.log("Toggle is now unchecked!");
+        }
+      });
+
+      let toggleLabel = document.createElement("label");
+      toggleLabel.classList.add("custom-control-label");
+      toggleLabel.setAttribute("for", "toggleSwitch");
+      toggleLabel.textContent = "Show my jobs only";
+
+      toggleSwitch.appendChild(toggleLabel);
+      toggleContainer.appendChild(toggleSwitch);
+      $('#jupyterlab-slurm').append(toggleContainer);
+
+
       // Set up and append the alert container -- an area for displaying request response 
       // messages as color coded, dismissable, alerts
       let alertContainer = document.createElement('div');
@@ -208,13 +238,13 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
-      // Add a switch that toggles between global and user queue (user by default)
-      let toggleSwitch = document.createElement('div');
-      let togHTML = "<div class=\"custom-control custom-switch\"><input type=\"checkbox\" class=\"custom-control-input\" id=\"customSwitch1\" checked><label class=\"custom-control-label\" for=\"customSwitch1\">Toggle this switch element</label></div>";
-      toggleSwitch.innerHTML = togHTML;
-      $('#toolbar').append(toggleSwitch);
+
     });
   }
+
+  // private _toggle_user_view() {
+  //   console.log("Toggler has been toggled!");
+  // }
 
   private _reload_data_table(dt: DataTables.Api) {
     // reload the data table
