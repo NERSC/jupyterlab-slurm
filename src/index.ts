@@ -236,20 +236,17 @@ class SlurmWidget extends Widget {
       var user;
       $.ajax({
         url: '/user', 
-        async: false,
         success: function(result) {
           user = result;
           console.log("user: ", user);
-          var dataCache;// = table.data().toArray(); 
+          var dataCache;
 
           $("#toggleSwitch").change(function () {
             if ((<HTMLInputElement>this).checked) {
               console.log("Toggle is checked!");
               table.ajax.url(userViewURL);
-              dataCache = table.data();
-              let filteredData = table
-                  .rows()
-                  .data()
+              dataCache = table.rows().data();
+              let filteredData = dataCache
                   .filter(function(value, index) {
                     return value[self.USER_IDX] == user;
                   });
@@ -264,13 +261,12 @@ class SlurmWidget extends Widget {
               // table.clear();
               // table.rows.add(dataCache.toArray());
               let filteredData = dataCache
-                  .rows()
-                  .data()
                   .filter(function(value, index) {
                     return value[self.USER_IDX] != user;
                   })
               table.clear();
               table.rows.add(filteredData.toArray());
+              console.log("userdata: ", userData.toArray());
               table.rows.add(userData.toArray());
 
 
@@ -282,12 +278,13 @@ class SlurmWidget extends Widget {
               
             }
           });
+          // Initial call to change to enable the default user view, after the entire 
+          // queue has been loaded in the DataTables initializer
+          $("#toggleSwitch").change();
         }
       });          
 
-      // Initial call to change to enable the default user view, after the entire 
-      // queue has been loaded in the DataTables initializer
-      $("#toggleSwitch").change();
+
 
 
       // Set up and append the alert container -- an area for displaying request response 
