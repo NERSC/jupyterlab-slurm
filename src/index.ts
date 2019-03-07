@@ -64,6 +64,9 @@ class SlurmWidget extends Widget {
   private queue_table: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
+  // The column index of the username
+  readonly USER_IDX = 3;
+
 
   /* Construct a new Slurm widget. */
   constructor() {
@@ -96,15 +99,8 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
-    // Fetch the user name from the server extension; used to filter table 
-    // entries to display the given user's jobs only
-    var user;
-    $.ajax({url: '/user', success: function(result) {
-      user = result;
-      console.log("user: ", user);
-    }})
-
-    // reference to this SlurmWidget object for use in the jquery func below
+    // reference to this SlurmWidget object for use in functions where THIS
+    // is overridden by a parent object
     var self = this;
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
@@ -170,21 +166,21 @@ class SlurmWidget extends Widget {
             extend: 'selected',
             text: 'Kill Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scancel', 'DELETE', dt);
+              self.runOnSelected('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
             text: 'Hold Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scontrol/hold', 'PATCH', dt);
+              self.runOnSelected('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
             text: 'Release Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scontrol/release', 'PATCH', dt);
+              self.runOnSelected('/scontrol/release', 'PATCH', dt);
             }  
           },
           {
@@ -235,14 +231,53 @@ class SlurmWidget extends Widget {
       toggleContainer.appendChild(toggleLabel);
       $('#jupyterlab-slurm').append(toggleContainer);
 
+      // Fetch the user name from the server extension; used to filter table 
+      // entries to display the given user's jobs only
+      var user;
+      $.ajax({
+        url: '/user', 
+        async: false,
+        success: function(result) {
+          user = result;
+          console.log("user: ", user);
+        }
+      });
+
+      var dataCache;// = table.data().toArray(); 
 
       $("#toggleSwitch").change(function () {
         if ((<HTMLInputElement>this).checked) {
           console.log("Toggle is checked!");
-          table.search(user).draw();
+          dataCache = table.data();
+          let filteredData = table
+              .column(self.USER_IDX)
+              .data()
+              .filter(function(value, index) {
+                return value == user;
+              });
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          table.draw();
           table.ajax.url(userViewURL);
         }
         else {
+          let userData = table.data();
+          // table.clear();
+          // table.rows.add(dataCache.toArray());
+          let filteredData = dataCache
+              .column(self.USER_IDX)
+              .data()
+              .filter(function(value, index) {
+                return value != user;
+              })
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          table.rows.add(userData.toArray());
+
+
+          dataCache = table.data();
+
+
           console.log("Toggle is now unchecked!");
           table.search('*').draw();
           table.ajax.url(globalViewURL);
@@ -269,15 +304,15 @@ class SlurmWidget extends Widget {
   //   console.log("Toggler has been toggled!");
   // }
 
-  private _reload_data_table(dt: DataTables.Api) {
+  private reloadDataTable(dt: DataTables.Api) {
     // reload the data table
     dt.ajax.reload(null, false);
   }
 
 
-  private _submit_request(cmd: string, requestType: string, body: string, jobCount: any = null) {
+  private submitRequest(cmd: string, requestType: string, body: string, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    this._set_job_completed_tasks(xhttp, jobCount);
+    this.setJobCompletedTasks(xhttp, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -290,7 +325,7 @@ class SlurmWidget extends Widget {
     xhttp.send(body);
   }
 
-  private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
+  private runOnSelected(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
     // selected row. Eventually we may want to change the logic for this functionality
     // such that only one request is made with a list of Job IDs instead of one request
@@ -299,7 +334,7 @@ class SlurmWidget extends Widget {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
+       this.submitRequest(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
     }
     
     
@@ -307,8 +342,8 @@ class SlurmWidget extends Widget {
 
   // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
   // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-  //   this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
-  //   this._reload_data_table(dt);
+  //   this.submitRequest('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
+  //   this.reloadDataTable(dt);
   // };
 
   // private _submit_batch_script_contents(dt: DataTables.Api) {
@@ -328,8 +363,8 @@ class SlurmWidget extends Widget {
   //   // do the callback after clicking on the submit button
   //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
   //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-  //                                     this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
-  //                                     this._reload_data_table(dt);
+  //                                     this.submitRequest('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
+  //                                     this.reloadDataTable(dt);
   //                                     // remove the submit script prompt area
   //                                     submitScript.remove();
   //                                     } );
@@ -339,7 +374,7 @@ class SlurmWidget extends Widget {
   //   }
   // };
 
-  private _set_job_completed_tasks(xhttp: XMLHttpRequest, jobCount: any) {
+  private setJobCompletedTasks(xhttp: XMLHttpRequest, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
         let response = JSON.parse(xhttp.responseText);
@@ -366,11 +401,11 @@ class SlurmWidget extends Widget {
           // this will not cause a data race (not atomic, but still ok) 
           jobCount.count++;
           if (jobCount.numJobs == jobCount.count) {
-            this._reload_data_table($('#queue').DataTable());
+            this.reloadDataTable($('#queue').DataTable());
           }
         }
         else {
-           this._reload_data_table($('#queue').DataTable());
+           this.reloadDataTable($('#queue').DataTable());
         }
       }
     };
@@ -387,7 +422,7 @@ class SlurmWidget extends Widget {
   * require some overhead due to sorting, etc.
   */
   public onUpdateRequest(msg: Message) {
-    this._reload_data_table($('#queue').DataTable());
+    this.reloadDataTable($('#queue').DataTable());
   };
 
 } // class SlurmWidget
