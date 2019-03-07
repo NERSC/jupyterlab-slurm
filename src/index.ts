@@ -240,50 +240,49 @@ class SlurmWidget extends Widget {
         success: function(result) {
           user = result;
           console.log("user: ", user);
+          var dataCache;// = table.data().toArray(); 
+
+          $("#toggleSwitch").change(function () {
+            if ((<HTMLInputElement>this).checked) {
+              console.log("Toggle is checked!");
+              table.ajax.url(userViewURL);
+              dataCache = table.data();
+              let filteredData = table
+                  .rows()
+                  .data()
+                  .filter(function(value, index) {
+                    return value[self.USER_IDX] == user;
+                  });
+              table.clear();
+              table.rows.add(filteredData.toArray());
+              table.draw();
+              
+            }
+            else {
+              let userData = table.data();
+              // table.clear();
+              // table.rows.add(dataCache.toArray());
+              let filteredData = dataCache
+                  .rows()
+                  .data()
+                  .filter(function(value, index) {
+                    return value[self.USER_IDX] != user;
+                  })
+              table.clear();
+              table.rows.add(filteredData.toArray());
+              table.rows.add(userData.toArray());
+
+
+              dataCache = table.data();
+
+
+              console.log("Toggle is now unchecked!");
+              table.search('*').draw();
+              table.ajax.url(globalViewURL);
+            }
+          });
         }
-      });
-
-      var dataCache;// = table.data().toArray(); 
-
-      $("#toggleSwitch").change(function () {
-        if ((<HTMLInputElement>this).checked) {
-          console.log("Toggle is checked!");
-          table.ajax.url(userViewURL);
-          dataCache = table.data();
-          let filteredData = table
-              .rows()
-              .data()
-              .filter(function(value, index) {
-                return value[self.USER_IDX] == user;
-              });
-          table.clear();
-          table.rows.add(filteredData.toArray());
-          table.draw();
-          
-        }
-        else {
-          let userData = table.data();
-          // table.clear();
-          // table.rows.add(dataCache.toArray());
-          let filteredData = dataCache
-              .rows()
-              .data()
-              .filter(function(value, index) {
-                return value[self.USER_IDX] != user;
-              })
-          table.clear();
-          table.rows.add(filteredData.toArray());
-          table.rows.add(userData.toArray());
-
-
-          dataCache = table.data();
-
-
-          console.log("Toggle is now unchecked!");
-          table.search('*').draw();
-          table.ajax.url(globalViewURL);
-        }
-      });
+      });          
 
       // Initial call to change to enable the default user view, after the entire 
       // queue has been loaded in the DataTables initializer
