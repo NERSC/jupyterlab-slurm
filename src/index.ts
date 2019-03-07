@@ -248,27 +248,28 @@ class SlurmWidget extends Widget {
       $("#toggleSwitch").change(function () {
         if ((<HTMLInputElement>this).checked) {
           console.log("Toggle is checked!");
+          table.ajax.url(userViewURL);
           dataCache = table.data();
           let filteredData = table
-              .column(self.USER_IDX)
+              .rows()
               .data()
               .filter(function(value, index) {
-                return value == user;
+                return value[self.USER_IDX] == user;
               });
           table.clear();
           table.rows.add(filteredData.toArray());
           table.draw();
-          table.ajax.url(userViewURL);
+          
         }
         else {
           let userData = table.data();
           // table.clear();
           // table.rows.add(dataCache.toArray());
           let filteredData = dataCache
-              .column(self.USER_IDX)
+              .rows()
               .data()
               .filter(function(value, index) {
-                return value != user;
+                return value[self.USER_IDX] != user;
               })
           table.clear();
           table.rows.add(filteredData.toArray());
