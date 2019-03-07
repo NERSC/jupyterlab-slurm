@@ -259,6 +259,7 @@ class SlurmWidget extends Widget {
               
             }
             else {
+              table.ajax.url(globalViewURL);
               let userData = table.data();
               // table.clear();
               // table.rows.add(dataCache.toArray());
@@ -277,8 +278,8 @@ class SlurmWidget extends Widget {
 
 
               console.log("Toggle is now unchecked!");
-              table.search('*').draw();
-              table.ajax.url(globalViewURL);
+
+              
             }
           });
         }
