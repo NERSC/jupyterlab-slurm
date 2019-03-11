@@ -67,8 +67,13 @@ class SlurmWidget extends Widget {
   // The column index of the username
   readonly USER_IDX = 3;
 
-  // private dataCache;
+  private dataCache: DataTables.Api;
 
+  private user: string;
+
+  private userViewURL: string;
+
+  private globalViewURL: string;
 
   /* Construct a new Slurm widget. */
   constructor() {
@@ -110,13 +115,25 @@ class SlurmWidget extends Widget {
     // The ajax request URL for calling squeue; changes depending on whether 
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
-    // var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
-    var globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
+    this.userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
+    this.globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
+
+
+    let userRequest = $.ajax({
+      url: '/user', 
+      success: function(result) {
+        this.user = result;
+        console.log("user: ", this.user);
+      }
+    });
 
     // Render table using DataTable's API
     $(document).ready(function() {
-      var table = $('#queue').DataTable( {
-        ajax: globalViewURL,
+      $('#queue').DataTable( {
+        ajax: self.globalViewURL,
+        initComplete: function(settings, json) {
+          self.initComplete(userRequest);
+        },
         select: {
           style: 'os',
         },
@@ -235,12 +252,12 @@ class SlurmWidget extends Widget {
 
       // Fetch the user name from the server extension; used to filter table 
       // entries to display the given user's jobs only
-      var user;
-      let userRequest = $.ajax({
-        url: '/user', 
-        success: function(result) {
-          user = result;
-          console.log("user: ", user);
+      // var user;
+      // let userRequest = $.ajax({
+      //   url: '/user', 
+      //   success: function(result) {
+      //     user = result;
+      //     console.log("user: ", user);
           // var dataCache;
 
           // $("#toggleSwitch").change(function () {
@@ -278,12 +295,12 @@ class SlurmWidget extends Widget {
           // Initial call to change to enable the default user view, after the entire 
           // queue has been loaded in the DataTables initializer
           // $("#toggleSwitch").change();
-        }
-      });  
+      //   }
+      // });  
 
-      $.when(table, userRequest).done(function () {
-        console.log("table and user requests finished");
-      });        
+      // $.when(table, userRequest).done(function () {
+      //   console.log("table and user requests finished");
+      // });        
 
 
 
@@ -297,6 +314,43 @@ class SlurmWidget extends Widget {
 
 
     });
+  }
+
+  private initComplete(userRequest: any) {
+    var self = this;
+    var table = $('#queue').DataTable();
+    $.when(userRequest).done(function () {
+      $("#toggleSwitch").change(function () {
+        if ((<HTMLInputElement>this).checked) {
+          console.log("Toggle is checked!");
+          table.ajax.url(self.userViewURL);
+          self.dataCache = table.rows().data();
+          let filteredData = self.dataCache
+              .filter(function(value, index) {
+                return value[self.USER_IDX] == self.user;
+              });
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          table.draw();
+        }
+        else {
+          table.ajax.url(self.globalViewURL);
+          let userData = table.data(); //table.rows.data()?
+          // table.clear();
+          // table.rows.add(dataCache.toArray());
+          let filteredData = self.dataCache
+              .filter(function(value, index) {
+                return value[self.USER_IDX] != self.user;
+              })
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          console.log("userdata: ", userData.toArray());
+          table.rows.add(userData.toArray());
+          console.log("Toggle is now unchecked!");
+        }
+      });
+    });
+    $("#toggleSwitch").change();
   }
 
   // private _toggle_user_view() {
