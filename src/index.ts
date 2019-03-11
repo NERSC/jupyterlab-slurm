@@ -233,7 +233,7 @@ class SlurmWidget extends Widget {
 
       // Add a switch that toggles between global and user view (user by default)
       let toggleContainer = document.createElement("div");
-      toggleContainer.classList.add("custom-control", "custom-switch");
+      toggleContainer.classList.add("custom-control", "custom-switch", "toggle-switch");
 
       let toggleSwitch = document.createElement("input");
       toggleSwitch.classList.add("custom-control-input");

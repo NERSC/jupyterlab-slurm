@@ -19,7 +19,7 @@
 /* The message alerts container */
 .alert-container {
   margin-top: 20px;
-  margin-left: 20px;
+  margin-left: 2em;
   width: 50%;
 }
 
@@ -35,6 +35,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.toggle-switch {
+  margin-left: 3em;
+  font-size: .9em;
+  margin-top: 10px;
+
 }
 
 /* basically all of the substance/content of the widget */
