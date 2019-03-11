@@ -122,8 +122,8 @@ class SlurmWidget extends Widget {
     let userRequest = $.ajax({
       url: '/user', 
       success: function(result) {
-        this.user = result;
-        console.log("user: ", this.user);
+        self.user = result;
+        console.log("user: ", self.user);
       }
     });
 
@@ -320,11 +320,14 @@ class SlurmWidget extends Widget {
     var self = this;
     var table = $('#queue').DataTable();
     $.when(userRequest).done(function () {
+      console.log("user now: ", self.user);
       $("#toggleSwitch").change(function () {
+      
         if ((<HTMLInputElement>this).checked) {
           console.log("Toggle is checked!");
           table.ajax.url(self.userViewURL);
           self.dataCache = table.rows().data();
+	  console.log("cache: ", self.dataCache);
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] == self.user;
@@ -343,14 +346,17 @@ class SlurmWidget extends Widget {
                 return value[self.USER_IDX] != self.user;
               })
           table.clear();
+	  console.log("cache 2: ", self.dataCache);
+	  console.log("filtered: ", filteredData);
           table.rows.add(filteredData.toArray());
           console.log("userdata: ", userData.toArray());
           table.rows.add(userData.toArray());
           console.log("Toggle is now unchecked!");
+	  table.draw();
         }
       });
+      $("#toggleSwitch").change();
     });
-    $("#toggleSwitch").change();
   }
 
   // private _toggle_user_view() {
