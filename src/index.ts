@@ -67,7 +67,7 @@ class SlurmWidget extends Widget {
   // The column index of the username
   readonly USER_IDX = 3;
 
-  private dataCache;
+  // private dataCache;
 
 
   /* Construct a new Slurm widget. */
@@ -110,7 +110,7 @@ class SlurmWidget extends Widget {
     // The ajax request URL for calling squeue; changes depending on whether 
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
-    var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
+    // var userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
     var globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
 
     // Render table using DataTable's API
@@ -236,55 +236,54 @@ class SlurmWidget extends Widget {
       // Fetch the user name from the server extension; used to filter table 
       // entries to display the given user's jobs only
       var user;
-      $.ajax({
+      let userRequest = $.ajax({
         url: '/user', 
         success: function(result) {
           user = result;
           console.log("user: ", user);
-          var dataCache;
+          // var dataCache;
 
-          $("#toggleSwitch").change(function () {
-            if ((<HTMLInputElement>this).checked) {
-              console.log("Toggle is checked!");
-              table.ajax.url(userViewURL);
-              dataCache = table.rows().data();
-              let filteredData = dataCache
-                  .filter(function(value, index) {
-                    return value[self.USER_IDX] == user;
-                  });
-              table.clear();
-              table.rows.add(filteredData.toArray());
-              table.draw();
+          // $("#toggleSwitch").change(function () {
+          //   if ((<HTMLInputElement>this).checked) {
+          //     console.log("Toggle is checked!");
+          //     table.ajax.url(userViewURL);
+          //     dataCache = table.rows().data();
+          //     let filteredData = dataCache
+          //         .filter(function(value, index) {
+          //           return value[self.USER_IDX] == user;
+          //         });
+          //     table.clear();
+          //     table.rows.add(filteredData.toArray());
+          //     table.draw();
               
-            }
-            else {
-              table.ajax.url(globalViewURL);
-              let userData = table.data();
-              // table.clear();
-              // table.rows.add(dataCache.toArray());
-              let filteredData = dataCache
-                  .filter(function(value, index) {
-                    return value[self.USER_IDX] != user;
-                  })
-              table.clear();
-              table.rows.add(filteredData.toArray());
-              console.log("userdata: ", userData.toArray());
-              table.rows.add(userData.toArray());
-
-
-              dataCache = table.data();
-
-
-              console.log("Toggle is now unchecked!");
+          //   }
+          //   else {
+          //     table.ajax.url(globalViewURL);
+          //     let userData = table.data();
+          //     // table.clear();
+          //     // table.rows.add(dataCache.toArray());
+          //     let filteredData = dataCache
+          //         .filter(function(value, index) {
+          //           return value[self.USER_IDX] != user;
+          //         })
+          //     table.clear();
+          //     table.rows.add(filteredData.toArray());
+          //     console.log("userdata: ", userData.toArray());
+          //     table.rows.add(userData.toArray());
+          //     console.log("Toggle is now unchecked!");
 
               
-            }
-          });
+          //   }
+          // });
           // Initial call to change to enable the default user view, after the entire 
           // queue has been loaded in the DataTables initializer
-          $("#toggleSwitch").change();
+          // $("#toggleSwitch").change();
         }
-      });          
+      });  
+
+      $.when(table, userRequest).done(function () {
+        console.log("table and user requests finished");
+      });        
 
 
 
