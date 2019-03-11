@@ -67,6 +67,8 @@ class SlurmWidget extends Widget {
   // The column index of the username
   readonly USER_IDX = 3;
 
+  private dataCache;
+
 
   /* Construct a new Slurm widget. */
   constructor() {
