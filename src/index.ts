@@ -59,23 +59,21 @@ const AUTO_SQUEUE_LIMIT = 60000;
 
 
 class SlurmWidget extends Widget {
-  /**
-  * The table element containing Slurm queue data. */ 
+  // The table element containing Slurm queue data. 
   private queue_table: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
   // The column index of the username
   readonly USER_IDX = 3;
-
+  // A cache for storing global queue data
   private dataCache: DataTables.Api;
-
+  // The system username, fetched from the server
   private user: string;
-
+  // URL for calling squeue -u, used for user view
   private userViewURL: string;
-
+  // URL for calling squeue, used for global view
   private globalViewURL: string;
 
-  /* Construct a new Slurm widget. */
   constructor() {
     super();
     this.id = 'jupyterlab-slurm';
@@ -109,6 +107,7 @@ class SlurmWidget extends Widget {
     // reference to this SlurmWidget object for use in functions where THIS
     // is overridden by a parent object
     var self = this;
+
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
 
@@ -118,7 +117,9 @@ class SlurmWidget extends Widget {
     this.userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
     this.globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
 
-
+    // Fetch the user name from the server extension; this will be 
+    // used in the initComplete method once this request completes,
+    // and after the table is fully initialized. 
     let userRequest = $.ajax({
       url: '/user', 
       success: function(result) {
@@ -127,7 +128,7 @@ class SlurmWidget extends Widget {
       }
     });
 
-    // Render table using DataTable's API
+    // Render table using the DataTables API
     $(document).ready(function() {
       $('#queue').DataTable( {
         ajax: self.globalViewURL,
@@ -139,18 +140,15 @@ class SlurmWidget extends Widget {
         },
         deferRender: true,        
         pageLength: 15,
-        language: {
-          search: 'User',
-        },
         columns: [
-        { name: 'JOBID', searchable: false },
-        { name: 'PARTITION', searchable: false },
-        { name: 'NAME', searchable: false },
+        { name: 'JOBID', searchable: true },
+        { name: 'PARTITION', searchable: true },
+        { name: 'NAME', searchable: true },
         { name: 'USER', searchable: true },
-        { name: 'ST', searchable: false },
-        { name: 'TIME', searchable: false },
-        { name: 'NODES', searchable: false },
-        { name: 'NODELIST(REASON)', searchable: false },        
+        { name: 'ST', searchable: true },
+        { name: 'TIME', searchable: true },
+        { name: 'NODES', searchable: true },
+        { name: 'NODELIST(REASON)', searchable: true },        
         ],
         columnDefs: [
           {
@@ -159,7 +157,7 @@ class SlurmWidget extends Widget {
           }
         ],
         // Set rowId to maintain selection after table reload 
-        // (use primary key for rowId). 
+        // (use the queue's primary key (JOBID) for rowId). 
         rowId: self.JOBID_IDX.toString(),
         autoWidth: true,
         scrollY: '400px',
@@ -167,7 +165,8 @@ class SlurmWidget extends Widget {
         scrollCollapse: true,
         // Element layout parameter
         dom: '<"toolbar"Bfr><t><lip>',
-        buttons: { buttons: [
+        buttons: { 
+          buttons: [
           {
             text: 'Reload',
             name: 'Reload',
@@ -220,18 +219,19 @@ class SlurmWidget extends Widget {
           //   }
 	  // }
        
-        ],
-        // https://datatables.net/reference/option/buttons.dom.button
-        // make it easier to identify/grab buttons to change their appearance
-        dom: {
-          button: {
-            tag: 'button',
-            className: 'button',
-          }
-        }  }
+          ],
+          // https://datatables.net/reference/option/buttons.dom.button
+          // make it easier to identify/grab buttons to change their appearance
+          dom: {
+            button: {
+              tag: 'button',
+              className: 'button',
+            }
+          }  
+        }
       });
 
-      // Add a switch that toggles between global and user queue (user by default)
+      // Add a switch that toggles between global and user view (user by default)
       let toggleContainer = document.createElement("div");
       toggleContainer.classList.add("custom-control", "custom-switch");
 
@@ -249,85 +249,31 @@ class SlurmWidget extends Widget {
       toggleContainer.appendChild(toggleSwitch);
       toggleContainer.appendChild(toggleLabel);
       $('#jupyterlab-slurm').append(toggleContainer);
-
-      // Fetch the user name from the server extension; used to filter table 
-      // entries to display the given user's jobs only
-      // var user;
-      // let userRequest = $.ajax({
-      //   url: '/user', 
-      //   success: function(result) {
-      //     user = result;
-      //     console.log("user: ", user);
-          // var dataCache;
-
-          // $("#toggleSwitch").change(function () {
-          //   if ((<HTMLInputElement>this).checked) {
-          //     console.log("Toggle is checked!");
-          //     table.ajax.url(userViewURL);
-          //     dataCache = table.rows().data();
-          //     let filteredData = dataCache
-          //         .filter(function(value, index) {
-          //           return value[self.USER_IDX] == user;
-          //         });
-          //     table.clear();
-          //     table.rows.add(filteredData.toArray());
-          //     table.draw();
-              
-          //   }
-          //   else {
-          //     table.ajax.url(globalViewURL);
-          //     let userData = table.data();
-          //     // table.clear();
-          //     // table.rows.add(dataCache.toArray());
-          //     let filteredData = dataCache
-          //         .filter(function(value, index) {
-          //           return value[self.USER_IDX] != user;
-          //         })
-          //     table.clear();
-          //     table.rows.add(filteredData.toArray());
-          //     console.log("userdata: ", userData.toArray());
-          //     table.rows.add(userData.toArray());
-          //     console.log("Toggle is now unchecked!");
-
-              
-          //   }
-          // });
-          // Initial call to change to enable the default user view, after the entire 
-          // queue has been loaded in the DataTables initializer
-          // $("#toggleSwitch").change();
-      //   }
-      // });  
-
-      // $.when(table, userRequest).done(function () {
-      //   console.log("table and user requests finished");
-      // });        
-
-
-
-
+     
       // Set up and append the alert container -- an area for displaying request response 
       // messages as color coded, dismissable, alerts
       let alertContainer = document.createElement('div');
       alertContainer.setAttribute("id", "alertContainer");
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
-
-
     });
   }
 
+  /**
+  * This method is triggered when the table is fully initialized.
+  * Waits for username request to finish, and then defines functionality
+  * for switching between user and global view. The switch function is 
+  * called immediately after it is defined, which makes it so user view
+  * is the default. 
+  */
   private initComplete(userRequest: any) {
     var self = this;
     var table = $('#queue').DataTable();
     $.when(userRequest).done(function () {
-      console.log("user now: ", self.user);
       $("#toggleSwitch").change(function () {
-      
         if ((<HTMLInputElement>this).checked) {
-          console.log("Toggle is checked!");
           table.ajax.url(self.userViewURL);
           self.dataCache = table.rows().data();
-	  console.log("cache: ", self.dataCache);
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] == self.user;
@@ -338,30 +284,21 @@ class SlurmWidget extends Widget {
         }
         else {
           table.ajax.url(self.globalViewURL);
-          let userData = table.data(); //table.rows.data()?
-          // table.clear();
-          // table.rows.add(dataCache.toArray());
+          let userData = table.data(); 
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] != self.user;
               })
           table.clear();
-	  console.log("cache 2: ", self.dataCache);
-	  console.log("filtered: ", filteredData);
           table.rows.add(filteredData.toArray());
-          console.log("userdata: ", userData.toArray());
           table.rows.add(userData.toArray());
-          console.log("Toggle is now unchecked!");
-	  table.draw();
+      	  table.draw();
         }
       });
       $("#toggleSwitch").change();
     });
   }
 
-  // private _toggle_user_view() {
-  //   console.log("Toggler has been toggled!");
-  // }
 
   private reloadDataTable(dt: DataTables.Api) {
     // reload the data table
