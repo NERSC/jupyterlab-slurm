@@ -52,20 +52,28 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 // The number of milliseconds a user must wait in between Refresh requests
 // This limits the number of times squeue is called, in order to avoid
 // overloading the Slurm workload manager
-const USER_SQUEUE_LIMIT = 60000;
+
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
 const AUTO_SQUEUE_LIMIT = 60000;
 
 
 class SlurmWidget extends Widget {
-  /**
-  * The table element containing Slurm queue data. */ 
+  // The table element containing Slurm queue data. 
   private queue_table: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
+  // The column index of the username
+  readonly USER_IDX = 3;
+  // A cache for storing global queue data
+  private dataCache: DataTables.Api;
+  // The system username, fetched from the server
+  private user: string;
+  // URL for calling squeue -u, used for user view
+  private userViewURL: string;
+  // URL for calling squeue, used for global view
+  private globalViewURL: string;
 
-  /* Construct a new Slurm widget. */
   constructor() {
     super();
     this.id = 'jupyterlab-slurm';
@@ -96,32 +104,51 @@ class SlurmWidget extends Widget {
       head_row.appendChild(h);
     }
 
-    // reference to this SlurmWidget object for use in the jquery func below
+    // reference to this SlurmWidget object for use in functions where THIS
+    // is overridden by a parent object
     var self = this;
+
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
 
-    // Render table using DataTable's API
+    // The ajax request URL for calling squeue; changes depending on whether 
+    // we are in user view (default), or global view, as determined by the
+    // toggleSwitch, defined below.
+    this.userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
+    this.globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
+
+    // Fetch the user name from the server extension; this will be 
+    // used in the initComplete method once this request completes,
+    // and after the table is fully initialized. 
+    let userRequest = $.ajax({
+      url: '/user', 
+      success: function(result) {
+        self.user = result;
+        console.log("user: ", self.user);
+      }
+    });
+
+    // Render table using the DataTables API
     $(document).ready(function() {
       $('#queue').DataTable( {
-        ajax: URLExt.join(baseUrl, '/squeue'),
+        ajax: self.globalViewURL,
+        initComplete: function(settings, json) {
+          self.initComplete(userRequest);
+        },
         select: {
           style: 'os',
         },
         deferRender: true,        
         pageLength: 15,
-        language: {
-          search: 'User',
-        },
         columns: [
-        { name: 'JOBID', searchable: false },
-        { name: 'PARTITION', searchable: false },
-        { name: 'NAME', searchable: false },
+        { name: 'JOBID', searchable: true },
+        { name: 'PARTITION', searchable: true },
+        { name: 'NAME', searchable: true },
         { name: 'USER', searchable: true },
-        { name: 'ST', searchable: false },
-        { name: 'TIME', searchable: false },
-        { name: 'NODES', searchable: false },
-        { name: 'NODELIST(REASON)', searchable: false },        
+        { name: 'ST', searchable: true },
+        { name: 'TIME', searchable: true },
+        { name: 'NODES', searchable: true },
+        { name: 'NODELIST(REASON)', searchable: true },        
         ],
         columnDefs: [
           {
@@ -130,7 +157,7 @@ class SlurmWidget extends Widget {
           }
         ],
         // Set rowId to maintain selection after table reload 
-        // (use primary key for rowId). 
+        // (use the queue's primary key (JOBID) for rowId). 
         rowId: self.JOBID_IDX.toString(),
         autoWidth: true,
         scrollY: '400px',
@@ -138,38 +165,40 @@ class SlurmWidget extends Widget {
         scrollCollapse: true,
         // Element layout parameter
         dom: '<"toolbar"Bfr><t><lip>',
-        buttons: { buttons: [
+        buttons: { 
+          buttons: [
           {
             text: 'Reload',
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
+              // NOTE: currently not using this feature -- may use again in the future.
               // Disable the button to avoid overloading Slurm with calls to squeue
               // Note, this does not persist across a browser window refresh
-              dt.button( 'Reload:name' ).disable();
+              // dt.button( 'Reload:name' ).disable();
               // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
+              // setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
             extend: 'selected',
             text: 'Kill Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scancel', 'DELETE', dt);
+              self.runOnSelected('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
             text: 'Hold Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scontrol/hold', 'PATCH', dt);
+              self.runOnSelected('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
             text: 'Release Selected Job(s)',
             action: (e, dt, node, config) => {
-              self._run_on_selected('/scontrol/release', 'PATCH', dt);
+              self.runOnSelected('/scontrol/release', 'PATCH', dt);
             }  
           },
           {
@@ -190,36 +219,96 @@ class SlurmWidget extends Widget {
           //   }
 	  // }
        
-        ],
-        // https://datatables.net/reference/option/buttons.dom.button
-        // make it easier to identify/grab buttons to change their appearance
-        dom: {
-          button: {
-            tag: 'button',
-            className: 'button',
-          }
-        }  }
+          ],
+          // https://datatables.net/reference/option/buttons.dom.button
+          // make it easier to identify/grab buttons to change their appearance
+          dom: {
+            button: {
+              tag: 'button',
+              className: 'button',
+            }
+          }  
+        }
       });
 
+      // Add a switch that toggles between global and user view (user by default)
+      let toggleContainer = document.createElement("div");
+      toggleContainer.classList.add("custom-control", "custom-switch", "toggle-switch");
+
+      let toggleSwitch = document.createElement("input");
+      toggleSwitch.classList.add("custom-control-input");
+      toggleSwitch.setAttribute("type", "checkbox");
+      toggleSwitch.setAttribute("id", "toggleSwitch");
+      toggleSwitch.setAttribute("checked", "true");
+
+      let toggleLabel = document.createElement("label");
+      toggleLabel.classList.add("custom-control-label");
+      toggleLabel.setAttribute("for", "toggleSwitch");
+      toggleLabel.textContent = "Show my jobs only";
+
+      toggleContainer.appendChild(toggleSwitch);
+      toggleContainer.appendChild(toggleLabel);
+      $('#jupyterlab-slurm').append(toggleContainer);
+     
       // Set up and append the alert container -- an area for displaying request response 
       // messages as color coded, dismissable, alerts
       let alertContainer = document.createElement('div');
       alertContainer.setAttribute("id", "alertContainer");
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
-
     });
   }
 
-  private _reload_data_table(dt: DataTables.Api) {
+  /**
+  * This method is triggered when the table is fully initialized.
+  * Waits for username request to finish, and then defines functionality
+  * for switching between user and global view. The switch function is 
+  * called immediately after it is defined, which makes it so user view
+  * is the default. 
+  */
+  private initComplete(userRequest: any) {
+    var self = this;
+    var table = $('#queue').DataTable();
+    $.when(userRequest).done(function () {
+      $("#toggleSwitch").change(function () {
+        if ((<HTMLInputElement>this).checked) {
+          table.ajax.url(self.userViewURL);
+          self.dataCache = table.rows().data();
+          let filteredData = self.dataCache
+              .filter(function(value, index) {
+                return value[self.USER_IDX] == self.user;
+              });
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          table.draw();
+        }
+        else {
+          table.ajax.url(self.globalViewURL);
+          let userData = table.data(); 
+          let filteredData = self.dataCache
+              .filter(function(value, index) {
+                return value[self.USER_IDX] != self.user;
+              })
+          table.clear();
+          table.rows.add(filteredData.toArray());
+          table.rows.add(userData.toArray());
+      	  table.draw();
+        }
+      });
+      $("#toggleSwitch").change();
+    });
+  }
+
+
+  private reloadDataTable(dt: DataTables.Api) {
     // reload the data table
     dt.ajax.reload(null, false);
   }
 
 
-  private _submit_request(cmd: string, requestType: string, body: string, jobCount: any = null) {
+  private submitRequest(cmd: string, requestType: string, body: string, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    this._set_job_completed_tasks(xhttp, jobCount);
+    this.setJobCompletedTasks(xhttp, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -232,7 +321,7 @@ class SlurmWidget extends Widget {
     xhttp.send(body);
   }
 
-  private _run_on_selected(cmd: string, requestType: string, dt: DataTables.Api) {
+  private runOnSelected(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
     // selected row. Eventually we may want to change the logic for this functionality
     // such that only one request is made with a list of Job IDs instead of one request
@@ -241,7 +330,7 @@ class SlurmWidget extends Widget {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this._submit_request(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
+       this.submitRequest(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
     }
     
     
@@ -249,8 +338,8 @@ class SlurmWidget extends Widget {
 
   // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
   // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-  //   this._submit_request('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
-  //   this._reload_data_table(dt);
+  //   this.submitRequest('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
+  //   this.reloadDataTable(dt);
   // };
 
   // private _submit_batch_script_contents(dt: DataTables.Api) {
@@ -270,8 +359,8 @@ class SlurmWidget extends Widget {
   //   // do the callback after clicking on the submit button
   //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
   //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-  //                                     this._submit_request('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
-  //                                     this._reload_data_table(dt);
+  //                                     this.submitRequest('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
+  //                                     this.reloadDataTable(dt);
   //                                     // remove the submit script prompt area
   //                                     submitScript.remove();
   //                                     } );
@@ -281,7 +370,7 @@ class SlurmWidget extends Widget {
   //   }
   // };
 
-  private _set_job_completed_tasks(xhttp: XMLHttpRequest, jobCount: any) {
+  private setJobCompletedTasks(xhttp: XMLHttpRequest, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
         let response = JSON.parse(xhttp.responseText);
@@ -308,11 +397,11 @@ class SlurmWidget extends Widget {
           // this will not cause a data race (not atomic, but still ok) 
           jobCount.count++;
           if (jobCount.numJobs == jobCount.count) {
-            this._reload_data_table($('#queue').DataTable());
+            this.reloadDataTable($('#queue').DataTable());
           }
         }
         else {
-           this._reload_data_table($('#queue').DataTable());
+           this.reloadDataTable($('#queue').DataTable());
         }
       }
     };
@@ -329,7 +418,7 @@ class SlurmWidget extends Widget {
   * require some overhead due to sorting, etc.
   */
   public onUpdateRequest(msg: Message) {
-    this._reload_data_table($('#queue').DataTable());
+    this.reloadDataTable($('#queue').DataTable());
   };
 
 } // class SlurmWidget
