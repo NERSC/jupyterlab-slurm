@@ -8,7 +8,7 @@ from .slurm import UserFetchHandler
 
 from notebook.utils import url_path_join
 
-__version__="0.1.3"
+__version__="0.1.0"
 
 def _jupyter_server_extension_paths():
     return [{

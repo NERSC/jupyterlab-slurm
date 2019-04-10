@@ -5,11 +5,14 @@
   "keywords": [
     "jupyter",
     "jupyterlab",
-    "jupyterlab-extension"
+    "jupyterlab-extension",
+    "Slurm",
+    "NERSC",
+    "HPC"
   ],
-  "homepage": "https://github.com/krinsman/jupyterlab-slurm",
+  "homepage": "https://github.com/NERSC/jupyterlab-slurm",
   "bugs": {
-    "url": "https://github.com/krinsman/jupyterlab-slurm/issues"
+    "url": "https://github.com/NERSC/jupyterlab-slurm/issues"
   },
   "license": "BSD-3-Clause",
   "author": "Jon Hays, William Krinsman, NERSC",
@@ -21,7 +24,7 @@
   "types": "lib/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/krinsman/jupyterlab-slurm.git"
+    "url": "https://github.com/NERSC/jupyterlab-slurm.git"
   },
   "scripts": {
     "build": "tsc",

@@ -1,1 +1,1 @@
-include README.md
+recursive-include jupyter-config *.json

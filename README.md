@@ -1,39 +1,25 @@
-# jupyterlab-slurm
+# Slurm JupyterLab Extension
 
-A JupyterLab extension to interface with the Slurm Workload Manager.
+A JupyterLab extension to interface with the Slurm Workload Manager, 
+providing simple and intuitive controls for viewing and managing queued jobs.
 
+![Slurm Extension](./slurm.png)
 
 ## Prerequisites
 
-* JupyterLab
-* NodeJS
+* JupyterLab >= 0.35
+* Node.js 5+
 * Slurm
 
 
 ## Installation
 
-### Create a conda environment with the prerequisites
-```
-conda create -n jupyterlab-slurm jupyterlab nodejs 
-source activate jupyterlab-slurm
-```
-Note: If ```source activate``` doesn't work on your system, try ```conda activate```
+This extension includes both a client-side JupyterLab extension and a server-side
+Jupyter notebook server extension. Install these using the command line with
 
-### Get the code
-```
-git clone https://github.com/NERSC/jupyterlab-slurm.git
-```
-
-### Install the JupyterLab extension
-```
+```bash
+pip install jupyterlab_slurm
 jupyter labextension install jupyterlab-slurm
-```
-
-### Install the Jupyter Notebook server extension
-```
-cd jupyterlab-slurm
-pip install .                      
-jupyter serverextension enable --py jupyterlab-slurm --sys-prefix
 ```
 
 After launching JupyterLab, the extension can be found in the command palette under
@@ -41,27 +27,28 @@ the name ```Slurm Queue Manager```, and is listed under the ```HPC TOOLS``` sect
 of the palette and the launcher.
 
 
-## Development
+### Development install
 
-For a development install (requires npm version 4 or later), do the following in the repository directory:
-
-```bash
-npm install
-npm run build
-jupyter labextension link .
-```
-
-To rebuild the package and the JupyterLab app (run these commands after making changes to the extension during development):
+As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io/en/stable/developer/extension_dev.html#extension-authoring) for a development install of the labextension you can run the following in this directory:
 
 ```bash
-npm run build
-jupyter lab build
+jlpm install   # Install npm package dependencies
+jlpm run build  # Compile the TypeScript sources to Javascript
+jupyter labextension install  # Install the current directory as an extension
 ```
 
+To rebuild the extension:
 
-For a development install of the server extension (jupyterlab-slurm/slurm.py),
-follow the directions in the "Install the Jupyter Notebook server extension"
-section above. To see changes made to the server extension during development,
-the server extension will need to be reinstalled by running `pip install .` from
-within the main repo directory. Note, the server extension will not need to be enabled
-more than once.
+```bash
+jlpm run build
+```
+
+If you run JupyterLab in watch mode (`jupyter lab --watch`) it will automatically pick
+up changes to the built extension and rebundle itself.
+
+To run an editable install of the server extension, run
+
+```bash
+pip install -e .
+jupyter serverextension enable --sys-prefix jupyterlab_slurm
+```
