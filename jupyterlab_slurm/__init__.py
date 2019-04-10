@@ -8,9 +8,11 @@ from .slurm import UserFetchHandler
 
 from notebook.utils import url_path_join
 
+__version__="0.1.3"
+
 def _jupyter_server_extension_paths():
     return [{
-        "module": "jupyterlab-slurm"
+        "module": "jupyterlab_slurm"
         }]
         
 def load_jupyter_server_extension(nb_server_app):
@@ -20,7 +22,7 @@ def load_jupyter_server_extension(nb_server_app):
     Args:
         nb_server_app (NotebookWebApplication): handle to the Notebook webserver instance.
     """
-    print('Jupyterlab-slurm server extension loaded!')
+    print('jupyterlab_slurm server extension loaded')
     web_app = nb_server_app.web_app
     host_pattern = '.*$'
 
