@@ -25,7 +25,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-# It seems lib/ is necessary for easy install at this point, will look into ommitting this later: lib/
+lib/
 lib64/
 parts/
 sdist/

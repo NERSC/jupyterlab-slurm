@@ -117,7 +117,7 @@ class SqueueHandler(ShellExecutionHandler):
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))
 
-# A simple request handler for retrieving the user name
+# A simple request handler for retrieving the username
 class UserFetchHandler(ShellExecutionHandler):
     def get(self):
         username = os.environ.get('USER')
