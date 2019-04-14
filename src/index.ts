@@ -267,25 +267,31 @@ class SlurmWidget extends Widget {
 
       let modal = 
       `
-      <div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+      <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
+              <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
               <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
               </button>
             </div>
-            <div class="modal-body">
-              <div class="form-group">
-                <label for="name">Name</label>
-                <input type="text" name="name" class="form-control">
-              </div> 
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-              <button type="button" class="btn btn-primary">Save changes</button>
-            </div>
+            <form id="jobSubmitForm" name="jobSubmit" role="form">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="path">File Path</label>
+                  <input type="text" name="path" class="form-control">
+                </div> 
+                <div class="form-group">
+                  <label for="message">Message</label>
+                  <textarea name="message" class="form-control"></textarea>
+                </div>
+              </div>  
+              <div class="modal-footer">          
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <input type="submit" class="btn btn-success" id="submit">
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -325,11 +331,14 @@ class SlurmWidget extends Widget {
       //$('#jp-main-dock-panel').append(modalContainer);
       $('#jupyterlab-slurm').append(modalContainer);
 
+
+      $('')
+
     }); 
   }
 
   private launchSubmitModal() {
-    (<any>$('#exampleModalCenter')).modal('show');
+    (<any>$('#submitJobModal')).modal('show');
     $('.modal-backdrop').detach().appendTo('#jupyterlab-slurm');
   }
 
@@ -405,9 +414,7 @@ class SlurmWidget extends Widget {
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
        this.submitRequest(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
-    }
-    
-    
+    } 
   };
 
   // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored

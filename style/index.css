@@ -25,7 +25,7 @@
 
 
 .modal, .modal-backdrop {
-    position: absolute !important;
+  position: absolute !important;
 }
 
 /* The alert itself -- this class is originally defined by bootstrap */
@@ -78,7 +78,7 @@
   margin-top: 1em;
   margin-bottom: 1em;
   /* see here: https://stackoverflow.com/questions/9519841/why-does-this-css-margin-top-style-not-work#9519933 */;
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* attributes of the buttons at the top of the table */
