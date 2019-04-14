@@ -265,46 +265,68 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
-
-
-
       let modal = 
       `
-      <div id="jobSubmitModal" class="modal fade" role="dialog">
-        <div class="modal-dialog">
+      <div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
           <div class="modal-content">
             <div class="modal-header">
-              <a class="close" data-dismiss="modal">×</a>
-              <h3>Submit a Job</h3>
+              <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
             </div>
-            <form id="jobSubmitForm" name="jobSubmit" role="form">
-              <div class="modal-body">        
-                <div class="form-group">
-                  <label for="name">Name</label>
-                  <input type="text" name="name" class="form-control">
-                </div>         
-              </div>
-              <div class="modal-footer">          
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <input type="submit" class="btn btn-success" id="submit">
-              </div>
-            </form>
+            <div class="modal-body">
+              ...
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary">Save changes</button>
+            </div>
           </div>
         </div>
       </div>
       `;
+
+
+      // let modal = 
+      // `
+      // <div id="jobSubmitModal" class="modal fade" role="dialog">
+      //   <div class="modal-dialog">
+      //     <div class="modal-content">
+      //       <div class="modal-header">
+      //         <a class="close" data-dismiss="modal">×</a>
+      //         <h3>Submit a Job</h3>
+      //       </div>
+      //       <form id="jobSubmitForm" name="jobSubmit" role="form">
+      //         <div class="modal-body">        
+      //           <div class="form-group">
+      //             <label for="name">Name</label>
+      //             <input type="text" name="name" class="form-control">
+      //           </div>         
+      //         </div>
+      //         <div class="modal-footer">          
+      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      //           <input type="submit" class="btn btn-success" id="submit">
+      //         </div>
+      //       </form>
+      //     </div>
+      //   </div>
+      // </div>
+      // `;
       // let modalHtml = $.parseHTML(modal);
 
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
       // document.appendChild(modalContainer);
-      // $('#jupyterlab-slurm').append(modalContainer);
+      // $('#jp-main-dock-panel').append(modalContainer);
+      $('#jupyterlab-slurm').append(modalContainer);
 
     }); 
   }
 
   private launchSubmitModal() {
-    (<any>$('#jobSubmitModal')).modal('show');
+    (<any>$('#exampleModalCenter')).modal('show');
   }
 
   /**
