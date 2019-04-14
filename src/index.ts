@@ -30,12 +30,14 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
+
+// import * as fs from 'fs';
+
 import 'datatables.net-dt/css/jquery.dataTables.css';
 import 'datatables.net';
 import 'datatables.net-buttons-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
-
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/dist/js/bootstrap.js';
@@ -257,6 +259,9 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
+
+
+
 let modal = 
 `<!-- basic modal -->
 <div class="modal fade" id="basicModal" tabindex="-1" role="dialog" aria-labelledby="basicModal" aria-hidden="true">
@@ -282,6 +287,8 @@ let modal =
 let modalContainer = document.createElement('div');
 modalContainer.innerHTML = modal;
 $('#jupyterlab-slurm').append(modalContainer);
+let m = document.getElementById('basicModal');
+m.style.display = 'block';
 
     }); 
   }
