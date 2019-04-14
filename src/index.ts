@@ -283,13 +283,13 @@ class SlurmWidget extends Widget {
                   <input type="text" name="path" class="form-control">
                 </div> 
                 <div class="form-group">
-                  <label for="message">Message</label>
-                  <textarea name="message" class="form-control"></textarea>
+                  <label for="script">Script</label>
+                  <textarea name="script" class="form-control"></textarea>
                 </div>
               </div>  
               <div class="modal-footer">          
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <input type="submit" class="btn btn-success" id="submit">
+                <input type="submit" class="btn btn-primary" id="submit">
               </div>
             </form>
           </div>
