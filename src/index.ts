@@ -322,14 +322,15 @@ class SlurmWidget extends Widget {
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
       // document.appendChild(modalContainer);
-      // $('#jp-main-dock-panel').append(modalContainer);
-      $('#jupyterlab-slurm').append(modalContainer);
+      $('#jp-main-dock-panel').append(modalContainer);
+      // $('#jupyterlab-slurm').append(modalContainer);
 
     }); 
   }
 
   private launchSubmitModal() {
     (<any>$('#exampleModalCenter')).modal('show');
+    $('.modal-backdrop').detach().appendTo('#jp-main-dock-panel');
   }
 
   /**

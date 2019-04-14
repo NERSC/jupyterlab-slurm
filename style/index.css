@@ -24,6 +24,10 @@
 }
 
 
+.modal, .modal-backdrop {
+    position: absolute !important;
+}
+
 /* The alert itself -- this class is originally defined by bootstrap */
 .alert {
   height: 1.5em;
