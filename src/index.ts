@@ -184,21 +184,21 @@ class SlurmWidget extends Widget {
           },
           {
             extend: 'selected',
-            text: 'Kill Selected Job(s)',
+            text: 'Kill Job(s)',
             action: (e, dt, node, config) => {
               self.runOnSelected('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
-            text: 'Hold Selected Job(s)',
+            text: 'Hold Job(s)',
             action: (e, dt, node, config) => {
               self.runOnSelected('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
-            text: 'Release Selected Job(s)',
+            text: 'Release Job(s)',
             action: (e, dt, node, config) => {
               self.runOnSelected('/scontrol/release', 'PATCH', dt);
             }  
@@ -211,22 +211,7 @@ class SlurmWidget extends Widget {
             action: (e, dt, node, config) => {
               self.launchSubmitModal();
             }
-          }
-          // Job submission temporarily disabled
-          // {
-          //   text: 'Submit Slurm Script via File Path',
-          //   action:  (e, dt, node, config) => {
-          //     var scriptPath = window.prompt('Enter a Slurm script file path');
-          //     self._submit_batch_script_path(scriptPath, dt)
-          //   }
-          // },
-          // {
-          //   text: 'Submit Slurm Script via File Contents',
-          //   action: (e, dt, node, config) => {
-          //     self._submit_batch_script_contents(dt);
-          //   }
-	  // }
-       
+          }       
           ],
           // https://datatables.net/reference/option/buttons.dom.button
           // make it easier to identify/grab buttons to change their appearance
