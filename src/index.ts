@@ -277,7 +277,10 @@ class SlurmWidget extends Widget {
               </button>
             </div>
             <div class="modal-body">
-              ...
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" name="name" class="form-control">
+              </div> 
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
