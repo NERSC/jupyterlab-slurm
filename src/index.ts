@@ -265,6 +265,39 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
+      // let modal = 
+      // `
+      // <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
+      //   <div class="modal-dialog modal-dialog-centered" role="document">
+      //     <div class="modal-content">
+      //       <div class="modal-header">
+      //         <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
+      //         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+      //           <span aria-hidden="true">&times;</span>
+      //         </button>
+      //       </div>
+      //       <form id="jobSubmitForm" name="jobSubmit" role="form">
+      //         <div class="modal-body">
+      //           <div class="form-group">
+      //             <label for="path">File Path</label>
+      //             <input type="text" name="path" class="form-control">
+      //           </div> 
+      //           <div class="form-group">
+      //             <label for="script">Script</label>
+      //             <textarea name="script" class="form-control"></textarea>
+      //           </div>
+      //         </div>  
+      //         <div class="modal-footer">          
+      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      //           <input type="submit" class="btn btn-primary" id="submit">
+      //         </div>
+      //       </form>
+      //     </div>
+      //   </div>
+      // </div>
+      // `;
+
+
       let modal = 
       `
       <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
@@ -282,10 +315,6 @@ class SlurmWidget extends Widget {
                   <label for="path">File Path</label>
                   <input type="text" name="path" class="form-control">
                 </div> 
-                <div class="form-group">
-                  <label for="script">Script</label>
-                  <textarea name="script" class="form-control"></textarea>
-                </div>
               </div>  
               <div class="modal-footer">          
                 <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -297,42 +326,14 @@ class SlurmWidget extends Widget {
       </div>
       `;
 
-
-      // let modal = 
-      // `
-      // <div id="jobSubmitModal" class="modal fade" role="dialog">
-      //   <div class="modal-dialog">
-      //     <div class="modal-content">
-      //       <div class="modal-header">
-      //         <a class="close" data-dismiss="modal">×</a>
-      //         <h3>Submit a Job</h3>
-      //       </div>
-      //       <form id="jobSubmitForm" name="jobSubmit" role="form">
-      //         <div class="modal-body">        
-      //           <div class="form-group">
-      //             <label for="name">Name</label>
-      //             <input type="text" name="name" class="form-control">
-      //           </div>         
-      //         </div>
-      //         <div class="modal-footer">          
-      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      //           <input type="submit" class="btn btn-success" id="submit">
-      //         </div>
-      //       </form>
-      //     </div>
-      //   </div>
-      // </div>
-      // `;
-      // let modalHtml = $.parseHTML(modal);
-
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
-      // document.appendChild(modalContainer);
-      //$('#jp-main-dock-panel').append(modalContainer);
       $('#jupyterlab-slurm').append(modalContainer);
 
+      $('#jobSubmitForm').submit(function( event ) {
+        self.submitJobPath($("input[type=text]").val()[0]);
 
-      $('')
+      });
 
     }); 
   }
@@ -417,11 +418,9 @@ class SlurmWidget extends Widget {
     } 
   };
 
-  // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
-  // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-  //   this.submitRequest('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
-  //   this.reloadDataTable(dt);
-  // };
+  private submitJobPath(input: string) {
+    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));
+  };
 
   // private _submit_batch_script_contents(dt: DataTables.Api) {
   //   // TODO: clean up
@@ -440,7 +439,7 @@ class SlurmWidget extends Widget {
   //   // do the callback after clicking on the submit button
   //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
   //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-  //                                     this.submitRequest('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
+  //                                     this.submitRequest('/sbatch?inputType=contents', 'POST', 'script='+scriptContents);
   //                                     this.reloadDataTable(dt);
   //                                     // remove the submit script prompt area
   //                                     submitScript.remove();
