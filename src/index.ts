@@ -270,22 +270,25 @@ class SlurmWidget extends Widget {
 
       let modal = 
       `
-      <div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
+      <div id="jobSubmitModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="exampleModalLongTitle">Modal title</h5>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
+              <a class="close" data-dismiss="modal">×</a>
+              <h3>Submit a Job</h3>
             </div>
-            <div class="modal-body">
-              ...
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-              <button type="button" class="btn btn-primary">Save changes</button>
-            </div>
+            <form id="jobSubmitForm" name="jobSubmit" role="form">
+              <div class="modal-body">        
+                <div class="form-group">
+                  <label for="name">Name</label>
+                  <input type="text" name="name" class="form-control">
+                </div>         
+              </div>
+              <div class="modal-footer">          
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <input type="submit" class="btn btn-success" id="submit">
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -294,14 +297,14 @@ class SlurmWidget extends Widget {
 
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
-      document.appendChild(modalContainer);
+      // document.appendChild(modalContainer);
       // $('#jupyterlab-slurm').append(modalContainer);
 
     }); 
   }
 
   private launchSubmitModal() {
-    (<any>$('#exampleModalCenter')).modal('show');
+    (<any>$('#jobSubmitModal')).modal('show');
   }
 
   /**
