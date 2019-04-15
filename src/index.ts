@@ -317,7 +317,7 @@ class SlurmWidget extends Widget {
 
       $('#jobSubmitForm').submit(function( event ) {
         event.preventDefault();
-        self.submitJobPath($("input[type=text]").val()[0]);
+        self.submitJobPath(<string>$("input[type=text]").val());
 
       });
 

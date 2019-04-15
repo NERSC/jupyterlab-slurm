@@ -69,7 +69,7 @@ class SbatchHandler(ShellExecutionHandler):
         if inputType:
             if inputType == 'path':
                 script_path = self.get_body_argument('input')
-                stdout, stderr = await self.run_command('sbatch '+script_path)
+                stdout, stderr, returncode = await self.run_command('sbatch '+script_path)
             elif inputType == 'contents':
                 script_contents = self.get_body_argument('input')
                 string_to_file(script_contents)
