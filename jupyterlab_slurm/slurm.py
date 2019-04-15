@@ -68,10 +68,10 @@ class SbatchHandler(ShellExecutionHandler):
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if inputType:
             if inputType == 'path':
-                script_path = self.get_body_argument('script')
+                script_path = self.get_body_argument('input')
                 stdout, stderr = await self.run_command('sbatch '+script_path)
             elif inputType == 'contents':
-                script_contents = self.get_body_argument('script')
+                script_contents = self.get_body_argument('input')
                 string_to_file(script_contents)
                 stdout, stderr, returncode = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
                 os.remove('temporary_file.temporary')

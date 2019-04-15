@@ -316,6 +316,7 @@ class SlurmWidget extends Widget {
       $('#jupyterlab-slurm').append(modalContainer);
 
       $('#jobSubmitForm').submit(function( event ) {
+        event.preventDefault();
         self.submitJobPath($("input[type=text]").val()[0]);
 
       });
