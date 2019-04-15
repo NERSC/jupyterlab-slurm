@@ -204,13 +204,13 @@ class SlurmWidget extends Widget {
             }  
           },
           {
-            extend: 'selectNone'
-          },
-          {
             text: "Submit Job",
             action: (e, dt, node, config) => {
               self.launchSubmitModal();
             }
+          },
+          {
+            extend: 'selectNone'
           }       
           ],
           // https://datatables.net/reference/option/buttons.dom.button
@@ -342,6 +342,7 @@ class SlurmWidget extends Widget {
     $.when(userRequest).done(function () {
       $("#toggleSwitch").change(function () {
         if ((<HTMLInputElement>this).checked) {
+          // Global -> User view switch
           table.ajax.url(self.userViewURL);
           self.dataCache = table.rows().data();
           table.clear();
@@ -353,6 +354,7 @@ class SlurmWidget extends Widget {
           table.draw();
         }
         else {
+          // User -> Global view switch
           table.ajax.url(self.globalViewURL);
           let userData = table.data(); 
           table.clear();
