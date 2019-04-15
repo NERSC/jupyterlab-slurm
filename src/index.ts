@@ -344,22 +344,22 @@ class SlurmWidget extends Widget {
         if ((<HTMLInputElement>this).checked) {
           table.ajax.url(self.userViewURL);
           self.dataCache = table.rows().data();
+          table.clear();
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] == self.user;
               });
-          table.clear();
           table.rows.add(filteredData.toArray());
           table.draw();
         }
         else {
           table.ajax.url(self.globalViewURL);
           let userData = table.data(); 
+          table.clear();
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] != self.user;
               })
-          table.clear();
           table.rows.add(filteredData.toArray());
           table.rows.add(userData.toArray());
       	  table.draw();
