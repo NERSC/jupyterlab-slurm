@@ -99,7 +99,7 @@
 
 .pending {
   opacity: 0.6;
-
+}
 /* space containing the buttons only, not the search bar */
 .dt-buttons {
   float: left;

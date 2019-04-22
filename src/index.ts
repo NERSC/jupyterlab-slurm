@@ -226,7 +226,8 @@ class SlurmWidget extends Widget {
 
       // Disable the ability to select rows that correspond to a pending request
       table.on('user-select', function (e, dt, type, cell, originalEvent) {
-        if (originalEvent.target.classList.contains("pending")) {
+        console.log(originalEvent.target.nodeName);
+        if ($(originalEvent.target).parent().hasClass("pending")) {
           e.preventDefault();
         }
       });
@@ -416,12 +417,12 @@ class SlurmWidget extends Widget {
     // per selected job. Changes will need to be made on the back end for this to work
 
     let selected_data = dt.rows( { selected: true } ).data().toArray();
+    dt.rows( {selected: true } ).deselect();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
        let jobID = selected_data[i][this.JOBID_IDX];
        // Add the request pending classes to the selected row 
        $("#"+jobID).addClass("pending");
-       $("#"+jobID).removeClass("selected");
        this.submitRequest(cmd, requestType, 'jobID='+jobID, $("#"+jobID), jobCount);
 
     } 
