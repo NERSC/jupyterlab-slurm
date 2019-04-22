@@ -308,14 +308,14 @@ class SlurmWidget extends Widget {
               <div class="modal-body">
                 <div class="form-group">
                   <label for="path">Enter a file path containing a batch script</label>
-                  <input type="text" name="path" class="form-control">
+                  <input type="text" name="path" id="batchPath" class="form-control">
                   <input type="submit" class="btn btn-primary" id="submitPath">
                 </div> 
                 <div class="form-group">
                   <label for="script">Enter a new batch script</label>
                   <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
-                  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                   <input type="submit" class="btn btn-primary" id="submitScript">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
               </div>
             </form>
@@ -357,18 +357,20 @@ class SlurmWidget extends Widget {
       modalContainer.innerHTML = modal;
       $('#jupyterlab-slurm').append(modalContainer);
 
+      // The path submission click function
       $('#submitPath').click(function( event ) {
         event.preventDefault();
-        self.submitJobPath(<string>$("input[type=text]").val());
+        self.submitJobPath(<string>$("batchPath").val());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
         // Hide the modal
         (<any>$('#submitJobModal')).modal('hide');
       });
 
+      // The script submission click function 
       $('#submitScript').click(function( event ) {
         event.preventDefault();
-        self.submitJobScript(<string>$("#bathScript").val().toString());
+        self.submitJobScript(<string>$("#batchScript").val().toString());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
         // Hide the modal
