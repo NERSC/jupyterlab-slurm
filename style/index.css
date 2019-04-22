@@ -106,9 +106,17 @@
   margin-bottom: 3rem;
 }
 
+/* modal form inputs */
+.form-control {
+  font-size: 14px;
+}
+
 /* modal from buttons */
 .btn {
   float: right;
+  margin-top: 1em;
+  margin-bottom: .8em;
+  margin-left: .5em;
 }
 
 /* space containing the buttons only, not the search bar */

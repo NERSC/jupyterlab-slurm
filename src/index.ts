@@ -313,7 +313,7 @@ class SlurmWidget extends Widget {
                 </div> 
                 <div class="form-group">
                   <label for="script">Enter a new batch script</label>
-                  <textarea name="script" id="batchScript" cols="50" rows="20" class="form-control"></textarea>
+                  <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
                   <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                   <input type="submit" class="btn btn-primary" id="submitScript">
                 </div>
@@ -357,7 +357,8 @@ class SlurmWidget extends Widget {
       modalContainer.innerHTML = modal;
       $('#jupyterlab-slurm').append(modalContainer);
 
-      $('#submitPath').click(function() {
+      $('#submitPath').click(function( event ) {
+        event.preventDefault();
         self.submitJobPath(<string>$("input[type=text]").val());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
@@ -365,7 +366,8 @@ class SlurmWidget extends Widget {
         (<any>$('#submitJobModal')).modal('hide');
       });
 
-      $('#submitScript').click(function() {
+      $('#submitScript').click(function( event ) {
+        event.preventDefault();
         self.submitJobScript(<string>$("#bathScript").val().toString());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
