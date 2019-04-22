@@ -421,6 +421,7 @@ class SlurmWidget extends Widget {
        let jobID = selected_data[i][this.JOBID_IDX];
        // Add the request pending classes to the selected row 
        $("#"+jobID).addClass("pending");
+       $("#"+jobID).removeClass("selected");
        this.submitRequest(cmd, requestType, 'jobID='+jobID, $("#"+jobID), jobCount);
 
     } 
