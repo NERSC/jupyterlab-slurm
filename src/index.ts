@@ -226,7 +226,6 @@ class SlurmWidget extends Widget {
 
       // Disable the ability to select rows that correspond to a pending request
       table.on('user-select', function (e, dt, type, cell, originalEvent) {
-        console.log(originalEvent.target.nodeName);
         if ($(originalEvent.target).parent().hasClass("pending")) {
           e.preventDefault();
         }
@@ -260,6 +259,40 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
+      let modal = 
+      `
+      <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <form id="jobSubmitForm" name="jobSubmit" role="form">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="path">Enter a file path containing a batch script</label>
+                  <input type="text" name="path" class="form-control">
+                  <input type="submit" class="btn btn-primary" id="submitPath">
+                </div> 
+                <div class="form-group">
+                  <label for="script">Enter a new batch script</label>
+                  <textarea name="script" id="batchScript" class="form-control"></textarea>
+                </div>
+              </div>  
+              <div class="modal-footer">          
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <input type="submit" class="btn btn-primary" id="submitScript">
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      `;
+
+
       // let modal = 
       // `
       // <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
@@ -277,10 +310,6 @@ class SlurmWidget extends Widget {
       //             <label for="path">File Path</label>
       //             <input type="text" name="path" class="form-control">
       //           </div> 
-      //           <div class="form-group">
-      //             <label for="script">Script</label>
-      //             <textarea name="script" class="form-control"></textarea>
-      //           </div>
       //         </div>  
       //         <div class="modal-footer">          
       //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
@@ -292,50 +321,35 @@ class SlurmWidget extends Widget {
       // </div>
       // `;
 
-
-      let modal = 
-      `
-      <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <form id="jobSubmitForm" name="jobSubmit" role="form">
-              <div class="modal-body">
-                <div class="form-group">
-                  <label for="path">File Path</label>
-                  <input type="text" name="path" class="form-control">
-                </div> 
-              </div>  
-              <div class="modal-footer">          
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <input type="submit" class="btn btn-primary" id="submit">
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      `;
-
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
       $('#jupyterlab-slurm').append(modalContainer);
 
-      $('#jobSubmitForm').submit(function( event ) {
-        event.preventDefault();
+      $('#submitPath').click(function() {
         self.submitJobPath(<string>$("input[type=text]").val());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
         // Hide the modal
         (<any>$('#submitJobModal')).modal('hide');
-        // Add the request pending classes to the entire extension panel
-        $('#jupyterlab-slurm').addClass("modal-backdrop"); // add spinner here too
-        // this.addClass("modal-backdrop");
       });
+
+      $('#submitScript').click(function() {
+        self.submitJobScript(<string>$("#bathScript").val().toString());
+        // Reset form fields
+        document.forms["jobSubmitForm"].reset();
+        // Hide the modal
+        (<any>$('#submitJobModal')).modal('hide');
+      });
+
+
+      // $('#jobSubmitForm').submit(function( event ) {
+      //   event.preventDefault();
+      //   self.submitJobPath(<string>$("input[type=text]").val());
+      //   // Reset form fields
+      //   document.forms["jobSubmitForm"].reset();
+      //   // Hide the modal
+      //   (<any>$('#submitJobModal')).modal('hide');
+      // });
 
     }); 
   }
@@ -429,9 +443,15 @@ class SlurmWidget extends Widget {
   };
 
   private submitJobPath(input: string) {
-    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input),
-                       $('#jupyterlab-slurm'));
+    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));         
   };
+
+
+
+  private submitJobScript(input: string) {
+    this.submitRequest('/sbatch?inputType=contents', 'POST', 'input=' + encodeURIComponent(input));
+  };
+
 
   // private _submit_batch_script_contents(dt: DataTables.Api) {
   //   // TODO: clean up
