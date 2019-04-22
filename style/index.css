@@ -91,7 +91,7 @@
   font-family: var(--jp-ui-font-family);
   background-color: var(--jp-layout-color2);
   box-shadow: var(--jp-toolbar-box-shadow);
-  margin-right: 0.3em;
+  margin: 0.3em;
   /* copy-pasted from dataTables CSS for .dataTables_wrapper .dataTables_paginate .paginate_button */
   cursor: pointer;
   *cursor: hand;
