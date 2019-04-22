@@ -30,8 +30,8 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
+import * as fs from 'fs-extra';
 
-// import * as fs from 'fs';
 
 import 'datatables.net-dt/css/jquery.dataTables.css';
 import 'datatables.net';
@@ -174,12 +174,6 @@ class SlurmWidget extends Widget {
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
-              // NOTE: currently not using this feature -- may use again in the future.
-              // Disable the button to avoid overloading Slurm with calls to squeue
-              // Note, this does not persist across a browser window refresh
-              // dt.button( 'Reload:name' ).disable();
-              // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              // setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
@@ -259,6 +253,8 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
+
+
       // let modal = 
       // `
       // <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
@@ -274,17 +270,15 @@ class SlurmWidget extends Widget {
       //         <div class="modal-body">
       //           <div class="form-group">
       //             <label for="path">Enter a file path containing a batch script</label>
-      //             <input type="text" name="path" class="form-control">
+      //             <input type="text" name="path" id="batchPath" class="form-control">
       //             <input type="submit" class="btn btn-primary" id="submitPath">
       //           </div> 
       //           <div class="form-group">
       //             <label for="script">Enter a new batch script</label>
-      //             <textarea name="script" id="batchScript" cols="50" rows="20" class="form-control"></textarea>
+      //             <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
+      //             <input type="submit" class="btn btn-primary" id="submitScript">
+      //             <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
       //           </div>
-      //         </div>  
-      //         <div class="modal-footer">          
-      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      //           <input type="submit" class="btn btn-primary" id="submitScript">
       //         </div>
       //       </form>
       //     </div>
@@ -292,66 +286,8 @@ class SlurmWidget extends Widget {
       // </div>
       // `;
 
-
-      let modal = 
-      `
-      <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <form id="jobSubmitForm" name="jobSubmit" role="form">
-              <div class="modal-body">
-                <div class="form-group">
-                  <label for="path">Enter a file path containing a batch script</label>
-                  <input type="text" name="path" id="batchPath" class="form-control">
-                  <input type="submit" class="btn btn-primary" id="submitPath">
-                </div> 
-                <div class="form-group">
-                  <label for="script">Enter a new batch script</label>
-                  <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
-                  <input type="submit" class="btn btn-primary" id="submitScript">
-                  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      `;
-
-
-      // let modal = 
-      // `
-      // <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
-      //   <div class="modal-dialog modal-dialog-centered" role="document">
-      //     <div class="modal-content">
-      //       <div class="modal-header">
-      //         <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
-      //         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-      //           <span aria-hidden="true">&times;</span>
-      //         </button>
-      //       </div>
-      //       <form id="jobSubmitForm" name="jobSubmit" role="form">
-      //         <div class="modal-body">
-      //           <div class="form-group">
-      //             <label for="path">File Path</label>
-      //             <input type="text" name="path" class="form-control">
-      //           </div> 
-      //         </div>  
-      //         <div class="modal-footer">          
-      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      //           <input type="submit" class="btn btn-primary" id="submit">
-      //         </div>
-      //       </form>
-      //     </div>
-      //   </div>
-      // </div>
-      // `;
+      let modal = fs
+        .readFileSync("templates/job_submit_modal.html", "utf-8");
 
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
@@ -376,16 +312,6 @@ class SlurmWidget extends Widget {
         // Hide the modal
         (<any>$('#submitJobModal')).modal('hide');
       });
-
-
-      // $('#jobSubmitForm').submit(function( event ) {
-      //   event.preventDefault();
-      //   self.submitJobPath(<string>$("input[type=text]").val());
-      //   // Reset form fields
-      //   document.forms["jobSubmitForm"].reset();
-      //   // Hide the modal
-      //   (<any>$('#submitJobModal')).modal('hide');
-      // });
 
     }); 
   }
@@ -489,34 +415,6 @@ class SlurmWidget extends Widget {
   };
 
 
-  // private _submit_batch_script_contents(dt: DataTables.Api) {
-  //   // TODO: clean up
-  //   if ( $('#slurm_script').length == 0) {
-  //    // at the end of the main queue table area, append a prompt message and a form submission area
-  //   $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
-  //                              'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
-  //                              '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
-  //   // after the form submission area, insert a submit button and then a cancel button
-  //   $('#slurm_script').after('<div id="slurm_buttons">'+
-  //                             '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
-  //                             '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
-  //                             '</div></div>');
-  //   // message above textarea (form submission area), textarea itself, and the two buttons below
-  //   var submitScript = $('#submit_script');
-  //   // do the callback after clicking on the submit button
-  //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
-  //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-  //                                     this.submitRequest('/sbatch?inputType=contents', 'POST', 'script='+scriptContents);
-  //                                     this.reloadDataTable(dt);
-  //                                     // remove the submit script prompt area
-  //                                     submitScript.remove();
-  //                                     } );
-  //   // remove the submit script prompt area after clicking the cancel button
-  //   $('#cancel_button').unbind().click( () => {submitScript.remove();} );
-    
-  //   }
-  // };
-
   private setJobCompletedTasks(xhttp: XMLHttpRequest, element: JQuery, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
@@ -544,7 +442,6 @@ class SlurmWidget extends Widget {
           element.removeClass("pending");
         }
         
-
         // TODO: the alert and removing of the pending classes 
         // should occur after table reload, but will have to 
         // rework synchronization here..
