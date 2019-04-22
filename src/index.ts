@@ -360,7 +360,7 @@ class SlurmWidget extends Widget {
       // The path submission click function
       $('#submitPath').click(function( event ) {
         event.preventDefault();
-        self.submitJobPath(<string>$("batchPath").val());
+        self.submitJobPath(<string>$("#batchPath").val());
         // Reset form fields
         document.forms["jobSubmitForm"].reset();
         // Hide the modal
