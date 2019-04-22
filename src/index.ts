@@ -186,21 +186,21 @@ class SlurmWidget extends Widget {
             extend: 'selected',
             text: 'Kill Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scancel', 'DELETE', dt);
+              self.runOnSelectedRows('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
             text: 'Hold Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scontrol/hold', 'PATCH', dt);
+              self.runOnSelectedRows('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
             text: 'Release Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scontrol/release', 'PATCH', dt);
+              self.runOnSelectedRows('/scontrol/release', 'PATCH', dt);
             }  
           },
           {
@@ -318,7 +318,13 @@ class SlurmWidget extends Widget {
       $('#jobSubmitForm').submit(function( event ) {
         event.preventDefault();
         self.submitJobPath(<string>$("input[type=text]").val());
-
+        // Reset form fields
+        document.forms["jobSubmitForm"].reset();
+        // Hide the modal
+        (<any>$('#submitJobModal')).modal('hide');
+        // Add the request pending classes to the entire extension panel
+        $('#jupyterlab-slurm').addClass("modal-backdrop"); // add spinner here too
+        // this.addClass("modal-backdrop");
       });
 
     }); 
@@ -378,9 +384,10 @@ class SlurmWidget extends Widget {
   }
 
 
-  private submitRequest(cmd: string, requestType: string, body: string, jobCount: any = null) {
+  private submitRequest(cmd: string, requestType: string, body: string, 
+                        element: JQuery = null, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    this.setJobCompletedTasks(xhttp, jobCount);
+    this.setJobCompletedTasks(xhttp, element, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -393,7 +400,7 @@ class SlurmWidget extends Widget {
     xhttp.send(body);
   }
 
-  private runOnSelected(cmd: string, requestType: string, dt: DataTables.Api) {
+  private runOnSelectedRows(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
     // selected row. Eventually we may want to change the logic for this functionality
     // such that only one request is made with a list of Job IDs instead of one request
@@ -402,12 +409,17 @@ class SlurmWidget extends Widget {
     let selected_data = dt.rows( { selected: true } ).data().toArray();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this.submitRequest(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
+       let jobID = selected_data[i][this.JOBID_IDX];
+       // Add the request pending classes to the selected row 
+       $(jobID).addClass("modal-backdrop");
+       this.submitRequest(cmd, requestType, 'jobID='+jobID, $(jobID), jobCount);
+
     } 
   };
 
   private submitJobPath(input: string) {
-    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));
+    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input),
+                       $('#jupyterlab-slurm'));
   };
 
   // private _submit_batch_script_contents(dt: DataTables.Api) {
@@ -438,7 +450,7 @@ class SlurmWidget extends Widget {
   //   }
   // };
 
-  private setJobCompletedTasks(xhttp: XMLHttpRequest, jobCount: any) {
+  private setJobCompletedTasks(xhttp: XMLHttpRequest, element: JQuery, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
         let response = JSON.parse(xhttp.responseText);
@@ -458,11 +470,20 @@ class SlurmWidget extends Widget {
         alert.appendChild(alertText);
         $('#alertContainer').append(alert);
 
+        // Remove request pending classes from the element;
+        // the element may be a table row or the entire 
+        // extension panel 
+        element.removeClass("modal-backdrop");
+
+        // TODO: the alert and removing of the pending classes 
+        // should occur after table reload, but will have to 
+        // rework synchronization here..
+
         // If all current jobs have finished executing, 
         // reload the queue (using squeue)
         if (jobCount) {
           // By the nature of javascript's sequential function execution,
-          // this will not cause a data race (not atomic, but still ok) 
+          // this will not cause a race condition 
           jobCount.count++;
           if (jobCount.numJobs == jobCount.count) {
             this.reloadDataTable($('#queue').DataTable());
