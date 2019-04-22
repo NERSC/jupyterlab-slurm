@@ -132,7 +132,7 @@ class SlurmWidget extends Widget {
 
     // Render table using the DataTables API
     $(document).ready(function() {
-      $('#queue').DataTable( {
+      var table = $('#queue').DataTable( {
         ajax: self.globalViewURL,
         initComplete: function(settings, json) {
           self.initComplete(userRequest);
@@ -223,6 +223,15 @@ class SlurmWidget extends Widget {
           }  
         }
       });
+
+      // Disable the ability to select rows that correspond to a pending request
+      table.on('user-select', function (e, dt, type, cell, originalEvent) {
+        if (originalEvent.target.classList.contains("pending")) {
+          e.preventDefault();
+        }
+      });
+
+
 
       // Add a switch that toggles between global and user view (user by default)
       let toggleContainer = document.createElement("div");
@@ -411,7 +420,7 @@ class SlurmWidget extends Widget {
     for (let i = 0; i < selected_data.length; i++) {
        let jobID = selected_data[i][this.JOBID_IDX];
        // Add the request pending classes to the selected row 
-       $(jobID).addClass("modal-backdrop");
+       $(jobID).addClass("pending");
        this.submitRequest(cmd, requestType, 'jobID='+jobID, $(jobID), jobCount);
 
     } 
@@ -473,7 +482,10 @@ class SlurmWidget extends Widget {
         // Remove request pending classes from the element;
         // the element may be a table row or the entire 
         // extension panel 
-        element.removeClass("modal-backdrop");
+        if (element) {
+          element.removeClass("pending");
+        }
+        
 
         // TODO: the alert and removing of the pending classes 
         // should occur after table reload, but will have to 
