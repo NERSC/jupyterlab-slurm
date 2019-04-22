@@ -30,7 +30,7 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
-import * as fs from 'fs-extra';
+// import * as fs from 'fs-extra';
 
 
 import 'datatables.net-dt/css/jquery.dataTables.css';
