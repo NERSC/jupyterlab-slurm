@@ -100,6 +100,17 @@
 .pending {
   opacity: 0.6;
 }
+
+/* modal form groups */
+.form-group {
+  margin-bottom: 3rem;
+}
+
+/* modal from buttons */
+.btn {
+  float: right;
+}
+
 /* space containing the buttons only, not the search bar */
 .dt-buttons {
   float: left;

@@ -259,6 +259,40 @@ class SlurmWidget extends Widget {
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
 
+      // let modal = 
+      // `
+      // <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
+      //   <div class="modal-dialog modal-dialog-centered" role="document">
+      //     <div class="modal-content">
+      //       <div class="modal-header">
+      //         <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
+      //         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+      //           <span aria-hidden="true">&times;</span>
+      //         </button>
+      //       </div>
+      //       <form id="jobSubmitForm" name="jobSubmit" role="form">
+      //         <div class="modal-body">
+      //           <div class="form-group">
+      //             <label for="path">Enter a file path containing a batch script</label>
+      //             <input type="text" name="path" class="form-control">
+      //             <input type="submit" class="btn btn-primary" id="submitPath">
+      //           </div> 
+      //           <div class="form-group">
+      //             <label for="script">Enter a new batch script</label>
+      //             <textarea name="script" id="batchScript" cols="50" rows="20" class="form-control"></textarea>
+      //           </div>
+      //         </div>  
+      //         <div class="modal-footer">          
+      //           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      //           <input type="submit" class="btn btn-primary" id="submitScript">
+      //         </div>
+      //       </form>
+      //     </div>
+      //   </div>
+      // </div>
+      // `;
+
+
       let modal = 
       `
       <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
@@ -279,12 +313,10 @@ class SlurmWidget extends Widget {
                 </div> 
                 <div class="form-group">
                   <label for="script">Enter a new batch script</label>
-                  <textarea name="script" id="batchScript" class="form-control"></textarea>
+                  <textarea name="script" id="batchScript" cols="50" rows="20" class="form-control"></textarea>
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                  <input type="submit" class="btn btn-primary" id="submitScript">
                 </div>
-              </div>  
-              <div class="modal-footer">          
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <input type="submit" class="btn btn-primary" id="submitScript">
               </div>
             </form>
           </div>
