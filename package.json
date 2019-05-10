@@ -49,6 +49,7 @@
     "bootstrap": "^4.2.1",
     "datatables.net-buttons-dt": "^1.5.4",
     "datatables.net-dt": "^1.10.19",
+    "datatables.net-plugins": "^1.10.19",
     "datatables.net-select-dt": "^1.2.4",
     "fs-extra": "^7.0.1",
     "jquery": "^3.3.1",
