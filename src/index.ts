@@ -142,16 +142,6 @@ class SlurmWidget extends Widget {
         },
         deferRender: true,        
         pageLength: 15,
-        // columns: [
-        // { name: 'JOBID', searchable: true },
-        // { name: 'PARTITION', searchable: true },
-        // { name: 'NAME', searchable: true },
-        // { name: 'USER', searchable: true },
-        // { name: 'ST', searchable: true },
-        // { name: 'TIME', searchable: true },
-        // { name: 'NODES', searchable: true },
-        // { name: 'NODELIST(REASON)', searchable: true },        
-        // ],
         columnDefs: [
           {
             className: 'dt-center', 
@@ -464,56 +454,55 @@ class SlurmWidget extends Widget {
     };
   };
 
- //  private esc(t: string) {
- //    return t
- //            .replace( /&/g, '&amp;' )
- //            .replace( /</g, '&lt;' )
- //            .replace( />/g, '&gt;' )
- //            .replace( /"/g, '&quot;' );
- // }
-
+  /**
+  * This method is adapted from the DataTables Ellipses plug-in:
+  * https://datatables.net/plug-ins/dataRender/ellipsis#Examples
+  * Truncates table content longer than config.cutoff -- if so,
+  * the full content will be displayed in a tool-tip. Also handles
+  * HTML escapes, and truncates at word boundaries. 
+  */
   private columnRenderer() {
     var esc = function ( t ) {
-        return t
-            .replace( /&/g, '&amp;' )
-            .replace( /</g, '&lt;' )
-            .replace( />/g, '&gt;' )
-            .replace( /"/g, '&quot;' );
+      return t
+      .replace( /&/g, '&amp;' )
+      .replace( /</g, '&lt;' )
+      .replace( />/g, '&gt;' )
+      .replace( /"/g, '&quot;' );
     };
 
     return function ( d, type, row ) {
-        // Order, search and type get the original data
-        if ( type !== 'display' ) {
-            return d;
-        }
- 
-        if ( typeof d !== 'number' && typeof d !== 'string' ) {
-            return d;
-        }
- 
-        d = d.toString(); // cast numbers
- 
-        if ( d.length < config["cutoff"] ) {
-            return d;
-        }
- 
-        var shortened = d.substr(0, config["cutoff"]-1);
- 
-        // Find the last white space character in the string
-        if ( config["wordbreak"] ) {
-            shortened = shortened.replace(/\s([^\s]*)$/, '');
-        }
- 
-        // Protect against uncontrolled HTML input
-        if ( config["escapeHtml"] ) {
-            shortened = shortened
-                        .replace( /&/g, '&amp;' )
-                        .replace( /</g, '&lt;' )
-                        .replace( />/g, '&gt;' )
-                        .replace( /"/g, '&quot;' );
-        }
- 
-        return '<span class="ellipsis" title="'+esc(d)+'">'+shortened+'&#8230;</span>';
+      // Order, search and type get the original data
+      if ( type !== 'display' ) {
+        return d;
+      }
+      
+      if ( typeof d !== 'number' && typeof d !== 'string' ) {
+        return d;
+      }
+      
+      d = d.toString(); // cast numbers
+      
+      if ( d.length < config["cutoff"] ) {
+        return d;
+      }
+      
+      var shortened = d.substr(0, config["cutoff"]-1);
+      
+      // Find the last white space character in the string
+      if ( config["wordbreak"] ) {
+        shortened = shortened.replace(/\s([^\s]*)$/, '');
+      }
+      
+      // Protect against uncontrolled HTML input
+      if ( config["escapeHtml"] ) {
+        shortened = shortened
+        .replace( /&/g, '&amp;' )
+        .replace( /</g, '&lt;' )
+        .replace( />/g, '&gt;' )
+        .replace( /"/g, '&quot;' );
+      }
+      
+      return '<span class="ellipsis" title="'+esc(d)+'">'+shortened+'&#8230;</span>';
     };
   };
 
