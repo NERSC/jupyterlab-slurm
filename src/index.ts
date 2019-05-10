@@ -30,17 +30,21 @@ import {
 } from '@phosphor/widgets';
 
 import * as $ from 'jquery';
+// import * as fs from 'fs-extra';
+
+
 import 'datatables.net-dt/css/jquery.dataTables.css';
 import 'datatables.net';
 import 'datatables.net-buttons-dt';
 import 'datatables.net-buttons';
 import 'datatables.net-select';
 
-
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
+
+import * as config from './slurm-config/config.json';
 
 /**
  * The class names for the Slurm extension icon, for launcher and
@@ -55,12 +59,12 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
-const AUTO_SQUEUE_LIMIT = 60000;
+// const AUTO_SQUEUE_LIMIT = config["squeueRefreshRate"];
 
 
 class SlurmWidget extends Widget {
   // The table element containing Slurm queue data. 
-  private queue_table: HTMLElement;
+  private queueTable: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
   // The column index of the username
@@ -81,27 +85,27 @@ class SlurmWidget extends Widget {
     this.title.closable = true;
     this.addClass('jp-SlurmWidget');
 
-    this.queue_table = document.createElement('table');
-    this.queue_table.setAttribute('id', 'queue');
-    this.queue_table.setAttribute('width', '100%');
-    this.queue_table.setAttribute('style', 'font:14px');
+    this.queueTable = document.createElement('table');
+    this.queueTable.setAttribute('id', 'queue');
+    this.queueTable.setAttribute('width', '100%');
+    this.queueTable.setAttribute('style', 'font:14px');
 
     // These css class definitions are from the DataTables default styling package
     // See: https://datatables.net/manual/styling/classes#display
-    this.queue_table.classList.add('order-column', 'cell-border');
-    this.node.appendChild(this.queue_table);
+    this.queueTable.classList.add('order-column', 'cell-border');
+    this.node.appendChild(this.queueTable);
 
-    // Add thead to queue_table, and define column names;
+    // Add thead to queueTable, and define column names;
     // this is required for DataTable's AJAX functionality. 
-    let tbl_head = document.createElement('thead');
-    this.queue_table.appendChild(tbl_head);
-    let head_row = tbl_head.insertRow(0);
-    let cols = ['JOBID', 'PARTITION', 'NAME', 'USER', 'ST', 'TIME', 'NODES', 'NODELIST(REASON)'];
+    let tableHead = document.createElement('thead');
+    this.queueTable.appendChild(tableHead);
+    let headRow = tableHead.insertRow(0);
+    let cols = config["queueCols"]; // ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"];
     for (let i = 0; i < cols.length; i++) {
       let h = document.createElement('th');
       let t = document.createTextNode(cols[i]);
       h.appendChild(t);
-      head_row.appendChild(h);
+      headRow.appendChild(h);
     }
 
     // reference to this SlurmWidget object for use in functions where THIS
@@ -114,8 +118,8 @@ class SlurmWidget extends Widget {
     // The ajax request URL for calling squeue; changes depending on whether 
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
-    this.userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
-    this.globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
+    this.userViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=true');
+    this.globalViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=false');
 
     // Fetch the user name from the server extension; this will be 
     // used in the initComplete method once this request completes,
@@ -130,7 +134,7 @@ class SlurmWidget extends Widget {
 
     // Render table using the DataTables API
     $(document).ready(function() {
-      $('#queue').DataTable( {
+      var table = $('#queue').DataTable( {
         ajax: self.globalViewURL,
         initComplete: function(settings, json) {
           self.initComplete(userRequest);
@@ -140,20 +144,12 @@ class SlurmWidget extends Widget {
         },
         deferRender: true,        
         pageLength: 15,
-        columns: [
-        { name: 'JOBID', searchable: true },
-        { name: 'PARTITION', searchable: true },
-        { name: 'NAME', searchable: true },
-        { name: 'USER', searchable: true },
-        { name: 'ST', searchable: true },
-        { name: 'TIME', searchable: true },
-        { name: 'NODES', searchable: true },
-        { name: 'NODELIST(REASON)', searchable: true },        
-        ],
         columnDefs: [
           {
             className: 'dt-center', 
-            targets: '_all'
+            searchable: true,
+            targets: '_all',
+            render: self.columnRenderer()
           }
         ],
         // Set rowId to maintain selection after table reload 
@@ -172,53 +168,38 @@ class SlurmWidget extends Widget {
             name: 'Reload',
             action: (e, dt, node, config) => {
               dt.ajax.reload(null, false);
-              // NOTE: currently not using this feature -- may use again in the future.
-              // Disable the button to avoid overloading Slurm with calls to squeue
-              // Note, this does not persist across a browser window refresh
-              // dt.button( 'Reload:name' ).disable();
-              // Reactivate Refresh button after USER_SQUEUE_LIMIT milliseconds
-              // setTimeout(function() { dt.button( 'Reload:name' ).enable() }, USER_SQUEUE_LIMIT);
             }
           },
           {
             extend: 'selected',
-            text: 'Kill Selected Job(s)',
+            text: 'Kill Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scancel', 'DELETE', dt);
+              self.runOnSelectedRows('/scancel', 'DELETE', dt);
             }
           },
           {
             extend: 'selected',
-            text: 'Hold Selected Job(s)',
+            text: 'Hold Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scontrol/hold', 'PATCH', dt);
+              self.runOnSelectedRows('/scontrol/hold', 'PATCH', dt);
             }  
           },
           {
             extend: 'selected',
-            text: 'Release Selected Job(s)',
+            text: 'Release Job(s)',
             action: (e, dt, node, config) => {
-              self.runOnSelected('/scontrol/release', 'PATCH', dt);
+              self.runOnSelectedRows('/scontrol/release', 'PATCH', dt);
             }  
+          },
+          {
+            text: "Submit Job",
+            action: (e, dt, node, config) => {
+              self.launchSubmitModal();
+            }
           },
           {
             extend: 'selectNone'
-          },
-          // Job submission temporarily disabled
-          // {
-          //   text: 'Submit Slurm Script via File Path',
-          //   action:  (e, dt, node, config) => {
-          //     var scriptPath = window.prompt('Enter a Slurm script file path');
-          //     self._submit_batch_script_path(scriptPath, dt)
-          //   }
-          // },
-          // {
-          //   text: 'Submit Slurm Script via File Contents',
-          //   action: (e, dt, node, config) => {
-          //     self._submit_batch_script_contents(dt);
-          //   }
-	  // }
-       
+          }       
           ],
           // https://datatables.net/reference/option/buttons.dom.button
           // make it easier to identify/grab buttons to change their appearance
@@ -230,6 +211,14 @@ class SlurmWidget extends Widget {
           }  
         }
       });
+
+      // Disable the ability to select rows that correspond to a pending request
+      table.on('user-select', function (e, dt, type, cell, originalEvent) {
+        if ($(originalEvent.target).parent().hasClass("pending")) {
+          e.preventDefault();
+        }
+      });
+
 
       // Add a switch that toggles between global and user view (user by default)
       let toggleContainer = document.createElement("div");
@@ -256,7 +245,75 @@ class SlurmWidget extends Widget {
       alertContainer.setAttribute("id", "alertContainer");
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
-    });
+
+
+
+      let modal = 
+      `
+      <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3 class="modal-title" id="submitJobModalTitle">Submit a Batch Job</h3>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <form id="jobSubmitForm" name="jobSubmit" role="form">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="path">Enter a file path containing a batch script</label>
+                  <input type="text" name="path" id="batchPath" class="form-control">
+                  <input type="submit" class="btn btn-primary" id="submitPath">
+                </div> 
+                <div class="form-group">
+                  <label for="script">Enter a new batch script</label>
+                  <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
+                  <input type="submit" class="btn btn-primary" id="submitScript">
+                  <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      `;
+
+      // TODO: import html string from external file for cleanliness
+      // this commented out code doesn't work as of now
+      // let modal = fs
+      //   .readFileSync("../templates/job_submit_modal.html", "utf-8");
+
+      let modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modal;
+      $('#jupyterlab-slurm').append(modalContainer);
+
+      // The path submission click function
+      $('#submitPath').click(function( event ) {
+        event.preventDefault();
+        self.submitJobPath(<string>$("#batchPath").val());
+        // Reset form fields
+        document.forms["jobSubmitForm"].reset();
+        // Hide the modal
+        (<any>$('#submitJobModal')).modal('hide');
+      });
+
+      // The script submission click function 
+      $('#submitScript').click(function( event ) {
+        event.preventDefault();
+        self.submitJobScript(<string>$("#batchScript").val().toString());
+        // Reset form fields
+        document.forms["jobSubmitForm"].reset();
+        // Hide the modal
+        (<any>$('#submitJobModal')).modal('hide');
+      });
+
+    }); 
+  }
+
+  private launchSubmitModal() {
+    (<any>$('#submitJobModal')).modal('show');
+    $('.modal-backdrop').detach().appendTo('#jupyterlab-slurm');
   }
 
   /**
@@ -272,24 +329,26 @@ class SlurmWidget extends Widget {
     $.when(userRequest).done(function () {
       $("#toggleSwitch").change(function () {
         if ((<HTMLInputElement>this).checked) {
+          // Global -> User view switch
           table.ajax.url(self.userViewURL);
           self.dataCache = table.rows().data();
+          table.clear();
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] == self.user;
               });
-          table.clear();
           table.rows.add(filteredData.toArray());
           table.draw();
         }
         else {
+          // User -> Global view switch
           table.ajax.url(self.globalViewURL);
           let userData = table.data(); 
+          table.clear();
           let filteredData = self.dataCache
               .filter(function(value, index) {
                 return value[self.USER_IDX] != self.user;
               })
-          table.clear();
           table.rows.add(filteredData.toArray());
           table.rows.add(userData.toArray());
       	  table.draw();
@@ -306,9 +365,10 @@ class SlurmWidget extends Widget {
   }
 
 
-  private submitRequest(cmd: string, requestType: string, body: string, jobCount: any = null) {
+  private submitRequest(cmd: string, requestType: string, body: string, 
+                        element: JQuery = null, jobCount: any = null) {
     let xhttp = new XMLHttpRequest();
-    this.setJobCompletedTasks(xhttp, jobCount);
+    this.setJobCompletedTasks(xhttp, element, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
@@ -321,56 +381,36 @@ class SlurmWidget extends Widget {
     xhttp.send(body);
   }
 
-  private runOnSelected(cmd: string, requestType: string, dt: DataTables.Api) {
+  private runOnSelectedRows(cmd: string, requestType: string, dt: DataTables.Api) {
     // Run CMD on all selected rows, by submitting a unique request for each 
     // selected row. Eventually we may want to change the logic for this functionality
     // such that only one request is made with a list of Job IDs instead of one request
     // per selected job. Changes will need to be made on the back end for this to work
 
     let selected_data = dt.rows( { selected: true } ).data().toArray();
+    dt.rows( {selected: true } ).deselect();
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
-       this.submitRequest(cmd, requestType, 'jobID='+selected_data[i][this.JOBID_IDX], jobCount);
-    }
-    
-    
+       let jobID = selected_data[i][this.JOBID_IDX];
+       // Add the request pending classes to the selected row 
+       $("#"+jobID).addClass("pending");
+       this.submitRequest(cmd, requestType, 'jobID='+jobID, $("#"+jobID), jobCount);
+
+    } 
   };
 
-  // NOTE: Job submission temporarily disabled -- this functions are working and ready to be used and/or refactored
-  // private _submit_batch_script_path(script: string, dt: DataTables.Api) {
-  //   this.submitRequest('/sbatch?scriptIs=path', 'POST', 'script=' + encodeURIComponent(script));
-  //   this.reloadDataTable(dt);
-  // };
+  private submitJobPath(input: string) {
+    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));         
+  };
 
-  // private _submit_batch_script_contents(dt: DataTables.Api) {
-  //   // TODO: clean up
-  //   if ( $('#slurm_script').length == 0) {
-  //    // at the end of the main queue table area, append a prompt message and a form submission area
-  //   $('#queue_wrapper').append('<br><div id="submit_script"><span>'+
-  //                              'Paste in the contents of a Slurm script file and submit them to be run </span><br><br>' +
-  //                              '<textarea id="slurm_script" cols="50" rows="20"></textarea><br>');
-  //   // after the form submission area, insert a submit button and then a cancel button
-  //   $('#slurm_script').after('<div id="slurm_buttons">'+
-  //                             '<button class="button slurm_button" id="submit_button"><span>Submit</span></button>' +
-  //                             '<button class="button slurm_button" id="cancel_button"><span>Cancel</span></button>'+
-  //                             '</div></div>');
-  //   // message above textarea (form submission area), textarea itself, and the two buttons below
-  //   var submitScript = $('#submit_script');
-  //   // do the callback after clicking on the submit button
-  //   $('#submit_button').click( () => {// grab contents of textarea, convert to string, then URI encode them
-  //                                     var scriptContents = encodeURIComponent($('#slurm_script').val().toString()); 
-  //                                     this.submitRequest('/sbatch?scriptIs=contents', 'POST', 'script='+scriptContents);
-  //                                     this.reloadDataTable(dt);
-  //                                     // remove the submit script prompt area
-  //                                     submitScript.remove();
-  //                                     } );
-  //   // remove the submit script prompt area after clicking the cancel button
-  //   $('#cancel_button').unbind().click( () => {submitScript.remove();} );
-    
-  //   }
-  // };
 
-  private setJobCompletedTasks(xhttp: XMLHttpRequest, jobCount: any) {
+
+  private submitJobScript(input: string) {
+    this.submitRequest('/sbatch?inputType=contents', 'POST', 'input=' + encodeURIComponent(input));
+  };
+
+
+  private setJobCompletedTasks(xhttp: XMLHttpRequest, element: JQuery, jobCount: any) {
     xhttp.onreadystatechange = () => {
       if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
         let response = JSON.parse(xhttp.responseText);
@@ -390,11 +430,22 @@ class SlurmWidget extends Widget {
         alert.appendChild(alertText);
         $('#alertContainer').append(alert);
 
+        // Remove request pending classes from the element;
+        // the element may be a table row or the entire 
+        // extension panel 
+        if (element) {
+          element.removeClass("pending");
+        }
+        
+        // TODO: the alert and removing of the pending class 
+        // should probably occur after table reload completes,
+        //  but we'll need to rework synchronization here..
+
         // If all current jobs have finished executing, 
         // reload the queue (using squeue)
         if (jobCount) {
           // By the nature of javascript's sequential function execution,
-          // this will not cause a data race (not atomic, but still ok) 
+          // this will not cause a race condition 
           jobCount.count++;
           if (jobCount.numJobs == jobCount.count) {
             this.reloadDataTable($('#queue').DataTable());
@@ -404,6 +455,58 @@ class SlurmWidget extends Widget {
            this.reloadDataTable($('#queue').DataTable());
         }
       }
+    };
+  };
+
+  /**
+  * This method is adapted from the DataTables Ellipses plug-in:
+  * https://datatables.net/plug-ins/dataRender/ellipsis#Examples
+  * Truncates table content longer than config.cutoff -- if so,
+  * the full content will be displayed in a tool-tip. Also handles
+  * HTML escapes, and truncates at word boundaries. 
+  */
+  private columnRenderer() {
+    var esc = function ( t ) {
+      return t
+      .replace( /&/g, '&amp;' )
+      .replace( /</g, '&lt;' )
+      .replace( />/g, '&gt;' )
+      .replace( /"/g, '&quot;' );
+    };
+
+    return function ( d, type, row ) {
+      // Order, search and type get the original data
+      if ( type !== 'display' ) {
+        return d;
+      }
+      
+      if ( typeof d !== 'number' && typeof d !== 'string' ) {
+        return d;
+      }
+      
+      d = d.toString(); // cast numbers
+      
+      if ( d.length < config["cutoff"] ) {
+        return d;
+      }
+      
+      var shortened = d.substr(0, config["cutoff"]-1);
+      
+      // Find the last white space character in the string
+      if ( config["wordbreak"] ) {
+        shortened = shortened.replace(/\s([^\s]*)$/, '');
+      }
+      
+      // Protect against uncontrolled HTML input
+      if ( config["escapeHtml"] ) {
+        shortened = shortened
+        .replace( /&/g, '&amp;' )
+        .replace( /</g, '&lt;' )
+        .replace( />/g, '&gt;' )
+        .replace( /"/g, '&quot;' );
+      }
+      
+      return '<span class="ellipsis" title="'+esc(d)+'">'+shortened+'&#8230;</span>';
     };
   };
 
@@ -446,8 +549,10 @@ function activate(
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
         widget.title.icon = SLURM_ICON_CLASS_T;
-        // Reload table every 60 seconds
-        setInterval(() => widget.update(), AUTO_SQUEUE_LIMIT);
+        // Reload table on regular intervals if autoReload is activated
+        if (config["autoReload"]) {
+          setInterval(() => widget.update(), config["autoReloadRate"]);
+        }
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration

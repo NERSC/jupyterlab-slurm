@@ -24,6 +24,10 @@
 }
 
 
+.modal, .modal-backdrop {
+  position: absolute !important;
+}
+
 /* The alert itself -- this class is originally defined by bootstrap */
 .alert {
   height: 1.5em;
@@ -42,6 +46,11 @@
   font-size: .9em;
   margin-top: 10px;
 
+}
+
+#queue {
+  font: 14px;
+  width: 100%;
 }
 
 /* basically all of the substance/content of the widget */
@@ -74,7 +83,7 @@
   margin-top: 1em;
   margin-bottom: 1em;
   /* see here: https://stackoverflow.com/questions/9519841/why-does-this-css-margin-top-style-not-work#9519933 */;
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* attributes of the buttons at the top of the table */
@@ -87,10 +96,32 @@
   font-family: var(--jp-ui-font-family);
   background-color: var(--jp-layout-color2);
   box-shadow: var(--jp-toolbar-box-shadow);
-  margin-right: 0.3em;
+  margin: 0.3em;
   /* copy-pasted from dataTables CSS for .dataTables_wrapper .dataTables_paginate .paginate_button */
   cursor: pointer;
   *cursor: hand;
+}
+
+.pending {
+  opacity: 0.6;
+}
+
+/* modal form groups */
+.form-group {
+  margin-bottom: 3rem;
+}
+
+/* modal form inputs */
+.form-control {
+  font-size: 14px;
+}
+
+/* modal from buttons */
+.btn {
+  float: right;
+  margin-top: 1em;
+  margin-bottom: .8em;
+  margin-left: .5em;
 }
 
 /* space containing the buttons only, not the search bar */

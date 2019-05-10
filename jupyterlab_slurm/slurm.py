@@ -64,21 +64,21 @@ class SbatchHandler(ShellExecutionHandler):
             file_object.write(string)
             file_object.close()
             return
-        scriptIs = self.get_query_argument('scriptIs')
+        inputType = self.get_query_argument('inputType')
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
-        if scriptIs:
-            if scriptIs == 'path':
-                script_path = self.get_body_argument('script')
-                stdout, stderr = await self.run_command('sbatch '+script_path)
-            elif scriptIs == 'contents':
-                script_contents = self.get_body_argument('script')
+        if inputType:
+            if inputType == 'path':
+                script_path = self.get_body_argument('input')
+                stdout, stderr, returncode = await self.run_command('sbatch '+script_path)
+            elif inputType == 'contents':
+                script_contents = self.get_body_argument('input')
                 string_to_file(script_contents)
                 stdout, stderr, returncode = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
                 os.remove('temporary_file.temporary')
             else:
-                raise Exception('The query argument scriptIs needs to be either \'path\' or \'contents\'.')
+                raise Exception('The query argument inputType needs to be either \'path\' or \'contents\'.')
         else:
-            raise MissingArgumentError('scriptIs')
+            raise MissingArgumentError('inputType')
         if stdout:
             responseMessage = stdout
         else:
