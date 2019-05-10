@@ -1,0 +1,9 @@
+{
+  "squeueURL": "/squeue",
+  "autoReload": false,
+  "autoReloadRate": 60000,
+  "queueCols": ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"],
+  "cutoff": 3,
+  "wordbreak": true,
+  "escapeHtml": true
+}
