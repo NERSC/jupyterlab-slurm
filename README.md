@@ -25,7 +25,7 @@ jupyter labextension install jupyterlab-slurm
 If you are running Notebook 5.2 or earlier, enable the server extension by running
 
 ```bash
-jupyter serverextension enable --py --sys-prefix dask_labextension
+jupyter serverextension enable --py --sys-prefix jupyterlab_slurm
 ```
 
 After launching JupyterLab, the extension can be found in the command palette under
