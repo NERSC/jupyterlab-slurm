@@ -44,7 +44,7 @@ import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
 
-import * as config from './config.json';
+import * as config from '../config.json';
 
 /**
  * The class names for the Slurm extension icon, for launcher and
@@ -59,7 +59,7 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 
 // The interval (milliseconds) in which the queue data automatically reloads
 // by calling squeue
-const AUTO_SQUEUE_LIMIT = 60000;
+// const AUTO_SQUEUE_LIMIT = config["squeueRefreshRate"];
 
 
 class SlurmWidget extends Widget {
@@ -100,7 +100,7 @@ class SlurmWidget extends Widget {
     let tableHead = document.createElement('thead');
     this.queueTable.appendChild(tableHead);
     let headRow = tableHead.insertRow(0);
-    let cols = ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"];
+    let cols = config["queueCols"]; // ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"];
     for (let i = 0; i < cols.length; i++) {
       let h = document.createElement('th');
       let t = document.createTextNode(cols[i]);
@@ -144,19 +144,20 @@ class SlurmWidget extends Widget {
         },
         deferRender: true,        
         pageLength: 15,
-        columns: [
-        { name: 'JOBID', searchable: true },
-        { name: 'PARTITION', searchable: true },
-        { name: 'NAME', searchable: true },
-        { name: 'USER', searchable: true },
-        { name: 'ST', searchable: true },
-        { name: 'TIME', searchable: true },
-        { name: 'NODES', searchable: true },
-        { name: 'NODELIST(REASON)', searchable: true },        
-        ],
+        // columns: [
+        // { name: 'JOBID', searchable: true },
+        // { name: 'PARTITION', searchable: true },
+        // { name: 'NAME', searchable: true },
+        // { name: 'USER', searchable: true },
+        // { name: 'ST', searchable: true },
+        // { name: 'TIME', searchable: true },
+        // { name: 'NODES', searchable: true },
+        // { name: 'NODELIST(REASON)', searchable: true },        
+        // ],
         columnDefs: [
           {
             className: 'dt-center', 
+            searchable: true,
             targets: '_all'
           }
         ],
@@ -226,7 +227,6 @@ class SlurmWidget extends Widget {
           e.preventDefault();
         }
       });
-
 
 
       // Add a switch that toggles between global and user view (user by default)
@@ -444,9 +444,9 @@ class SlurmWidget extends Widget {
           element.removeClass("pending");
         }
         
-        // TODO: the alert and removing of the pending classes 
-        // should occur after table reload, but will have to 
-        // rework synchronization here..
+        // TODO: the alert and removing of the pending class 
+        // should probably occur after table reload completes,
+        //  but we'll need to rework synchronization here..
 
         // If all current jobs have finished executing, 
         // reload the queue (using squeue)
@@ -504,8 +504,10 @@ function activate(
         // Instantiate a new widget if one does not exist
         widget = new SlurmWidget(); 
         widget.title.icon = SLURM_ICON_CLASS_T;
-        // Reload table every 60 seconds
-        setInterval(() => widget.update(), AUTO_SQUEUE_LIMIT);
+        // Reload table on regular intervals if autoReload is activated
+        if (config["autoReload"]) {
+          setInterval(() => widget.update(), config["autoReloadRate"]);
+        }
       }
       if (!tracker.has(widget)) {
         // Track the state of the widget for later restoration
