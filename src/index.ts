@@ -44,7 +44,7 @@ import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
 
-import * as config from '../config.json';
+import * as config from './slurm-config/config.json';
 
 /**
  * The class names for the Slurm extension icon, for launcher and

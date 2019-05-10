@@ -10,7 +10,6 @@
     "target": "ES5",
     "outDir": "./lib",
     "lib": ["ES5", "ES2015.Promise", "DOM"],
-    // "typeRoots": ["node_modules/@types", "custom_typings", "."],
     "types": []
   },
   "include": ["src/*"]
