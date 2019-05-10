@@ -87,6 +87,8 @@ class SlurmWidget extends Widget {
 
     this.queueTable = document.createElement('table');
     this.queueTable.setAttribute('id', 'queue');
+    this.queueTable.setAttribute('width', '100%');
+    this.queueTable.setAttribute('style', 'font:14px');
 
     // These css class definitions are from the DataTables default styling package
     // See: https://datatables.net/manual/styling/classes#display
