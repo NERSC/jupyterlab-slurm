@@ -44,6 +44,8 @@ import 'bootstrap/dist/js/bootstrap.js';
 
 import '../style/index.css';
 
+import * as config from './config.json';
+
 /**
  * The class names for the Slurm extension icon, for launcher and
  * tab, respectively
@@ -62,7 +64,7 @@ const AUTO_SQUEUE_LIMIT = 60000;
 
 class SlurmWidget extends Widget {
   // The table element containing Slurm queue data. 
-  private queue_table: HTMLElement;
+  private queueTable: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
   // The column index of the username
@@ -83,27 +85,27 @@ class SlurmWidget extends Widget {
     this.title.closable = true;
     this.addClass('jp-SlurmWidget');
 
-    this.queue_table = document.createElement('table');
-    this.queue_table.setAttribute('id', 'queue');
-    this.queue_table.setAttribute('width', '100%');
-    this.queue_table.setAttribute('style', 'font:14px');
+    this.queueTable = document.createElement('table');
+    this.queueTable.setAttribute('id', 'queue');
+    // this.queueTable.setAttribute('width', '100%');
+    // this.queueTable.setAttribute('style', 'font:14px');
 
     // These css class definitions are from the DataTables default styling package
     // See: https://datatables.net/manual/styling/classes#display
-    this.queue_table.classList.add('order-column', 'cell-border');
-    this.node.appendChild(this.queue_table);
+    this.queueTable.classList.add('order-column', 'cell-border');
+    this.node.appendChild(this.queueTable);
 
-    // Add thead to queue_table, and define column names;
+    // Add thead to queueTable, and define column names;
     // this is required for DataTable's AJAX functionality. 
-    let tbl_head = document.createElement('thead');
-    this.queue_table.appendChild(tbl_head);
-    let head_row = tbl_head.insertRow(0);
-    let cols = ['JOBID', 'PARTITION', 'NAME', 'USER', 'ST', 'TIME', 'NODES', 'NODELIST(REASON)'];
+    let tableHead = document.createElement('thead');
+    this.queueTable.appendChild(tableHead);
+    let headRow = tableHead.insertRow(0);
+    let cols = ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"];
     for (let i = 0; i < cols.length; i++) {
       let h = document.createElement('th');
       let t = document.createTextNode(cols[i]);
       h.appendChild(t);
-      head_row.appendChild(h);
+      headRow.appendChild(h);
     }
 
     // reference to this SlurmWidget object for use in functions where THIS
@@ -116,8 +118,8 @@ class SlurmWidget extends Widget {
     // The ajax request URL for calling squeue; changes depending on whether 
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
-    this.userViewURL = URLExt.join(baseUrl, '/squeue?userOnly=true');
-    this.globalViewURL = URLExt.join(baseUrl, '/squeue?userOnly=false');
+    this.userViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=true');
+    this.globalViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=false');
 
     // Fetch the user name from the server extension; this will be 
     // used in the initComplete method once this request completes,

@@ -48,6 +48,11 @@
 
 }
 
+#queueTable {
+  font: 14px;
+  width: 100%;
+}
+
 /* basically all of the substance/content of the widget */
 #queue_wrapper {
   margin-left: 3em;
