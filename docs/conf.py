@@ -20,13 +20,13 @@
 # -- Project information -----------------------------------------------------
 
 project = 'jupyterlab-slurm'
-copyright = '2019, Jon Hays, William Krinsman, NERSC'
-author = 'Jon Hays, William Krinsman, NERSC'
+copyright = '2019, NERSC'
+author = 'NERSC, Jon Hays, William Krinsman'
 
 # The short X.Y version
-version = ''
+version = '0.1'
 # The full version, including alpha/beta/rc tags
-release = ''
+release = '0.1.3'
 
 
 # -- General configuration ---------------------------------------------------
@@ -75,7 +75,8 @@ pygments_style = None
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'
+html_theme_path = ["_themes", ]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

@@ -3,8 +3,8 @@
 Installation
 ------------
 
-The jupyterlab-slurm extension requires both a client-side `JupyterLab extension <https://www.npmjs.com/package/jupyterlab-slurm>`__ and a server-side
-Jupyter `notebook server extension <https://pypi.org/project/jupyterlab-slurm/>`__.
+The jupyterlab-slurm extension requires both a client-side `JupyterLab extension <https://www.npmjs.com/package/jupyterlab-slurm>`_ and a server-side
+Jupyter `notebook server extension <https://pypi.org/project/jupyterlab-slurm/>`_.
 
 Prerequisites
 ~~~~~~~~~~~~~
@@ -14,8 +14,8 @@ Make sure you have the following prerequisites installed on your system before g
 * Node.js 5+
 * Slurm 
 
-Install the notebook server extension from PyPi using ``pip``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install the notebook server extension from PyPi
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. code:: bash
 
     pip install jupyterlab_slurm
@@ -32,6 +32,4 @@ Install the JupyterLab extension from NPM
 
     jupyter labextension install jupyterlab-slurm
 
-Now you should be all set. After launching JupyterLab, the extension can be found in the command palette under
-the name ``Slurm Queue Manager``, and is listed under the ``HPC TOOLS`` section
-of the palette and the launcher.
+Now, you should be all set! 
