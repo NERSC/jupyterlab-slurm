@@ -3,7 +3,7 @@
 A JupyterLab extension that interfaces with the Slurm Workload Manager, 
 providing simple and intuitive controls for viewing and managing jobs on the queue.
 
-![Slurm Extension](./slurm.png)
+![Slurm Extension](./docs/images/slurm.png)
 
 ## Prerequisites
 
