@@ -1,16 +1,16 @@
 import {
-  JupyterLab, 
-  JupyterLabPlugin, 
+  JupyterLab,
+  JupyterLabPlugin,
   ILayoutRestorer
 } from '@jupyterlab/application';
 
 import {
-  ICommandPalette, 
+  ICommandPalette,
   InstanceTracker
 } from '@jupyterlab/apputils';
 
-import { 
-  ILauncher 
+import {
+  ILauncher
 } from '@jupyterlab/launcher';
 
 import {
@@ -18,7 +18,7 @@ import {
 } from '@jupyterlab/coreutils';
 
 import {
-  JSONExt 
+  JSONExt
 } from '@phosphor/coreutils';
 
 import {
@@ -63,7 +63,7 @@ const SLURM_ICON_CLASS_T = 'jp-NerscTabIcon';
 
 
 class SlurmWidget extends Widget {
-  // The table element containing Slurm queue data. 
+  // The table element containing Slurm queue data.
   private queueTable: HTMLElement;
   // The column index of job ID
   readonly JOBID_IDX = 0;
@@ -96,7 +96,7 @@ class SlurmWidget extends Widget {
     this.node.appendChild(this.queueTable);
 
     // Add thead to queueTable, and define column names;
-    // this is required for DataTable's AJAX functionality. 
+    // this is required for DataTable's AJAX functionality.
     let tableHead = document.createElement('thead');
     this.queueTable.appendChild(tableHead);
     let headRow = tableHead.insertRow(0);
@@ -115,17 +115,17 @@ class SlurmWidget extends Widget {
     // The base URL that prepends commands -- necessary for hub functionality
     var baseUrl = PageConfig.getOption('baseUrl');
 
-    // The ajax request URL for calling squeue; changes depending on whether 
+    // The ajax request URL for calling squeue; changes depending on whether
     // we are in user view (default), or global view, as determined by the
     // toggleSwitch, defined below.
     this.userViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=true');
     this.globalViewURL = URLExt.join(baseUrl, config['squeueURL'] + '?userOnly=false');
 
-    // Fetch the user name from the server extension; this will be 
+    // Fetch the user name from the server extension; this will be
     // used in the initComplete method once this request completes,
-    // and after the table is fully initialized. 
+    // and after the table is fully initialized.
     let userRequest = $.ajax({
-      url: '/user', 
+      url: '/user',
       success: function(result) {
         self.user = result;
         console.log("user: ", self.user);
@@ -142,18 +142,18 @@ class SlurmWidget extends Widget {
         select: {
           style: 'os',
         },
-        deferRender: true,        
+        deferRender: true,
         pageLength: 15,
         columnDefs: [
           {
-            className: 'dt-center', 
+            className: 'dt-center',
             searchable: true,
             targets: '_all',
             render: self.columnRenderer()
           }
         ],
-        // Set rowId to maintain selection after table reload 
-        // (use the queue's primary key (JOBID) for rowId). 
+        // Set rowId to maintain selection after table reload
+        // (use the queue's primary key (JOBID) for rowId).
         rowId: self.JOBID_IDX.toString(),
         autoWidth: true,
         scrollY: '400px',
@@ -161,7 +161,7 @@ class SlurmWidget extends Widget {
         scrollCollapse: true,
         // Element layout parameter
         dom: '<"toolbar"Bfr><t><lip>',
-        buttons: { 
+        buttons: {
           buttons: [
           {
             text: 'Reload',
@@ -182,14 +182,14 @@ class SlurmWidget extends Widget {
             text: 'Hold Job(s)',
             action: (e, dt, node, config) => {
               self.runOnSelectedRows('/scontrol/hold', 'PATCH', dt);
-            }  
+            }
           },
           {
             extend: 'selected',
             text: 'Release Job(s)',
             action: (e, dt, node, config) => {
               self.runOnSelectedRows('/scontrol/release', 'PATCH', dt);
-            }  
+            }
           },
           {
             text: "Submit Job",
@@ -199,7 +199,7 @@ class SlurmWidget extends Widget {
           },
           {
             extend: 'selectNone'
-          }       
+          }
           ],
           // https://datatables.net/reference/option/buttons.dom.button
           // make it easier to identify/grab buttons to change their appearance
@@ -208,7 +208,7 @@ class SlurmWidget extends Widget {
               tag: 'button',
               className: 'button',
             }
-          }  
+          }
         }
       });
 
@@ -238,8 +238,8 @@ class SlurmWidget extends Widget {
       toggleContainer.appendChild(toggleSwitch);
       toggleContainer.appendChild(toggleLabel);
       $('#jupyterlab-slurm').append(toggleContainer);
-     
-      // Set up and append the alert container -- an area for displaying request response 
+
+      // Set up and append the alert container -- an area for displaying request response
       // messages as color coded, dismissable, alerts
       let alertContainer = document.createElement('div');
       alertContainer.setAttribute("id", "alertContainer");
@@ -248,7 +248,7 @@ class SlurmWidget extends Widget {
 
 
 
-      let modal = 
+      let modal =
       `
       <div class="modal fade" id="submitJobModal" tabindex="-1" role="dialog" aria-labelledby="submitJobModalTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
@@ -265,7 +265,7 @@ class SlurmWidget extends Widget {
                   <label for="path">Enter a file path containing a batch script</label>
                   <input type="text" name="path" id="batchPath" class="form-control">
                   <input type="submit" class="btn btn-primary" id="submitPath">
-                </div> 
+                </div>
                 <div class="form-group">
                   <label for="script">Enter a new batch script</label>
                   <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
@@ -298,7 +298,7 @@ class SlurmWidget extends Widget {
         (<any>$('#submitJobModal')).modal('hide');
       });
 
-      // The script submission click function 
+      // The script submission click function
       $('#submitScript').click(function( event ) {
         event.preventDefault();
         self.submitJobScript(<string>$("#batchScript").val().toString());
@@ -308,7 +308,7 @@ class SlurmWidget extends Widget {
         (<any>$('#submitJobModal')).modal('hide');
       });
 
-    }); 
+    });
   }
 
   private launchSubmitModal() {
@@ -319,9 +319,9 @@ class SlurmWidget extends Widget {
   /**
   * This method is triggered when the table is fully initialized.
   * Waits for username request to finish, and then defines functionality
-  * for switching between user and global view. The switch function is 
+  * for switching between user and global view. The switch function is
   * called immediately after it is defined, which makes it so user view
-  * is the default. 
+  * is the default.
   */
   private initComplete(userRequest: any) {
     var self = this;
@@ -343,7 +343,7 @@ class SlurmWidget extends Widget {
         else {
           // User -> Global view switch
           table.ajax.url(self.globalViewURL);
-          let userData = table.data(); 
+          let userData = table.data();
           table.clear();
           let filteredData = self.dataCache
               .filter(function(value, index) {
@@ -365,24 +365,35 @@ class SlurmWidget extends Widget {
   }
 
 
-  private submitRequest(cmd: string, requestType: string, body: string, 
+  private submitRequest(cmd: string, requestType: string, body: string,
                         element: JQuery = null, jobCount: any = null) {
-    let xhttp = new XMLHttpRequest();
-    this.setJobCompletedTasks(xhttp, element, jobCount);
     // The base URL that prepends the command path -- necessary for hub functionality
     let baseUrl = PageConfig.getOption('baseUrl');
     // Prepend command with the base URL to yield the final endpoint
     let endpoint = URLExt.join(baseUrl, cmd);
-    xhttp.open(requestType, endpoint, true);
-    // add Jupyter authorization (XRSF) token to request header
-    xhttp.setRequestHeader('Authorization', 'token ' + PageConfig.getToken());
-    // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
-    xhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhttp.send(body);
+    fetch(endpoint, {
+      method: requestType,
+      headers: {
+        // add Jupyter authorization (XRSF) token to request header
+        'Authorization': 'token ' + PageConfig.getToken(),
+        // prevent it from enconding as plain-text UTF-8, which is the default and screws everything up
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body,
+    }).then(response => {
+      if (response.status !== 200) {
+        throw Error(response.statusText);
+      }
+      return response.json();
+    }).then(response => {
+      this.setJobCompletedTasks(response, element, jobCount);
+    }).catch(error => {
+      console.log(error);
+    });
   }
 
   private runOnSelectedRows(cmd: string, requestType: string, dt: DataTables.Api) {
-    // Run CMD on all selected rows, by submitting a unique request for each 
+    // Run CMD on all selected rows, by submitting a unique request for each
     // selected row. Eventually we may want to change the logic for this functionality
     // such that only one request is made with a list of Job IDs instead of one request
     // per selected job. Changes will need to be made on the back end for this to work
@@ -392,15 +403,15 @@ class SlurmWidget extends Widget {
     let jobCount = { numJobs: selected_data.length, count: 0 };
     for (let i = 0; i < selected_data.length; i++) {
        let jobID = selected_data[i][this.JOBID_IDX];
-       // Add the request pending classes to the selected row 
+       // Add the request pending classes to the selected row
        $("#"+jobID).addClass("pending");
        this.submitRequest(cmd, requestType, 'jobID='+jobID, $("#"+jobID), jobCount);
 
-    } 
+    }
   };
 
   private submitJobPath(input: string) {
-    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));         
+    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));
   };
 
 
@@ -410,52 +421,47 @@ class SlurmWidget extends Widget {
   };
 
 
-  private setJobCompletedTasks(xhttp: XMLHttpRequest, element: JQuery, jobCount: any) {
-    xhttp.onreadystatechange = () => {
-      if (xhttp.readyState === xhttp.DONE && xhttp.status == 200) {
-        let response = JSON.parse(xhttp.responseText);
-        let alert = document.createElement('div');
-        if (response.returncode == 0) {
-          alert.classList.add('alert', 'alert-success', 'alert-dismissable', 'fade', 'show');
-        }
-        else {
-          alert.classList.add('alert', 'alert-danger', 'alert-dismissable', 'fade', 'show');
-        }
-        let temp = document.createElement('div');
-        let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
-        temp.innerHTML = closeLink;
-        alert.appendChild(temp.firstChild);
+  private setJobCompletedTasks(response: any, element: JQuery, jobCount: any) {
+    let alert = document.createElement('div');
+    if (response.returncode == 0) {
+      alert.classList.add('alert', 'alert-success', 'alert-dismissable', 'fade', 'show');
+    }
+    else {
+      alert.classList.add('alert', 'alert-danger', 'alert-dismissable', 'fade', 'show');
+    }
+    let temp = document.createElement('div');
+    let closeLink = '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>';
+    temp.innerHTML = closeLink;
+    alert.appendChild(temp.firstChild);
 
-        let alertText = document.createTextNode(response.responseMessage);
-        alert.appendChild(alertText);
-        $('#alertContainer').append(alert);
+    let alertText = document.createTextNode(response.responseMessage);
+    alert.appendChild(alertText);
+    $('#alertContainer').append(alert);
 
-        // Remove request pending classes from the element;
-        // the element may be a table row or the entire 
-        // extension panel 
-        if (element) {
-          element.removeClass("pending");
-        }
-        
-        // TODO: the alert and removing of the pending class 
-        // should probably occur after table reload completes,
-        //  but we'll need to rework synchronization here..
+    // Remove request pending classes from the element;
+    // the element may be a table row or the entire
+    // extension panel
+    if (element) {
+      element.removeClass("pending");
+    }
 
-        // If all current jobs have finished executing, 
-        // reload the queue (using squeue)
-        if (jobCount) {
-          // By the nature of javascript's sequential function execution,
-          // this will not cause a race condition 
-          jobCount.count++;
-          if (jobCount.numJobs == jobCount.count) {
-            this.reloadDataTable($('#queue').DataTable());
-          }
-        }
-        else {
-           this.reloadDataTable($('#queue').DataTable());
-        }
+    // TODO: the alert and removing of the pending class
+    // should probably occur after table reload completes,
+    //  but we'll need to rework synchronization here..
+
+    // If all current jobs have finished executing,
+    // reload the queue (using squeue)
+    if (jobCount) {
+      // By the nature of javascript's sequential function execution,
+      // this will not cause a race condition
+      jobCount.count++;
+      if (jobCount.numJobs == jobCount.count) {
+        this.reloadDataTable($('#queue').DataTable());
       }
-    };
+    }
+    else {
+        this.reloadDataTable($('#queue').DataTable());
+    }
   };
 
   /**
@@ -463,7 +469,7 @@ class SlurmWidget extends Widget {
   * https://datatables.net/plug-ins/dataRender/ellipsis#Examples
   * Truncates table content longer than config.cutoff -- if so,
   * the full content will be displayed in a tool-tip. Also handles
-  * HTML escapes, and truncates at word boundaries. 
+  * HTML escapes, and truncates at word boundaries.
   */
   private columnRenderer() {
     var esc = function ( t ) {
@@ -479,24 +485,24 @@ class SlurmWidget extends Widget {
       if ( type !== 'display' ) {
         return d;
       }
-      
+
       if ( typeof d !== 'number' && typeof d !== 'string' ) {
         return d;
       }
-      
+
       d = d.toString(); // cast numbers
-      
+
       if ( d.length < config["cutoff"] ) {
         return d;
       }
-      
+
       var shortened = d.substr(0, config["cutoff"]-1);
-      
+
       // Find the last white space character in the string
       if ( config["wordbreak"] ) {
         shortened = shortened.replace(/\s([^\s]*)$/, '');
       }
-      
+
       // Protect against uncontrolled HTML input
       if ( config["escapeHtml"] ) {
         shortened = shortened
@@ -505,7 +511,7 @@ class SlurmWidget extends Widget {
         .replace( />/g, '&gt;' )
         .replace( /"/g, '&quot;' );
       }
-      
+
       return '<span class="ellipsis" title="'+esc(d)+'">'+shortened+'&#8230;</span>';
     };
   };
@@ -513,11 +519,11 @@ class SlurmWidget extends Widget {
 
   /**
   * Reloads the queue table by using DataTables
-  * AJAX functionality, which reloads only the data that 
+  * AJAX functionality, which reloads only the data that
   * is needed. NOTE: This method is called
   * when widget.update() is called, and the false
   * param passed to ajax.reload(..) indicates that the table's
-  * pagination will not be reset upon reload, which does 
+  * pagination will not be reset upon reload, which does
   * require some overhead due to sorting, etc.
   */
   public onUpdateRequest(msg: Message) {
@@ -531,13 +537,13 @@ class SlurmWidget extends Widget {
  * Activate the Slurm widget extension.
  */
 function activate(
-  app: JupyterLab, 
-  palette: ICommandPalette, 
+  app: JupyterLab,
+  palette: ICommandPalette,
   restorer: ILayoutRestorer,
   launcher: ILauncher | null) {
 
   // Declare a Slurm widget variable
-  let widget: SlurmWidget; 
+  let widget: SlurmWidget;
 
   // Add an application command
   const command: string = 'slurm:open';
@@ -547,7 +553,7 @@ function activate(
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
-        widget = new SlurmWidget(); 
+        widget = new SlurmWidget();
         widget.title.icon = SLURM_ICON_CLASS_T;
         // Reload table on regular intervals if autoReload is activated
         if (config["autoReload"]) {
