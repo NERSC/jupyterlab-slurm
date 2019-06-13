@@ -52,7 +52,7 @@
     "datatables.net-plugins": "^1.10.19",
     "datatables.net-select-dt": "^1.2.4",
     "fs-extra": "^7.0.1",
-    "jquery": "^3.3.1",
+    "jquery": "^3.4",
     "popper.js": "^1.14.7"
   },
   "devDependencies": {

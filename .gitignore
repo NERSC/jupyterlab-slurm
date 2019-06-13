@@ -18,6 +18,7 @@ pip-delete-this-directory.txt
 
 # distribution/packaging
 node_modules/
+package-lock.json
 bin/
 build/
 develop-eggs/
