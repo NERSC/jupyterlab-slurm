@@ -10,6 +10,7 @@
     "NERSC",
     "HPC"
   ],
+  "style": "style/index.css",
   "homepage": "https://github.com/NERSC/jupyterlab-slurm",
   "bugs": {
     "url": "https://github.com/NERSC/jupyterlab-slurm/issues"
@@ -32,10 +33,10 @@
     "watch": "tsc -w"
   },
   "dependencies": {
-    "@jupyterlab/application": "^0.19.1",
-    "@jupyterlab/apputils": "^0.19.1",
-    "@jupyterlab/coreutils": "^2.0.2",
-    "@jupyterlab/launcher": "^0.19.1",
+    "@jupyterlab/application": "^1.0",
+    "@jupyterlab/apputils": "^1.0",
+    "@jupyterlab/coreutils": "^3.0",
+    "@jupyterlab/launcher": "^1.0",
     "@phosphor/coreutils": "^1.3.0",
     "@phosphor/messaging": "^1.2.2",
     "@phosphor/widgets": "^1.6.0",

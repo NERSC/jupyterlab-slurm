@@ -1,12 +1,12 @@
 import {
-  JupyterLab,
-  JupyterLabPlugin,
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin,
   ILayoutRestorer
 } from '@jupyterlab/application';
 
 import {
   ICommandPalette,
-  InstanceTracker
+  WidgetTracker
 } from '@jupyterlab/apputils';
 
 import {
@@ -41,8 +41,6 @@ import 'datatables.net-select';
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/dist/js/bootstrap.js';
-
-import '../style/index.css';
 
 import * as config from './slurm-config/config.json';
 
@@ -537,7 +535,7 @@ class SlurmWidget extends Widget {
  * Activate the Slurm widget extension.
  */
 function activate(
-  app: JupyterLab,
+  app: JupyterFrontEnd,
   palette: ICommandPalette,
   restorer: ILayoutRestorer,
   launcher: ILauncher | null) {
@@ -566,7 +564,7 @@ function activate(
       }
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there
-        app.shell.addToMainArea(widget);
+        app.shell.add(widget);
       } else {
         // Refresh the widget's state
         widget.update();
@@ -580,7 +578,7 @@ function activate(
   palette.addItem({command, category: 'HPC Tools', args: { isPalette: true } })
 
   // Track and restore the widget state
-  let tracker = new InstanceTracker<Widget>({ namespace: 'slurm'});
+  let tracker = new WidgetTracker<Widget>({ namespace: 'slurm'});
   restorer.restore(tracker, {
     command,
     args: () => JSONExt.emptyObject,
@@ -601,7 +599,7 @@ function activate(
 /**
  * Initialization data for the jupyterlab-slurm extension.
  */
-const extension: JupyterLabPlugin<void> = {
+const extension: JupyterFrontEndPlugin<void> = {
   id: 'jupyterlab-slurm',
   autoStart: true,
   requires: [ICommandPalette, ILayoutRestorer],

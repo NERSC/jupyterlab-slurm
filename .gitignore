@@ -32,6 +32,7 @@ parts/
 sdist/
 var/
 wheels/
+yarn.lock
 *.egg-info/
 *.egg
 .installed.cfg
