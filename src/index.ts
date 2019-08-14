@@ -22,6 +22,11 @@ import {
 } from '@phosphor/coreutils';
 
 import {
+  IFileBrowserFactory,
+  FileBrowser,
+} from '@jupyterlab/filebrowser';
+
+import {
   Message
 } from '@phosphor/messaging';
 
@@ -75,13 +80,20 @@ class SlurmWidget extends Widget {
   private userViewURL: string;
   // URL for calling squeue, used for global view
   private globalViewURL: string;
+  // JupyterLab's file browser
+  private filebrowser : FileBrowser;
+  // path where JupyterLab is being run
+  private serverRoot : string;
 
-  constructor() {
+  constructor(filebrowser: FileBrowser) {
     super();
     this.id = 'jupyterlab-slurm';
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
     this.addClass('jp-SlurmWidget');
+
+    this.filebrowser = filebrowser;
+    this.serverRoot  = PageConfig.getOption('serverRoot');
 
     this.queueTable = document.createElement('table');
     this.queueTable.setAttribute('id', 'queue');
@@ -408,14 +420,24 @@ class SlurmWidget extends Widget {
     }
   };
 
+  private submitJob(input: string, inputType: string) {
+    let fileBrowserRelativePath = this.filebrowser.model.path;
+    if (this.serverRoot != '/') {
+        var fileBrowserPath = this.serverRoot + '/' + fileBrowserRelativePath;
+    } else {
+        // Because paths are given relative to `` instead of `/` in this case for some reason
+	var fileBrowserPath = this.serverRoot + fileBrowserRelativePath;}
+    let queryArguments = {"inputType" : inputType, "outputDir" : encodeURIComponent(fileBrowserPath)};
+    let queryString = 'inputType=' + queryArguments.inputType + '&' + 'outputDir=' + queryArguments.outputDir;
+    this.submitRequest('/sbatch?' + queryString, 'POST', 'input=' + encodeURIComponent(input));
+  }
+
   private submitJobPath(input: string) {
-    this.submitRequest('/sbatch?inputType=path', 'POST', 'input=' + encodeURIComponent(input));
+    this.submitJob(input, "path");
   };
 
-
-
   private submitJobScript(input: string) {
-    this.submitRequest('/sbatch?inputType=contents', 'POST', 'input=' + encodeURIComponent(input));
+    this.submitJob(input, "contents");
   };
 
 
@@ -432,6 +454,7 @@ class SlurmWidget extends Widget {
     temp.innerHTML = closeLink;
     alert.appendChild(temp.firstChild);
 
+    console.log(response.errorMessage);
     let alertText = document.createTextNode(response.responseMessage);
     alert.appendChild(alertText);
     $('#alertContainer').append(alert);
@@ -538,6 +561,7 @@ function activate(
   app: JupyterFrontEnd,
   palette: ICommandPalette,
   restorer: ILayoutRestorer,
+  filebrowserfactory: IFileBrowserFactory,
   launcher: ILauncher | null) {
 
   // Declare a Slurm widget variable
@@ -545,13 +569,14 @@ function activate(
 
   // Add an application command
   const command: string = 'slurm:open';
+  const filebrowser = filebrowserfactory.defaultBrowser;
   app.commands.addCommand(command, {
     label: args => (args['isPalette'] ? 'Open Slurm Queue Manager' : 'Slurm Queue'),
     iconClass: args => (args['isPalette'] ? '' : SLURM_ICON_CLASS_L),
     execute: () => {
       if (!widget) {
         // Instantiate a new widget if one does not exist
-        widget = new SlurmWidget();
+        widget = new SlurmWidget(filebrowser);
         widget.title.icon = SLURM_ICON_CLASS_T;
         // Reload table on regular intervals if autoReload is activated
         if (config["autoReload"]) {
@@ -602,7 +627,7 @@ function activate(
 const extension: JupyterFrontEndPlugin<void> = {
   id: 'jupyterlab-slurm',
   autoStart: true,
-  requires: [ICommandPalette, ILayoutRestorer],
+  requires: [ICommandPalette, ILayoutRestorer, IFileBrowserFactory],
   optional: [ILauncher],
   activate: activate
 };
