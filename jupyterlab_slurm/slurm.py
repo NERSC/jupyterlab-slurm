@@ -9,12 +9,13 @@ from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
 
 class ShellExecutionHandler(IPythonHandler):
-    async def run_command(self, command, stdin=None):
+    async def run_command(self, command, stdin=None, cwd=None):
         commands = shlex.split(command)
         process = await asyncio.create_subprocess_exec(*commands,
                                                            stdout=asyncio.subprocess.PIPE,
                                                            stderr=asyncio.subprocess.PIPE,
-                                                           stdin=stdin)
+                                                           stdin=stdin,
+                                                           cwd=cwd)
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0) 
         # decode stdout and from bytes to str, and return stdout, stderr, and returncode  
         return (stdout.decode().strip(), stderr.decode().strip(), process.returncode)
@@ -64,27 +65,39 @@ class SbatchHandler(ShellExecutionHandler):
             file_object.write(string)
             file_object.close()
             return
+
         inputType = self.get_query_argument('inputType')
+        outputDir = self.get_query_argument('outputDir', default='')
+        sbatch_command = 'sbatch' + ' '
+
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if inputType:
             if inputType == 'path':
                 script_path = self.get_body_argument('input')
-                stdout, stderr, returncode = await self.run_command('sbatch '+script_path)
+                try:
+                    stdout, stderr, returncode = await self.run_command(sbatch_command + script_path, cwd=outputDir)
+                    errorMessage = ""
+                except Exception as e:
+                    stdout, stderr, returncode, errorMessage = ("", "Something went wrong. Check console for more details.", 1, str(e))
             elif inputType == 'contents':
                 script_contents = self.get_body_argument('input')
                 string_to_file(script_contents)
-                stdout, stderr, returncode = await self.run_command('sbatch', stdin=open('temporary_file.temporary','rb'))
+                try:
+                    stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=open('temporary_file.temporary','rb'), cwd=outputDir)
+                    errorMessage = ""
+                except Exception as e:
+                    stdout, stderr, returncode, errorMessage = ("", "Something went wrong. Check console for more details.", 1, str(e))
                 os.remove('temporary_file.temporary')
             else:
                 raise Exception('The query argument inputType needs to be either \'path\' or \'contents\'.')
         else:
             raise MissingArgumentError('inputType')
         if stdout:
-            responseMessage = stdout
+            responseMessage = "Success: " + stdout
         else:
-            responseMessage = stderr
+            responseMessage = "Failure: " + stderr
     # jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        self.finish({"responseMessage": responseMessage, "returncode": returncode})
+        self.finish({"responseMessage": responseMessage, "returncode": returncode, "errorMessage": errorMessage})
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
