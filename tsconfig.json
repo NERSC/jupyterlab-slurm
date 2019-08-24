@@ -10,7 +10,8 @@
     "target": "ES5",
     "outDir": "./lib",
     "lib": ["ES6", "ES2016", "DOM"],
-    "types": []
+    "types": [],
+    "jsx": "react"
   },
   "include": ["src/*"]
 }
