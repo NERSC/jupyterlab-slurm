@@ -5,6 +5,7 @@
     "noEmitOnError": true,
     "noUnusedLocals": true,
     "resolveJsonModule": true,
+    "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES5",
@@ -13,5 +14,6 @@
     "types": [],
     "jsx": "react"
   },
-  "include": ["src/*"]
+  "include": ["src/*"],
+  "files": ["src/slurm-config/config.json"]
 }

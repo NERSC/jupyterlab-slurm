@@ -1,5 +1,5 @@
 import { SlurmWidget } from "./slurmWidget";
-import * as $ from 'jquery';
+import $ from 'jquery';
 
 export function reload(slurmWidget: SlurmWidget)  {return  {
             text: 'Reload',

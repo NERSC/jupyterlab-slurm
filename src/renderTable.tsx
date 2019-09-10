@@ -7,7 +7,7 @@ import { SlurmWidget } from './slurmWidget';
 import {reload, kill, hold, release, submit} from './buttons';
 import {pathOnClick, scriptOnClick} from './onClick';
 
-import * as $ from 'jquery';
+import $ from 'jquery';
 
 // The base URL that prepends commands -- necessary for hub functionality
 var baseUrl = PageConfig.getOption('baseUrl');
@@ -137,7 +137,7 @@ export function renderTable(self: SlurmWidget, userRequest) {
       alertContainer.setAttribute("id", "alertContainer");
       alertContainer.classList.add('container', 'alert-container');
       $('#jupyterlab-slurm').append(alertContainer);
-      
+
       let modalContainer = document.createElement('div');
       modalContainer.innerHTML = modal;
       $('#jupyterlab-slurm').append(modalContainer);

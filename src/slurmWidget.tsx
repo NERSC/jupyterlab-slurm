@@ -16,7 +16,7 @@ import {
 
 import {renderTable} from './renderTable';
 
-import * as $ from 'jquery';
+import $ from 'jquery';
 
 import 'datatables.net';
 import 'datatables.net-buttons-dt';

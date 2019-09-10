@@ -36,3 +36,6 @@ yarn.lock
 *.egg-info/
 *.egg
 .installed.cfg
+
+# typescript
+tsconfig.tsbuildinfo

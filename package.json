@@ -56,20 +56,15 @@
     "fs-extra": "^7.0.1",
     "jquery": "^3.4.1",
     "popper.js": "^1.15.0",
-    "react": "^16.9.0",
-    "react-dom": "^16.9.0",
+    "react": "^16.8.4",
+    "react-dom": "^16.8.4",
     "yarn-deduplicate": "^1.1.1"
   },
   "devDependencies": {
-    "@types/react": "^16.9.2",
-    "@types/react-dom": "^16.9.0",
     "rimraf": "^2.6.1",
     "typescript": "~3.5.2"
   },
   "jupyterlab": {
     "extension": true
-  },
-  "resolutions": {
-  "@types/react": "^16.9.2"
   }
 }

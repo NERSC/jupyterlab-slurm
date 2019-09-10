@@ -1,5 +1,5 @@
 import { SlurmWidget } from "./slurmWidget";
-import * as $ from 'jquery';
+import $ from 'jquery';
 
 export function pathOnClick(slurmWidget: SlurmWidget) { return (
   (event) => {
@@ -10,7 +10,7 @@ export function pathOnClick(slurmWidget: SlurmWidget) { return (
     // Hide the modal
     ($('#submitJobModal') as any).modal('hide');
   }
-);   
+);
 }
 
 export function scriptOnClick(slurmWidget: SlurmWidget) { return (
