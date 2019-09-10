@@ -7,7 +7,7 @@ providing simple and intuitive controls for viewing and managing jobs on the que
 
 ## Prerequisites
 
-* JupyterLab >= 0.35
+* JupyterLab >= 1.0
 * Node.js 5+
 * Slurm
 
