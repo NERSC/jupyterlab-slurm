@@ -1,15 +1,16 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "noImplicitAny": false,
-    "noEmitOnError": true,
-    "noUnusedLocals": true,
-    "resolveJsonModule": true,
+    "lib": ["ES6", "ES2016", "DOM"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "target": "ES5",
+    "noEmitOnError": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": true,
     "outDir": "./lib",
-    "lib": ["ES6", "ES2016", "DOM"],
+    "resolveJsonModule": true,
+    "target": "ES5",
     "types": []
   },
   "include": ["src/*"]
