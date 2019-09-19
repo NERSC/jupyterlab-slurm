@@ -135,7 +135,7 @@ class SlurmWidget extends Widget {
     // used in the initComplete method once this request completes,
     // and after the table is fully initialized.
     let userRequest = $.ajax({
-      url: '/user',
+      url: window.location.origin + baseUrl + 'user',
       success: function(result) {
         self.user = result;
         console.log("user: ", self.user);
