@@ -274,12 +274,12 @@ class SlurmWidget extends Widget {
                 <div class="form-group">
                   <label for="path">Enter a file path containing a batch script</label>
                   <input type="text" name="path" id="batchPath" class="form-control">
-                  <input type="submit" value="Submit" class="btn btn-primary" id="submitPath">
+                  <input type="button" value="Submit" class="btn btn-primary" id="submitPath">
                 </div>
                 <div class="form-group">
                   <label for="script">Enter a new batch script</label>
                   <textarea name="script" id="batchScript" rows="10" class="form-control"></textarea>
-                  <input type="submit" value="Submit" class="btn btn-primary" id="submitScript">
+                  <input type="button" value="Submit" class="btn btn-primary" id="submitScript">
                   <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
               </div>
