@@ -6,15 +6,15 @@ import {
 
 import {
   ICommandPalette,
-  WidgetTracker
+  WidgetTracker,
 } from '@jupyterlab/apputils';
 
 import {
-  ILauncher
+  ILauncher,
 } from '@jupyterlab/launcher';
 
 import {
-  JSONExt
+  JSONExt,
 } from '@phosphor/coreutils';
 
 import {
@@ -22,17 +22,11 @@ import {
 } from '@jupyterlab/filebrowser';
 
 import {
-  SlurmWidget
-} from './slurmWidget'
-
-import {
-  Widget
+  Widget,
 } from '@phosphor/widgets';
 
-import 'datatables.net-dt/css/jquery.dataTables.css';
-import 'bootstrap/dist/css/bootstrap.css';
-import 'bootstrap/dist/js/bootstrap.js';
-
+// Local
+import SlurmWidget from './SlurmWidget';
 import * as config from './slurm-config/config.json';
 
 /**

@@ -16,8 +16,8 @@ class ShellExecutionHandler(IPythonHandler):
                                                            stderr=asyncio.subprocess.PIPE,
                                                            stdin=stdin,
                                                            cwd=cwd)
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0) 
-        # decode stdout and from bytes to str, and return stdout, stderr, and returncode  
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+        # decode stdout and from bytes to str, and return stdout, stderr, and returncode
         return (stdout.decode().strip(), stderr.decode().strip(), process.returncode)
 
 
@@ -38,7 +38,7 @@ class ScancelHandler(ShellExecutionHandler):
             responseMessage = stderr
         else:
             # stdout will be empty on success -- hence the custom success message
-            responseMessage = "Success: scancel " + jobID  
+            responseMessage = "Success: scancel " + jobID
         self.finish({"responseMessage": responseMessage, "returncode": returncode})
 
 
@@ -126,7 +126,7 @@ class SqueueHandler(ShellExecutionHandler):
             else:
                 continue
         data_dict['data'] = data_list[:]
-        # finish(chunk) writes chunk to the output 
+        # finish(chunk) writes chunk to the output
         # buffer and ends the HTTP request
         self.finish(json.dumps(data_dict))
 
