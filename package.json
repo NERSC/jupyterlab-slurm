@@ -1,6 +1,6 @@
 {
   "name": "jupyterlab-slurm",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A JupyterLab extension to interface with the Slurm workload manager.",
   "keywords": [
     "jupyter",
@@ -57,7 +57,7 @@
     "jquery": "^3.4",
     "popper.js": "^1.14.7",
     "react": "~16.8.4",
-    "react-dom": "~16.0.1",
+    "react-dom": "~16.8.4",
     "typescript": "^3.5.0"
   },
   "devDependencies": {
