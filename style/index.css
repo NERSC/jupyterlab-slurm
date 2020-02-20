@@ -30,15 +30,15 @@
 
 /* The alert itself -- this class is originally defined by bootstrap */
 .alert {
-  height: 1.5em;
+  /* height: 1.5em; */
   line-height: 1.4;
   padding: 0px 7.5px 0px 15px;
   margin-bottom: .25em;
   font-size: .9em;
-  /* vertical-align: middle; */
-  text-overflow: ellipsis;
+  vertical-align: middle; 
+  /* text-overflow: ellipsis;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: hidden; */
 }
 
 .toggle-switch {

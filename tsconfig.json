@@ -1,9 +1,14 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "noImplicitAny": false,
+    "lib": ["ES6", "ES2016", "DOM"],
+    "module": "commonjs",
+    "moduleResolution": "node",
     "noEmitOnError": true,
+    "noImplicitAny": false,
     "noUnusedLocals": true,
+    "outDir": "./lib",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "module": "commonjs",
