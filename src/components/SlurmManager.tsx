@@ -218,7 +218,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         variant: 'danger' as const,
       },
     }];
-    const { alerts, jobSubmitModalVisible, userOnly } = this.state;
+    const { alerts, jobSubmitModalVisible } = this.state;
     return (
       <>
         <DataTable

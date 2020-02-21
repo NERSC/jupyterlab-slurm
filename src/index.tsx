@@ -26,7 +26,7 @@ import {
 } from '@phosphor/widgets';
 
 // Local
-import SlurmWidget from './SlurmWidget';
+import SlurmWidget from './slurmWidget';
 import * as config from './slurm-config/config.json';
 
 /**
