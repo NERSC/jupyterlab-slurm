@@ -4,6 +4,7 @@ import shlex
 import asyncio
 import html
 import os
+import tempfile
 
 from notebook.base.handlers import IPythonHandler
 from tornado.web import MissingArgumentError
@@ -61,10 +62,14 @@ class SbatchHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any POST request
     async def post(self):
         def string_to_file(string):
-            file_object = open('temporary_file.temporary', 'w')
+            # Helper function to convert script typed into field into a tempfile for job submission.
+            # Takes in the script contents of the field.
+            # Returns path to tempfile.
+            tempscript = tempfile.mkstemp()
+            file_object = open(tempscript[1], 'w')
             file_object.write(string)
             file_object.close()
-            return
+            return tempscript[1]
 
         inputType = self.get_query_argument('inputType')
         outputDir = self.get_query_argument('outputDir', default='')
@@ -81,13 +86,13 @@ class SbatchHandler(ShellExecutionHandler):
                     stdout, stderr, returncode, errorMessage = ("", "Something went wrong. Check console for more details.", 1, str(e))
             elif inputType == 'contents':
                 script_contents = self.get_body_argument('input')
-                string_to_file(script_contents)
+                tempscript = string_to_file(script_contents)
                 try:
-                    stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=open('temporary_file.temporary','rb'), cwd=outputDir)
+                    stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=open(tempscript,'rb'), cwd=outputDir)
                     errorMessage = ""
                 except Exception as e:
                     stdout, stderr, returncode, errorMessage = ("", "Something went wrong. Check console for more details.", 1, str(e))
-                os.remove('temporary_file.temporary')
+                os.remove(tempscript)
             else:
                 raise Exception('The query argument inputType needs to be either \'path\' or \'contents\'.')
         else:
