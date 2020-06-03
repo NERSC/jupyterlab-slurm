@@ -60,7 +60,7 @@
     "lodash": "^4.17.15",
     "popper.js": "^1.15.0",
     "react": "^16.8.4",
-    "react-bootstrap": "^1.0.0-beta.12",
+    "react-bootstrap": "^1.0.1",
     "react-dom": "^16.8.4",
     "uuid": "^3.3.3",
     "yarn-deduplicate": "^1.1.1"
