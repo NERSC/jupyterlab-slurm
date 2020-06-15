@@ -81,7 +81,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Label>Write your script here</Form.Label>
               <Form.Control
                 as="textarea"
-                rows="10"
+                rows={10}
                 onChange={this.updateInlineScript.bind(this)}
               />
             </Form.Group>

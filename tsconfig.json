@@ -11,13 +11,10 @@
     "outDir": "./lib",
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "ES5",
-    "outDir": "./lib",
-    "lib": ["ES6", "ES2016", "DOM"],
+    "target": "ES6",
     "types": [],
-    "jsx": "react"
+    "jsx": "react",
+    "sourceMap": true
   },
   "include": ["src/*"],
   "files": ["src/slurm-config/config.json"]

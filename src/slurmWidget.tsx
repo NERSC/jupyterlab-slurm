@@ -18,11 +18,12 @@ import {
 
 import {
   Signal,
-} from '@phosphor/signaling';
+} from '@lumino/signaling';
 
 // Local
 import { makeRequest } from './utils';
 import SlurmManager from './components/SlurmManager';
+import { uniqueId } from 'lodash';
 
 export default class SlurmWidget extends ReactWidget {
   /**
@@ -44,11 +45,12 @@ export default class SlurmWidget extends ReactWidget {
 
   constructor(filebrowser: FileBrowser) {
     super();
+    this.id = uniqueId('slurm-');
     this.addClass('jp-SlurmWidget');
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
     this.filebrowser = filebrowser;
-    this.serverRoot  = PageConfig.getOption('serverRoot');
+    this.serverRoot = PageConfig.getOption('serverRoot');
   }
 
   get user(): string {
@@ -79,7 +81,7 @@ export default class SlurmWidget extends ReactWidget {
   onAfterAttach() {
     this.fetchUser();
   }
-
+  
   render() {
     return (
       <UseSignal

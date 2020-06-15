@@ -39,7 +39,10 @@ export async function makeRequest(request: types.Request) {
     const args = beforeResponse ? beforeResponse() : undefined;
     const response = await ServerConnection.makeRequest(endpoint, requestInit, settings);
     if (afterResponse) {
-      return afterResponse(response, ...args);
+      if (args)
+        return afterResponse(response, ...args);
+      else
+        return afterResponse(response);
     }
   }
   catch (error) {
