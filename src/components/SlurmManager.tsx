@@ -61,7 +61,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
 
   private toggleUserOnly() {
     const { userOnly } = this.state;
-    this.setState({  userOnly: !userOnly });
+    this.setState({ userOnly: !userOnly });
   }
 
   private showJobSubmitModal() {
@@ -132,7 +132,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
 
   processSelectedJobs(action: types.JobAction, rows: string[][]) {
     const { route, method } = (action => {
-      switch(action) {
+      switch (action) {
         case 'kill':
           return { route: 'scancel', method: 'DELETE' };
         case 'hold':
@@ -179,41 +179,48 @@ export default class SlurmManager extends Component<types.Props, types.State> {
       route: 'sbatch',
       method: 'POST',
       query: `?inputType=${inputType}&outputDir=${outputDir}`,
-      body: `input=${encodeURIComponent(input)}`,
+      body: JSON.stringify({ "input": input }),
     });
   }
 
   render() {
+    /** We should get rid of this. If we need a higher level item to perform actions, we can create a dispatch system */
     const buttons = [{
       name: 'Submit Job',
+      id: 'submit-job',
       action: () => { this.showJobSubmitModal(); },
       props: {
         variant: 'primary' as const,
       },
     }, {
       action: 'reload' as const,
+      id: 'reload',
       props: {
         variant: 'secondary' as const,
       },
     }, {
       action: 'clear-selected' as const,
+      id: 'clear-selected',
       props: {
         variant: 'warning' as const,
       },
     }, {
       name: 'Kill Selected Job(s)',
+      id: 'kill-selected',
       action: (rows) => { this.processSelectedJobs('kill', rows); },
       props: {
         variant: 'danger' as const,
       },
     }, {
       name: 'Hold Selected Job(s)',
+      id: 'hold-selected',
       action: (rows) => { this.processSelectedJobs('hold', rows); },
       props: {
         variant: 'danger' as const,
       },
     }, {
       name: 'Release Selected Job(s)',
+      id: 'release-selected',
       action: (rows) => { this.processSelectedJobs('release', rows); },
       props: {
         variant: 'danger' as const,

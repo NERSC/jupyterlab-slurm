@@ -3,6 +3,7 @@ import re
 import shlex
 import asyncio
 import html
+import json
 import os
 
 from notebook.base.handlers import IPythonHandler
@@ -73,14 +74,20 @@ class SbatchHandler(ShellExecutionHandler):
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if inputType:
             if inputType == 'path':
-                script_path = self.get_body_argument('input')
+                if self.request.headers['Content-Type'] == 'application/json':
+                    script_path = json.loads(self.request.body)["input"]
+                else:
+                    script_path = self.get_body_argument('input')
                 try:
                     stdout, stderr, returncode = await self.run_command(sbatch_command + script_path, cwd=outputDir)
                     errorMessage = ""
                 except Exception as e:
                     stdout, stderr, returncode, errorMessage = ("", "Something went wrong. Check console for more details.", 1, str(e))
             elif inputType == 'contents':
-                script_contents = self.get_body_argument('input')
+                if self.request.headers['Content-Type'] == 'application/json':
+                    script_contents = json.loads(self.request.body)["input"]
+                else:
+                    script_contents = self.get_body_argument('input')
                 string_to_file(script_contents)
                 try:
                     stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=open('temporary_file.temporary','rb'), cwd=outputDir)

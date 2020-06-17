@@ -35,16 +35,17 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
     this.setState({ inputType, filepath: '', inlineScript: '' });
   }
 
-  updateFilepath(filepath: string) {
+  updateFilepath(filepath) {
     this.setState({ filepath });
   }
 
-  updateInlineScript(inlineScript: string) {
+  updateInlineScript(inlineScript) {
     this.setState({ inlineScript });
   }
 
   handleSubmit() {
     const { inputType, filepath, inlineScript } = this.state;
+    console.log(inputType, filepath, inlineScript);
     const input = inputType === 'path' ? filepath : inlineScript;
     this.props.submitJob(input, inputType);
   }
@@ -60,7 +61,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
         <Modal.Body>
           <Form.Group controlId="mode-selector">
             <Form.Label>Script type</Form.Label>
-            <Form.Control as="select" onChange={this.changeInputType.bind(this)}>
+            <Form.Control as="select" onChange={e => this.changeInputType(e.target.value)}>
               <option value="path">File</option>
               <option value="contents">Text input</option>
             </Form.Control>
@@ -72,7 +73,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Control
                 type="text"
                 placeholder="path relative to filebrowser"
-                onChange={this.updateFilepath.bind(this)}
+                onChange={(e) => this.updateFilepath(e.target.value)}
               />
             </Form.Group>
           }
@@ -82,7 +83,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Control
                 as="textarea"
                 rows={10}
-                onChange={this.updateInlineScript.bind(this)}
+                onChange={e => this.updateInlineScript(e.target.value)}
               />
             </Form.Group>
           }

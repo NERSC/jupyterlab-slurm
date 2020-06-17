@@ -13,6 +13,7 @@ import Pager from './Pager';
 namespace types {
   export type button = {
     name?: string;
+    id: string;
     props?: ButtonProps;
     action: 'reload' | 'clear-selected' | ((rows: string[][]) => void);
   };
@@ -144,7 +145,7 @@ export default class DataTable extends Component<types.Props, types.State> {
       <div>
         {buttons && <ButtonToolbar>
           {(buttons).map((button, idx) => {
-            switch (button.action) {
+            switch (button.id) {
               case 'reload':
                 return <Button {...button.props}
                   onClick={this.reload.bind(this)}
@@ -157,6 +158,12 @@ export default class DataTable extends Component<types.Props, types.State> {
                   onClick={this.clearSelectedRows.bind(this)}
                   key={idx}>
                   {button.name ? button.name : 'Clear Selection'}
+                </Button>
+              case 'submit-job':
+                return <Button {...button.props}
+                  onClick={() => (button.action as any)(selectedRows)}
+                  key={idx}>
+                  {button.name ? button.name : 'Submit Job'}
                 </Button>
               default:
                 return <Button {...button.props}
