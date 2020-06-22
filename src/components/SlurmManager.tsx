@@ -38,6 +38,7 @@ namespace types {
   export type State = {
     alerts: Alert[];
     jobSubmitModalVisible: boolean;
+    jobSubmitError?: string;
     userOnly: boolean
   };
 }
@@ -180,6 +181,25 @@ export default class SlurmManager extends Component<types.Props, types.State> {
       method: 'POST',
       query: `?inputType=${inputType}&outputDir=${outputDir}`,
       body: JSON.stringify({ "input": input }),
+      afterResponse: async (response: Response) => {
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      }
+    }).then((result) => {
+      if (result === null) {
+        this.setState({
+          jobSubmitError: "Unknown error encountered while submitting the script. Try again later."
+        })
+      }
+      if (result["errorMessage"] !== "") {
+        this.setState({
+          jobSubmitError: result["errorMessage"]
+        });
+      } else {
+        this.hideJobSubmitModal();
+      }
     });
   }
 
@@ -251,6 +271,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         </div>
         <JobSubmitModal
           show={jobSubmitModalVisible}
+          error={this.state.jobSubmitError}
           onHide={this.hideJobSubmitModal.bind(this)}
           submitJob={this.submitJob.bind(this)}
         />

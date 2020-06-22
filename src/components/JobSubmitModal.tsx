@@ -12,6 +12,7 @@ namespace types {
     show: boolean,
     onHide: () => void;
     submitJob: (input: string, inputType: string) => void;
+    error?: string;
   };
 
   export type State = {
@@ -65,7 +66,6 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <option value="path">File</option>
               <option value="contents">Text input</option>
             </Form.Control>
-            {/* <Select options={['file', 'text Input']}/> */}
           </Form.Group>
           {inputType === 'path' &&
             <Form.Group controlId="filepath-input">
@@ -87,6 +87,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               />
             </Form.Group>
           }
+          <div>{this.props.error}</div>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide}>Close</Button>
