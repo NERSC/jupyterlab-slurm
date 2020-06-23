@@ -10,8 +10,8 @@ import {
 } from '@jupyterlab/filebrowser';
 
 import {
-  uuidv4,
-} from 'uuid/v4';
+  v4 as uuidv4
+} from 'uuid';
 
 // Local
 import { makeRequest } from '../utils';
@@ -39,6 +39,7 @@ namespace types {
     alerts: Alert[];
     jobSubmitModalVisible: boolean;
     jobSubmitError?: string;
+    jobSubmitDisabled?: boolean;
     userOnly: boolean
   };
 }
@@ -53,6 +54,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
 
   constructor(props: types.Props) {
     super(props);
+    this.requestStatusTable = new Map<string, types.JobStatus>();
     this.state = {
       alerts: [],
       jobSubmitModalVisible: false,
@@ -81,12 +83,12 @@ export default class SlurmManager extends Component<types.Props, types.State> {
   private async makeJobRequest(route: string, method: string, body: string) {
     const beforeResponse = () => {
       const requestID = uuidv4();
-      this.requestStatusTable[requestID] = 'sent';
+      this.requestStatusTable.set(requestID, 'sent');
       return [requestID];
     }
     const afterResponse = async (response: Response, requestID: string) => {
       if (response.status !== 200) {
-        this.requestStatusTable[requestID] = 'error';
+        this.requestStatusTable.set(requestID, 'error');
         throw Error(response.statusText);
       }
       else {
@@ -94,11 +96,11 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         let alert: types.Alert = { message: json.responseMessage };
         if (json.returncode === 0) {
           alert.variant = 'success';
-          this.requestStatusTable[requestID] = 'received';
+          this.requestStatusTable.set(requestID, 'received');
         }
         else {
           alert.variant = 'danger';
-          this.requestStatusTable[requestID] = 'error';
+          this.requestStatusTable.set(requestID, 'error');
           console.log(json.errorMessage);
         }
         this.addAlert(alert);
@@ -141,11 +143,11 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         case 'release':
           return { route: 'scontrol/release', method: 'PATCH' };
       }
-    })();
+    })(action);
     // TODO: Change backend and do all of this in a single request
     rows.map(row => {
       const jobID = row[this.JOBID_IDX];
-      this.makeJobRequest(route, method, `jobID=${jobID}`);
+      this.makeJobRequest(route, method, JSON.stringify({ jobID }));
     });
   }
 
@@ -169,6 +171,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
   }
 
   private submitJob(input: string, inputType: string) {
+    this.setState({ jobSubmitDisabled: true });
     let { serverRoot, filebrowser } = this.props;
     const fileBrowserRelativePath = filebrowser.model.path;
     if (serverRoot !== '/') { // Add trailing slash, but not to '/'
@@ -190,15 +193,18 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     }).then((result) => {
       if (result === null) {
         this.setState({
-          jobSubmitError: "Unknown error encountered while submitting the script. Try again later."
+          jobSubmitError: "Unknown error encountered while submitting the script. Try again later.",
+          jobSubmitDisabled: false
         })
       }
-      if (result["errorMessage"] !== "") {
+      if (result["returncode"] !== 0) {
         this.setState({
-          jobSubmitError: result["errorMessage"]
+          jobSubmitError: result["errorMessage"] == "" ? result["responseMessage"] : result["errorMessage"],
+          jobSubmitDisabled: false
         });
       } else {
         this.hideJobSubmitModal();
+        this.setState({ jobSubmitDisabled: false });
       }
     });
   }
@@ -264,7 +270,10 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         </div>
         <div id="alertContainer" className="container alert-container">
           {alerts.map((alert, index) => (
-            <Alert variant={alert.variant} key={`alert-${index}`} dismissible>
+            <Alert variant={alert.variant} key={`alert-${index}`} dismissible onClose={() => {
+              this.state.alerts.splice(index, 1);
+              this.setState({});
+            }}>
               {alert.message}
             </Alert>
           ))}
@@ -274,6 +283,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
           error={this.state.jobSubmitError}
           onHide={this.hideJobSubmitModal.bind(this)}
           submitJob={this.submitJob.bind(this)}
+          disabled={this.state.jobSubmitDisabled}
         />
       </>
     );

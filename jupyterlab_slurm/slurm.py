@@ -33,7 +33,10 @@ class ShellExecutionHandler(IPythonHandler):
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     async def delete(self):
-        jobID = self.get_body_arguments('jobID')[0]
+        if self.request.headers['Content-Type'] == 'application/json':
+            jobID = json.loads(self.request.body)["jobID"]
+        else:
+            jobID = self.get_body_arguments('jobID')[0]
         stdout, stderr, returncode = await self.run_command("scancel " + jobID)
         if stderr:
             responseMessage = stderr
@@ -47,7 +50,10 @@ class ScancelHandler(ShellExecutionHandler):
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     async def patch(self, command):
-        jobID = self.get_body_arguments('jobID')[0]
+        if self.request.headers['Content-Type'] == 'application/json':
+            jobID = json.loads(self.request.body)["jobID"]
+        else:
+            jobID = self.get_body_arguments('jobID')[0]
         stdout, stderr, returncode = await self.run_command("scontrol " + command + " " + jobID)
         if stderr:
             responseMessage = stderr

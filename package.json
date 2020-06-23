@@ -59,7 +59,7 @@
     "react": "^16.9.0",
     "react-bootstrap": "^1.0.1",
     "react-dom": "^16.9.0",
-    "uuid": "^3.3.3",
+    "uuid": "^8.1.0",
     "yarn-deduplicate": "^1.1.1"
   },
   "devDependencies": {

@@ -29,6 +29,7 @@ export async function makeRequest(request: types.Request) {
       // Add Jupyter authorization (XRSF) token to request header
       'Authorization': 'token ' + PageConfig.getToken(),
       // Prevent it from enconding as plain-text UTF-8
+      'Content-Type': 'application/x-www-form-urlencoded'
     },
   }
   if (body) {
