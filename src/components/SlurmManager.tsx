@@ -40,7 +40,7 @@ namespace types {
     jobSubmitModalVisible: boolean;
     jobSubmitError?: string;
     jobSubmitDisabled?: boolean;
-    userOnly: boolean
+    userOnly: boolean;
   };
 }
 
@@ -51,6 +51,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
   readonly USER_IDX = 3;
   // A Map of UUID to request status
   private requestStatusTable: types.RequestStatusTable;
+  private dt?: DataTable;
 
   constructor(props: types.Props) {
     super(props);
@@ -58,7 +59,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     this.state = {
       alerts: [],
       jobSubmitModalVisible: false,
-      userOnly: config['userOnly'],
+      userOnly: config['userOnly']
     };
   }
 
@@ -266,6 +267,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
             id="user-only-checkbox"
             label="Show my jobs only"
             onChange={this.toggleUserOnly.bind(this)}
+            defaultChecked={config["userOnly"]}
           />
         </div>
         <div id="alertContainer" className="container alert-container">

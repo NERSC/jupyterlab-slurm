@@ -7,7 +7,7 @@ import json
 import os
 
 from notebook.base.handlers import IPythonHandler
-from tornado.web import MissingArgumentError
+from tornado.web import MissingArgumentError, authenticated
 
 class ShellExecutionHandler(IPythonHandler):
     async def run_command(self, command, stdin=None, cwd=None):
@@ -32,6 +32,7 @@ class ShellExecutionHandler(IPythonHandler):
 # Since this is idempotent, hypothetically one could also use PUT instead of DELETE here.
 class ScancelHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
+    @authenticated
     async def delete(self):
         if self.request.headers['Content-Type'] == 'application/json':
             jobID = json.loads(self.request.body)["jobID"]
@@ -49,6 +50,7 @@ class ScancelHandler(ShellExecutionHandler):
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties, so POST also is not ideal
 class ScontrolHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
+    @authenticated
     async def patch(self, command):
         if self.request.headers['Content-Type'] == 'application/json':
             jobID = json.loads(self.request.body)["jobID"]
@@ -66,6 +68,7 @@ class ScontrolHandler(ShellExecutionHandler):
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for the C in CRUD here, not PUT
 class SbatchHandler(ShellExecutionHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any POST request
+    @authenticated
     async def post(self):
         def string_to_file(string):
             file_object = open('temporary_file.temporary', 'w')
@@ -114,6 +117,7 @@ class SbatchHandler(ShellExecutionHandler):
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"), so clearly GET request is appropriate here
 class SqueueHandler(ShellExecutionHandler):
+    @authenticated
     async def get(self):
         # what to keep in the mind if we want to add a view user's jobs only button -- it would just add the -u flag to the command
         userOnly = self.get_query_argument('userOnly')
@@ -145,6 +149,7 @@ class SqueueHandler(ShellExecutionHandler):
 
 # A simple request handler for retrieving the username
 class UserFetchHandler(ShellExecutionHandler):
+    @authenticated
     def get(self):
         username = os.environ.get('USER')
         self.finish(username)
