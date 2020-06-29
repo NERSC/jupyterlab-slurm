@@ -40,7 +40,9 @@ namespace types {
     jobSubmitModalVisible: boolean;
     jobSubmitError?: string;
     jobSubmitDisabled?: boolean;
+    processingJobs: boolean;
     userOnly: boolean;
+    reloading: boolean;
   };
 }
 
@@ -51,7 +53,6 @@ export default class SlurmManager extends Component<types.Props, types.State> {
   readonly USER_IDX = 3;
   // A Map of UUID to request status
   private requestStatusTable: types.RequestStatusTable;
-  private dt?: DataTable;
 
   constructor(props: types.Props) {
     super(props);
@@ -59,7 +60,9 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     this.state = {
       alerts: [],
       jobSubmitModalVisible: false,
-      userOnly: config['userOnly']
+      userOnly: config['userOnly'],
+      processingJobs: false,
+      reloading: false
     };
   }
 
@@ -83,6 +86,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
 
   private async makeJobRequest(route: string, method: string, body: string) {
     const beforeResponse = () => {
+      this.setState({ processingJobs: true });
       const requestID = uuidv4();
       this.requestStatusTable.set(requestID, 'sent');
       return [requestID];
@@ -90,6 +94,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     const afterResponse = async (response: Response, requestID: string) => {
       if (response.status !== 200) {
         this.requestStatusTable.set(requestID, 'error');
+        this.setState({ processingJobs: false });
         throw Error(response.statusText);
       }
       else {
@@ -112,6 +117,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         // if (element) {
         //   element.removeClass("pending");
         // }
+        this.setState({ processingJobs: false });
 
         // TODO: the alert and removing of the pending class
         // should probably occur after table reload completes,
@@ -126,7 +132,6 @@ export default class SlurmManager extends Component<types.Props, types.State> {
           }
         });
         if (allJobsFinished) {
-          // TODO: this.reloadDataTable($('#queue').DataTable());
           console.log('All jobs finished.');
         }
       }
@@ -152,27 +157,8 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     });
   }
 
-  async getData() {
-    const { userOnly } = this.state;
-    const data = await makeRequest({
-      route: 'squeue',
-      method: 'GET',
-      query: `?userOnly=${userOnly}`,
-      afterResponse: async (response) => {
-        if (response.status !== 200) {
-          throw Error(response.statusText);
-        }
-        else {
-          let data = await response.json();
-          return data.data;
-        }
-      },
-    });
-    return data;
-  }
-
   private submitJob(input: string, inputType: string) {
-    this.setState({ jobSubmitDisabled: true });
+    this.setState({ jobSubmitDisabled: true, processingJobs: true });
     let { serverRoot, filebrowser } = this.props;
     const fileBrowserRelativePath = filebrowser.model.path;
     if (serverRoot !== '/') { // Add trailing slash, but not to '/'
@@ -195,17 +181,19 @@ export default class SlurmManager extends Component<types.Props, types.State> {
       if (result === null) {
         this.setState({
           jobSubmitError: "Unknown error encountered while submitting the script. Try again later.",
-          jobSubmitDisabled: false
+          jobSubmitDisabled: false,
+          processingJobs: false
         })
       }
       if (result["returncode"] !== 0) {
         this.setState({
           jobSubmitError: result["errorMessage"] == "" ? result["responseMessage"] : result["errorMessage"],
-          jobSubmitDisabled: false
+          jobSubmitDisabled: false,
+          processingJobs: false
         });
       } else {
         this.hideJobSubmitModal();
-        this.setState({ jobSubmitDisabled: false });
+        this.setState({ jobSubmitDisabled: false, processingJobs: false });
       }
     });
   }
@@ -257,9 +245,11 @@ export default class SlurmManager extends Component<types.Props, types.State> {
     return (
       <>
         <DataTable
-          getRows={this.getData.bind(this)}
           buttons={buttons}
           availableColumns={config['queueCols']}
+          userOnly={this.state.userOnly}
+          processing={this.state.processingJobs}
+          reloading={this.state.reloading}
         />
         <div>
           <Form.Check

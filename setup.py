@@ -20,7 +20,7 @@ setup(
     description='A Jupyter Notebook server extension that implements common Slurm commands.',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=find_packages(),
+    packages=find_packages(exclude=("node_modules",)),
     include_package_data=True,
     data_files = data_files,
     author='NERSC, Jon Hays, William Krinsman',

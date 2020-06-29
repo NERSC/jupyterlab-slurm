@@ -33,6 +33,7 @@
     "watch": "tsc -w"
   },
   "dependencies": {
+    "@babel/preset-typescript": "^7.10.1",
     "@jupyterlab/application": "^2.1.2",
     "@jupyterlab/apputils": "^2.1.1",
     "@jupyterlab/coreutils": "^4.1.0",
@@ -59,11 +60,17 @@
     "react": "^16.9.0",
     "react-bootstrap": "^1.0.1",
     "react-dom": "^16.9.0",
+    "react-redux": "^7.2.0",
     "uuid": "^8.1.0",
     "yarn-deduplicate": "^1.1.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.10.3",
+    "@babel/preset-env": "^7.10.3",
+    "@types/jest": "^26.0.3",
+    "jest": "^26.1.0",
     "rimraf": "^2.6.1",
+    "ts-jest": "^26.1.1",
     "typescript": "~3.9.0"
   },
   "jupyterlab": {

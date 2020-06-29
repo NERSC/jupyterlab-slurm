@@ -9,6 +9,7 @@ import { range } from 'lodash/fp';
 // Local
 import Select from './Select';
 import Pager from './Pager';
+import { makeRequest } from '../utils';
 
 namespace types {
   export type button = {
@@ -19,10 +20,12 @@ namespace types {
   };
 
   export type Props = {
-    getRows: () => Promise<string[][]>;
     availableColumns: string[];
     defaultColumns?: string[];
     buttons?: button[];
+    userOnly: boolean;
+    processing: boolean;
+    reloading: boolean;
   };
 
   export type State = {
@@ -66,6 +69,7 @@ export default class DataTable extends Component<types.Props, types.State> {
 
   selectRow(rowIdx: number, event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) {
     event.stopPropagation();
+    if (this.props.processing) return;
     let { focusedRowIdx, selectedRowIdxs } = this.state;
     if (focusedRowIdx != -1) {
       if (event.shiftKey) {
@@ -116,10 +120,30 @@ export default class DataTable extends Component<types.Props, types.State> {
     this.setState({ focusedRowIdx, selectedRowIdxs });
   }
 
+
+  async getData() {
+    const { userOnly } = this.props;
+    const data = await makeRequest({
+      route: 'squeue',
+      method: 'GET',
+      query: `?userOnly=${userOnly}`,
+      afterResponse: async (response) => {
+        if (response.status !== 200) {
+          throw Error(response.statusText);
+        }
+        else {
+          let data = await response.json();
+          return data.data;
+        }
+      },
+    });
+    return data;
+  }
+
+
   async reload() {
-    const { getRows } = this.props;
-    const rows = await getRows();
-    this.setState({ rows });
+    const rows = await this.getData();
+    this.setState({ rows, focusedRowIdx: -1, selectedRowIdxs: [] });
   }
 
   componentWillMount() {
@@ -185,11 +209,18 @@ export default class DataTable extends Component<types.Props, types.State> {
           </thead>
           <tbody>
             {currentRows.map((row, rowIdx) => {
-              let selectedComposition = ""
-              if (this.state.selectedRowIdxs.length)
-                selectedComposition = (this.state.selectedRowIdxs.length ? this.state.selectedRowIdxs.includes(rowIdx) ? "selected" : "unselected" : "");
-              else
+              let selectedComposition = "";
+              let selected = false;
+              if (this.state.selectedRowIdxs.length) {
+                selectedComposition = this.state.selectedRowIdxs.includes(rowIdx) ? "selected" : "unselected";
+                selected = this.state.selectedRowIdxs.includes(rowIdx);
+              } else {
                 selectedComposition = this.state.focusedRowIdx == rowIdx ? "selected" : "";
+                selected = this.state.focusedRowIdx == rowIdx;
+              }
+              if (selected && this.props.processing) {
+                selectedComposition += " processing"
+              }
               return <tr onClick={this.selectRow.bind(this, rowIdx)} key={`${rowIdx}`}
                 className={selectedComposition}>
                 {row.map((field, fieldIdx) =>

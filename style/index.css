@@ -169,6 +169,11 @@ table.dataTable tbody tr.selected {
   /** color: var(--jp-ui-font-color2); **/
 }
 
+table.dataTable tbody tr.processing {
+  background-color: var(--jp-brand-color3);
+  /** color: var(--jp-ui-font-color2); **/
+}
+
 /* columns which are being sorted on and are unselected */
 table.dataTable.order-column tbody tr > .sorting_1,
 table.dataTable.order-column tbody tr > .sorting_2,

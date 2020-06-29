@@ -1,1 +1,2 @@
 recursive-include jupyter-config *.json
+prune node_modules
