@@ -2,7 +2,11 @@
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "lib": ["ES6", "ES2016", "DOM"],
+    "lib": [
+      "ES6",
+      "ES2016",
+      "DOM"
+    ],
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmitOnError": true,
@@ -12,10 +16,16 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "target": "ES6",
-    "types": [],
+    "types": [
+      "jest"
+    ],
     "jsx": "react",
     "sourceMap": true
   },
-  "include": ["src/*"],
-  "files": ["src/slurm-config/config.json"]
+  "include": [
+    "src/*"
+  ],
+  "files": [
+    "src/slurm-config/config.json"
+  ]
 }

@@ -40,6 +40,7 @@
     "@jupyterlab/filebrowser": "^2.1.1",
     "@jupyterlab/launcher": "^2.1.1",
     "@jupyterlab/services": "^5.1.0",
+    "@jupyterlab/testutils": "^2.1.2",
     "@types/bootstrap": "^4.3.0",
     "@types/datatables.net": "^1.10.12",
     "@types/datatables.net-buttons": "^1.4.0",
@@ -60,7 +61,6 @@
     "react": "^16.9.0",
     "react-bootstrap": "^1.0.1",
     "react-dom": "^16.9.0",
-    "react-redux": "^7.2.0",
     "uuid": "^8.1.0",
     "yarn-deduplicate": "^1.1.1"
   },
