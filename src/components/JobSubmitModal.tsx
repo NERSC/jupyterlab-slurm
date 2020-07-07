@@ -4,14 +4,14 @@ import {
   Form,
   Button,
 } from 'react-bootstrap';
-// Local
-// import Select from './Select';
 
 namespace types {
   export type Props = {
     show: boolean,
     onHide: () => void;
     submitJob: (input: string, inputType: string) => void;
+    error?: string;
+    disabled?: boolean;
   };
 
   export type State = {
@@ -35,11 +35,11 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
     this.setState({ inputType, filepath: '', inlineScript: '' });
   }
 
-  updateFilepath(filepath: string) {
+  updateFilepath(filepath) {
     this.setState({ filepath });
   }
 
-  updateInlineScript(inlineScript: string) {
+  updateInlineScript(inlineScript) {
     this.setState({ inlineScript });
   }
 
@@ -60,11 +60,12 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
         <Modal.Body>
           <Form.Group controlId="mode-selector">
             <Form.Label>Script type</Form.Label>
-            <Form.Control as="select" onChange={this.changeInputType.bind(this)}>
+            <Form.Control as="select"
+              onChange={e => this.changeInputType(e.target.value)} value={this.state.inputType}
+              disabled={this.props.disabled}>
               <option value="path">File</option>
               <option value="contents">Text input</option>
             </Form.Control>
-            {/* <Select options={['file', 'text Input']}/> */}
           </Form.Group>
           {inputType === 'path' &&
             <Form.Group controlId="filepath-input">
@@ -72,7 +73,8 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Control
                 type="text"
                 placeholder="path relative to filebrowser"
-                onChange={this.updateFilepath.bind(this)}
+                onChange={(e) => this.updateFilepath(e.target.value)}
+                disabled={this.props.disabled}
               />
             </Form.Group>
           }
@@ -81,15 +83,17 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Label>Write your script here</Form.Label>
               <Form.Control
                 as="textarea"
-                rows="10"
-                onChange={this.updateInlineScript.bind(this)}
+                rows={10}
+                onChange={e => this.updateInlineScript(e.target.value)}
+                disabled={this.props.disabled}
               />
             </Form.Group>
           }
+          <div>{this.props.error}</div>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onHide}>Close</Button>
-          <Button variant="primary" onClick={this.handleSubmit.bind(this)}>Submit Job</Button>
+          <Button variant="secondary" onClick={onHide} disabled={this.props.disabled}>Close</Button>
+          <Button variant="primary" onClick={this.handleSubmit.bind(this)} disabled={this.props.disabled}>Submit Job</Button>
         </Modal.Footer>
       </Modal>
     );

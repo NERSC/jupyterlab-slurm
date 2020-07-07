@@ -4,24 +4,28 @@ import {
   ButtonToolbar,
   Button,
   ButtonProps,
- } from 'react-bootstrap';
+} from 'react-bootstrap';
 import { range } from 'lodash/fp';
 // Local
 import Select from './Select';
 import Pager from './Pager';
+import { makeRequest } from '../utils';
 
 namespace types {
   export type button = {
     name?: string;
+    id: string;
     props?: ButtonProps;
     action: 'reload' | 'clear-selected' | ((rows: string[][]) => void);
   };
 
   export type Props = {
-    getRows: () => Promise<string[][]>;
     availableColumns: string[];
     defaultColumns?: string[];
     buttons?: button[];
+    userOnly: boolean;
+    processing: boolean;
+    reloading: boolean;
   };
 
   export type State = {
@@ -44,7 +48,7 @@ export default class DataTable extends Component<types.Props, types.State> {
       selectedRowIdxs: [],
       displayedColumns: props.defaultColumns ? props.defaultColumns : props.availableColumns,
       itemsPerPage: 10, // make this prop dependent
-      currentPage: 0,
+      currentPage: 1,
       filterQuery: '',
     };
   }
@@ -65,8 +69,9 @@ export default class DataTable extends Component<types.Props, types.State> {
 
   selectRow(rowIdx: number, event: React.MouseEvent<HTMLTableRowElement, MouseEvent>) {
     event.stopPropagation();
+    if (this.props.processing) return;
     let { focusedRowIdx, selectedRowIdxs } = this.state;
-    if (focusedRowIdx) {
+    if (focusedRowIdx != -1) {
       if (event.shiftKey) {
         const [start, end] = [focusedRowIdx, rowIdx].sort();
         selectedRowIdxs = range(start, end + 1);
@@ -115,13 +120,33 @@ export default class DataTable extends Component<types.Props, types.State> {
     this.setState({ focusedRowIdx, selectedRowIdxs });
   }
 
-  async reload() {
-    const { getRows } = this.props;
-    const rows = await getRows();
-    this.setState({ rows });
+
+  async getData() {
+    const { userOnly } = this.props;
+    const data = await makeRequest({
+      route: 'squeue',
+      method: 'GET',
+      query: `?userOnly=${userOnly}`,
+      afterResponse: async (response) => {
+        if (response.status !== 200) {
+          throw Error(response.statusText);
+        }
+        else {
+          let data = await response.json();
+          return data.data;
+        }
+      },
+    });
+    return data;
   }
 
-  componentDidMount() {
+
+  async reload() {
+    const rows = await this.getData();
+    this.setState({ rows, focusedRowIdx: -1, selectedRowIdxs: [] });
+  }
+
+  componentWillMount() {
     this.reload();
   }
 
@@ -143,29 +168,38 @@ export default class DataTable extends Component<types.Props, types.State> {
     return (
       <div>
         {buttons && <ButtonToolbar>
-          {(buttons).map(button => {
-            switch(button.action) {
+          {(buttons).map((button, idx) => {
+            switch (button.id) {
               case 'reload':
                 return <Button {...button.props}
-                         onClick={this.reload.bind(this)}>
-                           {button.name ? button.name : 'Reload'}
-                       </Button>
+                  onClick={this.reload.bind(this)}
+                  key={idx}>
+                  {button.name ? button.name : 'Reload'}
+                </Button>
               case 'clear-selected':
                 return <Button {...button.props}
-                         disabled={!!selectedRowIdxs.length}
-                         onClick={this.clearSelectedRows.bind(this)}>
-                           {button.name ? button.name : 'Clear Selection'}
-                       </Button>
+                  disabled={!selectedRowIdxs.length}
+                  onClick={this.clearSelectedRows.bind(this)}
+                  key={idx}>
+                  {button.name ? button.name : 'Clear Selection'}
+                </Button>
+              case 'submit-job':
+                return <Button {...button.props}
+                  onClick={() => (button.action as any)(selectedRows)}
+                  key={idx}>
+                  {button.name ? button.name : 'Submit Job'}
+                </Button>
               default:
                 return <Button {...button.props}
-                         disabled={!!selectedRowIdxs.length}
-                         onClick={(e) => { (button.action as any)(selectedRows); }}>
-                           {button.name}
-                       </Button>
+                  disabled={!selectedRowIdxs.length}
+                  onClick={(e) => { (button.action as any)(selectedRows); }}
+                  key={idx}>
+                  {button.name}
+                </Button>
             }
           })}
         </ButtonToolbar>}
-        <Table striped bordered hover>
+        <Table striped bordered hover className="dataTable">
           <thead>
             <tr>
               {displayedColumns.map(header =>
@@ -174,17 +208,30 @@ export default class DataTable extends Component<types.Props, types.State> {
             </tr>
           </thead>
           <tbody>
-            {currentRows.map((row, rowIdx) =>
-              <tr onClick={this.selectRow.bind(this, rowIdx)} key={`${rowIdx}`}>
+            {currentRows.map((row, rowIdx) => {
+              let selectedComposition = "";
+              let selected = false;
+              if (this.state.selectedRowIdxs.length) {
+                selectedComposition = this.state.selectedRowIdxs.includes(rowIdx) ? "selected" : "unselected";
+                selected = this.state.selectedRowIdxs.includes(rowIdx);
+              } else {
+                selectedComposition = this.state.focusedRowIdx == rowIdx ? "selected" : "";
+                selected = this.state.focusedRowIdx == rowIdx;
+              }
+              if (selected && this.props.processing) {
+                selectedComposition += " processing"
+              }
+              return <tr onClick={this.selectRow.bind(this, rowIdx)} key={`${rowIdx}`}
+                className={selectedComposition}>
                 {row.map((field, fieldIdx) =>
                   <td key={`${rowIdx}-${fieldIdx}`}>{field}</td>
                 )}
               </tr>
-            )}
+            })}
           </tbody>
         </Table>
         <Select options={['10', '25', '50', '100']} onChange={this.changeItemsPerPage.bind(this)} />
-        <Pager numPages={numPages} onChange={this.changePage.bind(this)}/>
+        <Pager numPages={numPages} onChange={this.changePage.bind(this)} />
       </div>
     );
   }

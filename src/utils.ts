@@ -12,7 +12,7 @@ namespace types {
     route: string,
     method: string,
     query?: string,
-    body?: string,
+    body?: string | FormData | URLSearchParams,
     beforeResponse?: () => any[],
     afterResponse?: (response: Response, ...args: any[]) => Promise<any>,
   };
@@ -29,17 +29,25 @@ export async function makeRequest(request: types.Request) {
       // Add Jupyter authorization (XRSF) token to request header
       'Authorization': 'token ' + PageConfig.getToken(),
       // Prevent it from enconding as plain-text UTF-8
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/x-www-form-urlencoded'
     },
   }
   if (body) {
+    if (typeof (body) == "string") {
+      requestInit.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else if (body instanceof URLSearchParams) {
+      requestInit.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    }
     requestInit.body = body;
   }
   try {
     const args = beforeResponse ? beforeResponse() : undefined;
     const response = await ServerConnection.makeRequest(endpoint, requestInit, settings);
     if (afterResponse) {
-      return afterResponse(response, ...args);
+      if (args)
+        return afterResponse(response, ...args);
+      else
+        return afterResponse(response);
     }
   }
   catch (error) {

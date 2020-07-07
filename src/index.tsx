@@ -15,7 +15,7 @@ import {
 
 import {
   JSONExt,
-} from '@phosphor/coreutils';
+} from '@lumino/coreutils';
 
 import {
   IFileBrowserFactory,
@@ -23,11 +23,13 @@ import {
 
 import {
   Widget,
-} from '@phosphor/widgets';
+} from '@lumino/widgets';
 
 // Local
 import SlurmWidget from './slurmWidget';
 import * as config from './slurm-config/config.json';
+
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 /**
  * The class names for the Slurm extension icon, for launcher and
@@ -72,27 +74,25 @@ function activate(
       if (!widget.isAttached) {
         // Attach the widget to the main work area if it's not there
         app.shell.add(widget);
-      } else {
-        // Refresh the widget's state
-        widget.update();
-    }
+      }
+      widget.update();
       // Activate the widget
       app.shell.activateById(widget.id);
     }
   });
 
   // Add the command to the palette.
-  palette.addItem({command, category: 'HPC Tools', args: { isPalette: true } })
+  palette.addItem({ command, category: 'HPC Tools', args: { isPalette: true } })
 
   // Track and restore the widget state
-  let tracker = new WidgetTracker<Widget>({ namespace: 'slurm'});
+  let tracker = new WidgetTracker<Widget>({ namespace: 'slurm' });
   restorer.restore(tracker, {
     command,
     args: () => JSONExt.emptyObject,
     name: () => 'slurm'
   });
 
-    // Add a launcher item if the launcher is available.
+  // Add a launcher item if the launcher is available.
   if (launcher) {
     launcher.add({
       command: 'slurm:open',
@@ -100,7 +100,6 @@ function activate(
       category: 'HPC Tools'
     });
   }
-
 } // activate
 
 /**
