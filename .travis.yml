@@ -1,0 +1,43 @@
+
+language: python
+dist: bionic
+# python:
+#   - '3.6'
+#   - '3.7'
+# nodejs:
+#   - 10.0.0
+# os: osx
+# command to run tests
+cache: pip
+env:
+  global:
+    - MOZ_HEADLESS=1
+addons:
+  firefox: "78.0.1"
+sudo: required
+services:
+  - xvfb
+before_install:
+  - sudo apt-get install xvfb
+  - wget https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-linux64.tar.gz
+  # - mkdir geckodriver
+  # - tar -xzf geckodriver-v0.26.0-macos.tar.gz -C geckodriver
+  # - export PATH=$PATH:$PWD/geckodriver
+  - sudo tar -xzf geckodriver-v0.26.0-linux64.tar.gz -C /usr/bin
+  - sudo chmod a+x /usr/bin/geckodriver
+  # - export DISPLAY=:99.0
+  # - sh -e /etc/init.d/xvfb start
+  # - sleep 5 # give xvfb some time to start
+install: 
+  - "pip install -r requirements.txt"
+  - npm install selenium-webdriver@^3.0.0
+  - node --version
+  - npm install
+  - npm run build
+  - jupyter labextension install .
+
+script: 
+  - jupyter labextension list
+  - jupyter lab --port=8845 --NotebookApp.token='' &
+  - pytest
+  
