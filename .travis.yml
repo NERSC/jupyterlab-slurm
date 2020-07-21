@@ -32,9 +32,9 @@ install:
   - "pip install -r requirements.txt"
   - npm install selenium-webdriver@^3.0.0
   - node --version
-  - npm install
-  - npm run build
-  - jupyter labextension install .
+  - jlpm install
+  - jlpm run build
+  - jupyter labextension install
 
 script: 
   - jupyter labextension list
