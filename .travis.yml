@@ -33,6 +33,7 @@ install:
   - npm install selenium-webdriver@^3.0.0
   - curl -o- -L https://yarnpkg.com/install.sh | bash
   - node --version
+  - jupyter --version
   - jlpm install
   - jlpm run build
   - jupyter labextension install
