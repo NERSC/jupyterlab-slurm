@@ -17,6 +17,10 @@ addons:
 sudo: required
 services:
   - xvfb
+branches:
+  only:
+    - master
+    - react
 before_install:
   - sudo apt-get install xvfb
   - wget https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-linux64.tar.gz
