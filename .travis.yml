@@ -37,7 +37,7 @@ install:
   - jlpm install
   - jlpm run build
   - jupyter labextension install
-  - travis_wait mvn install
+
 
 script: 
   - jupyter labextension list

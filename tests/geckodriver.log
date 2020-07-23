@@ -1513,3 +1513,37 @@ console.error: PushService:
   Failed to drop expired registrations on idle
   UnknownError
 JavaScript error: , line 0: uncaught exception: Object
+console.error: PushService: 
+  Failed to drop expired registrations on idle
+  UnknownError
+console.error: "Store does not have a valid reducer. Make sure the argument passed to combineReducers is an object whose values are reducers."
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("parent is null", "resource://devtools/client/inspector/shared/style-change-tracker.js", 67))
+TypeError: parent is null: canMutationImpactCurrentStyles@resource://devtools/client/inspector/shared/style-change-tracker.js:67:24
+onMutations@resource://devtools/client/inspector/shared/style-change-tracker.js:84:41
+_emit@resource://devtools/shared/event-emitter.js:226:34
+emit@resource://devtools/shared/event-emitter.js:172:18
+emit@resource://devtools/shared/event-emitter.js:324:18
+getMutations@resource://devtools/client/fronts/walker.js:409:10
+
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+JavaScript warning: https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js, line 1: Script terminated by timeout at:
+te@https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js:1:11899
+value@https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js:33:21892
+value@https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js:33:15993
+h@https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js:33:14233
+value@https://vidstat.taboola.com/vpaid/vPlayer/player/v11.4.9/OvaMediaPlayer.js:57:1762
+
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: (new TypeError("container.node.targetFront is null", "resource://devtools/client/inspector/markup/markup.js", 2245))
+console.error: "Store does not have a valid reducer. Make sure the argument passed to combineReducers is an object whose values are reducers."
+JavaScript error: , line 0: AbortError: A request was aborted, for example through a call to IDBTransaction.abort.
+JavaScript error: , line 0: uncaught exception: null
+
+###!!! [Child][MessageChannel] Error: (msgtype=0x3900C2,name=PContent::Msg_ScriptErrorWithStack) Channel closing: too late to send/recv, messages will be lost
+
+1595437102306	Marionette	INFO	Stopped listening on port 51611
