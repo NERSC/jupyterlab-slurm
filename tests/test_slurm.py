@@ -32,12 +32,13 @@ class TestAddfavs():
         actions = ActionChains(self.driver)
         self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
         actions.click(slurm_card).perform()
-        self.driver.implicitly_wait(30)
-        actions.click(slurm_card).perform()
+        self.driver.implicitly_wait(10)
+        #actions.click(slurm_card).perform()
         # WebDriverWait(self.driver, 5000)
         self.driver.implicitly_wait(30)
 
-        slurm_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[2]")
+        slurm_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[2]") 
+        #li.p-mod-current:nth-child(2) > div:nth-child(2)
         # slurm_tab = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue Manager')]")
         assert slurm_tab.text == "Slurm Queue Manager"
 
