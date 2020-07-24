@@ -21,11 +21,13 @@ class TestAddfavs():
         self.driver.get("http://localhost:8845/lab")
         self.driver.implicitly_wait(30)
         self.driver.maximize_window()
+        self.driver.implicitly_wait(30)
         #WebDriverWait(self.driver, 1000)
 
         #card_text = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
         #assert card_text.text == "Slurm Queue"
         slurm_card = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
+        self.driver.implicitly_wait(30)
         assert slurm_card.text == "Slurm Queue"
         #slurm_card = driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
         self.driver.implicitly_wait(30)
