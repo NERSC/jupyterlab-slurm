@@ -39,8 +39,8 @@ class TestAddfavs():
         # WebDriverWait(self.driver, 5000)
         self.driver.implicitly_wait(30)
 
-        slurm_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[2]") 
-        #li.p-mod-current:nth-child(2) > div:nth-child(2)
+        #slurm_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[2]") 
+        slurm_tab = self.driver.find_element_by_css_selector("li.p-mod-current:nth-child(2) > div:nth-child(2)")
         # slurm_tab = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue Manager')]")
         assert slurm_tab.text == "Slurm Queue Manager"
 
