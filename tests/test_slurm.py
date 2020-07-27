@@ -18,6 +18,8 @@ class TestAddfavs():
         self.driver.quit()
   
     def test_checktext(self):
+        #import pdb; pdb.set_trace()
+
         self.driver.get("http://localhost:8845/lab")
         self.driver.implicitly_wait(30)
         self.driver.maximize_window()
@@ -28,17 +30,17 @@ class TestAddfavs():
 
         #card_text = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
         #assert card_text.text == "Slurm Queue"
-        # slurm_card = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
-        slurm_card = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue')]")
-        #slurm_card = self.driver.find_elements_by_class_name("jp-LauncherCard")
+        #slurm_card = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
+        #slurm_card = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue')]")
+        slurm_card = self.driver.find_elements_by_class_name('jp-NerscLaunchIcon')
 
-        self.driver.implicitly_wait(30)
-        assert slurm_card.text == "Slurm Queue"
+        self.driver.implicitly_wait(10)
+        #assert slurm_card.text == "Slurm Queue"
         #slurm_card = driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
-        self.driver.implicitly_wait(30)
+        self.driver.implicitly_wait(10)
         actions = ActionChains(self.driver)
         self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
-        actions.click(slurm_card).perform()
+        actions.click(slurm_card[1]).perform()
         #actions.click(slurm_card).perform()
         self.driver.implicitly_wait(30)
 
