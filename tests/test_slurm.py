@@ -23,7 +23,7 @@ class TestAddfavs():
         self.driver.maximize_window()
         self.driver.implicitly_wait(30)
         #WebDriverWait(self.driver, 1000)
-div.jp-Launcher-section:nth-child(5) > div:nth-child(2) > div:nth-child(1)
+#div.jp-Launcher-section:nth-child(5) > div:nth-child(2) > div:nth-child(1)
 
 
         #card_text = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
