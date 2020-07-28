@@ -34,7 +34,7 @@ class TestAddfavs():
         #slurm_card = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue')]")
         slurm_card = self.driver.find_elements_by_class_name('jp-NerscLaunchIcon')
 
-        self.driver.implicitly_wait(10)
+        # self.driver.implicitly_wait(10)
         #assert slurm_card.text == "Slurm Queue"
         #slurm_card = driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/div[2]/div/div/div[5]/div[2]/div")
         self.driver.implicitly_wait(10)
@@ -42,7 +42,7 @@ class TestAddfavs():
         self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
         actions.click(slurm_card[1]).perform()
         #actions.click(slurm_card).perform()
-        self.driver.implicitly_wait(30)
+        self.driver.implicitly_wait(20)
 
         #slurm_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[2]") 
         # slurm_tab = self.driver.find_element_by_css_selector("li.p-mod-current:nth-child(2) > div:nth-child(2)")
