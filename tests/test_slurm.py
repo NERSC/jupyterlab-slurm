@@ -50,15 +50,18 @@ class TestAddfavs():
         # assert slurm_tab.text == "Slurm Queue Manager"
 
         # jobid_text = self.driver.find_element(By.XPATH, "//div[contains(text(),'JOBID')]")
-        jobid_text = self.driver.find_element(By.XPATH, "//*[contains(text(),'JOBID')]")
-        assert jobid_text.text == "JOBID"
+        try: 
+            jobid_text = self.driver.find_element(By.XPATH, "//*[contains(text(),'JOBID')]")
+            assert jobid_text.text == "JOBID"
 
-        partition_text = self.driver.find_element(By.XPATH, "//*[contains(text(),'PARTITION')]")
-        assert partition_text.text == "PARTITION"
+            partition_text = self.driver.find_element(By.XPATH, "//*[contains(text(),'PARTITION')]")
+            assert partition_text.text == "PARTITION"
 
-        close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[3]")
-        actions = ActionChains(self.driver)
-        actions.click(close_tab).perform()
+            close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[3]")
+            actions = ActionChains(self.driver)
+            actions.click(close_tab).perform()
+        except NoSuchElementException:
+            print('No slurm elements found')
 
 if __name__ == '__main__':
   setup_method()
