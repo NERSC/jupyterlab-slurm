@@ -46,5 +46,6 @@ install:
 script: 
   - jupyter labextension list
   - jupyter lab --port=8845 --NotebookApp.token='' &
+  - sleep 30
   - pytest
   
