@@ -22,7 +22,7 @@ class TestAddfavs():
         #import pdb; pdb.set_trace()
 
         self.driver.get("http://localhost:8845/lab")
-        self.driver.implicitly_wait(30)
+        self.driver.implicitly_wait(10)
         self.driver.maximize_window()
         self.driver.implicitly_wait(20)
         
