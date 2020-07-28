@@ -52,15 +52,18 @@ class TestAddfavs():
         # except NoSuchElementException:
         #     print('No slurm elements found')
 
-        jobid_text = self.driver.find_element(By.XPATH, "//th[contains(text(),'JOBID')]")
-        assert jobid_text.text == "JOBID"
+        jobid_text = self.driver.find_element(By.XPATH, "//h2[contains(text(),'HPC Tools')]")
+        assert jobid_text.text == "HPC Tools"
 
-        partition_text = self.driver.find_element(By.XPATH, "//th[contains(text(),'PARTITION')]")
-        assert partition_text.text == "PARTITION"
+        # jobid_text = self.driver.find_element(By.XPATH, "//th[contains(text(),'JOBID')]")
+        # assert jobid_text.text == "JOBID"
 
-        close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[3]")
-        actions = ActionChains(self.driver)
-        actions.click(close_tab).perform()
+        # partition_text = self.driver.find_element(By.XPATH, "//th[contains(text(),'PARTITION')]")
+        # assert partition_text.text == "PARTITION"
+
+        # close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[3]")
+        # actions = ActionChains(self.driver)
+        # actions.click(close_tab).perform()
 
 if __name__ == '__main__':
   setup_method()
