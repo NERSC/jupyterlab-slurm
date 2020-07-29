@@ -32,8 +32,10 @@ class TestAddfavs():
         #slurm_card = self.driver.find_elements_by_class_name('jp-NerscLaunchIcon')
         #slurm_card = self.driver.find_element_by_css_selector(".jp-NerscLaunchIcon.jp-Launcher-icon")
         #assert slurm_card.text == "Slurm Queue"
-        console = self.driver.find_element_by_css_selector("li.p-TabBar-tab:nth-child(3)")
+        #console = self.driver.find_element_by_css_selector("li.p-TabBar-tab:nth-child(3)")
+        console = self.driver.find_element(By.XPATH, '//*[@title="Commands (⇧ ⌘ C)"]')
         actions = ActionChains(self.driver)
+        self.driver.implicitly_wait(40)
         actions.click(console).perform()
         slurm_launcher = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue')]")
         #slurm_launcher = self.driver.find_element_by_css_selector("li.p-CommandPalette-item:nth-child(31) > div:nth-child(2) > div:nth-child(1)")
@@ -43,6 +45,8 @@ class TestAddfavs():
         #actions.click(slurm_card[1]).perform()
         #actions.click(slurm_card).perform()
         actions = ActionChains(self.driver)
+        #actions.move_to_element(slurm_launcher).perform()
+        #actions = ActionChains(self.driver)
         actions.click(slurm_launcher).perform()
         self.driver.implicitly_wait(10)
 
