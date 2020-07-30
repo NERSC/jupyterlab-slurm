@@ -124,11 +124,11 @@ class TestAddfavs():
         self.driver.implicitly_wait(40)
 
         #close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[2]/ul/li[2]/div[3]")
-        close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/ul/li/div[3]")
+        #close_tab = self.driver.find_element(By.XPATH, "/html/body/div/div[3]/div[2]/div[3]/div[3]/ul/li/div[3]")
         #close_tab = self.driver.find_element(By.XPATH, '//*[@data-icon-id="233519a9-a23c-4415-8e4f-961d69ab1b08"]')
         
-        actions = ActionChains(self.driver)
-        actions.click(close_tab).perform()
+        #actions = ActionChains(self.driver)
+        #actions.click(close_tab).perform()
 
 if __name__ == '__main__':
   setup_method()
