@@ -95,7 +95,7 @@ class TestAddfavs():
         self.driver.execute_script("return arguments[0].scrollIntoView(0, document.documentElement.scrollHeight-10);", slurm_launcher)
         actions = ActionChains(self.driver)
         #actions.move_to_element(slurm_launcher).perform()
-        self.driver.implicitly_wait(40)
+        self.driver.implicitly_wait(50)
         actions.click(slurm_launcher).perform()
         self.driver.implicitly_wait(40)
 
@@ -132,6 +132,6 @@ class TestAddfavs():
 
 if __name__ == '__main__':
   setup_method()
-  test_slurmcard()
-  # test_slurmcommands()
+  #test_slurmcard()
+  test_slurmcommands()
   teardown_method()
