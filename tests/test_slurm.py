@@ -82,7 +82,7 @@ class TestAddfavs():
         self.driver.maximize_window()
         self.driver.implicitly_wait(40)
         console = self.driver.find_element(By.XPATH, '//*[@data-id="command-palette"]')
-        self.driver.implicitly_wait(40)
+        self.driver.implicitly_wait(30)
         actions = ActionChains(self.driver)
         actions.click(console).perform()
         self.driver.implicitly_wait(40)
