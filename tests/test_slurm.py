@@ -87,10 +87,10 @@ class TestAddfavs():
         actions.click(console).perform()
         self.driver.implicitly_wait(40)
         slurm_launcher = self.driver.find_element(By.XPATH, "//div[contains(text(),'Slurm Queue')]")
-        self.driver.implicitly_wait(40)
+        self.driver.implicitly_wait(50)
         self.driver.execute_script("return arguments[0].scrollIntoView(0, document.documentElement.scrollHeight-10);", slurm_launcher)
         #actions.move_to_element(slurm_launcher).perform()
-        self.driver.implicitly_wait(50)
+        self.driver.implicitly_wait(60)
         actions = ActionChains(self.driver)
         actions.click(slurm_launcher).perform()
 
