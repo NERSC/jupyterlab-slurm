@@ -44,8 +44,10 @@ install:
 
 
 script: 
+  - JUPYTER_TOKEN=secret jupyter-notebook &
   - jupyter labextension list
   - jupyter lab --port=8845 --NotebookApp.token='' &
+  - export PATH=$(pwd)/tests:$PATH
   - sleep 30
   - pytest
   

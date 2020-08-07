@@ -16,6 +16,7 @@ jobIDMatcher = re.compile("^[0-9]+$")
 
 class ShellExecutionHandler(IPythonHandler):
     async def run_command(self, command, stdin=None, cwd=None):
+        print(command)
         commands = shlex.split(command)
         process = await asyncio.create_subprocess_exec(*commands,
                                                        stdout=asyncio.subprocess.PIPE,
