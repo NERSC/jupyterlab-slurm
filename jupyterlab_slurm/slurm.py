@@ -102,9 +102,12 @@ class SbatchHandler(ShellExecutionHandler):
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if inputType:
             if inputType == 'path':
+                print(self.request.body)
+                print(self.request.headers['Content-Type'] == 'application/json')
                 if self.request.headers['Content-Type'] == 'application/json':
                     script_path = json.loads(self.request.body)["input"]
                 else:
+                    print("shouldn't be here")
                     script_path = self.get_body_argument('input')
                 try:
                     stdout, stderr, returncode = await self.run_command(sbatch_command + script_path, cwd=outputDir)
@@ -122,7 +125,7 @@ class SbatchHandler(ShellExecutionHandler):
                     temp.flush()
                     temp.seek(0)
                     try:
-                        stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=temp.fileno(), cwd=outputDir)
+                        stdout, stderr, returncode = await self.run_command(sbatch_csrfommand, stdin=temp.fileno(), cwd=outputDir)
                         errorMessage = ""
                     except Exception as e:
                         stdout, stderr, returncode, errorMessage = (
