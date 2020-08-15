@@ -51,3 +51,4 @@ script:
   - sleep 30
   - pytest
   
+# JUPYTER_TOKEN=secret jupyter lab --port=8845 --NotebookApp.token='' &

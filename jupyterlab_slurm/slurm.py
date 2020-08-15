@@ -125,7 +125,7 @@ class SbatchHandler(ShellExecutionHandler):
                     temp.flush()
                     temp.seek(0)
                     try:
-                        stdout, stderr, returncode = await self.run_command(sbatch_csrfommand, stdin=temp.fileno(), cwd=outputDir)
+                        stdout, stderr, returncode = await self.run_command(sbatch_command, stdin=temp.fileno(), cwd=outputDir)
                         errorMessage = ""
                     except Exception as e:
                         stdout, stderr, returncode, errorMessage = (
