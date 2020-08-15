@@ -1,0 +1,6 @@
+#!/bin/sh
+#SBATCH -C haswell
+while [ ! -f /global/ul/n/labanyam/stop]
+do
+    sleep 3000
+done

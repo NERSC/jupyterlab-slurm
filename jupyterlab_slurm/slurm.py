@@ -16,6 +16,7 @@ jobIDMatcher = re.compile("^[0-9]+$")
 
 class ShellExecutionHandler(IPythonHandler):
     async def run_command(self, command, stdin=None, cwd=None):
+        print(command)
         commands = shlex.split(command)
         process = await asyncio.create_subprocess_exec(*commands,
                                                        stdout=asyncio.subprocess.PIPE,
@@ -101,9 +102,12 @@ class SbatchHandler(ShellExecutionHandler):
         # Have two options to specify SLURM script in the request body: either with a path to the script, or with the script's text contents
         if inputType:
             if inputType == 'path':
+                print(self.request.body)
+                print(self.request.headers['Content-Type'] == 'application/json')
                 if self.request.headers['Content-Type'] == 'application/json':
                     script_path = json.loads(self.request.body)["input"]
                 else:
+                    print("shouldn't be here")
                     script_path = self.get_body_argument('input')
                 try:
                     stdout, stderr, returncode = await self.run_command(sbatch_command + script_path, cwd=outputDir)
