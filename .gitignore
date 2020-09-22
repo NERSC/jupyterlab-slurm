@@ -15,6 +15,7 @@ __pycache__/
 pip-log.txt
 pip-delete-this-directory.txt
 .cache
+*.log
 
 # distribution/packaging
 node_modules/
@@ -36,3 +37,6 @@ yarn.lock
 *.egg-info/
 *.egg
 .installed.cfg
+
+# typescript
+tsconfig.tsbuildinfo

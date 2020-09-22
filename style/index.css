@@ -158,15 +158,20 @@ table.dataTable.cell-border tbody tr td:first-child {
 }
 
 /* columns which are not being sorted on and are unselected */
-table.dataTable tbody tr {
-  background-color: var(--jp-brand-color3);
+table.dataTable tbody tr.unselected {
+  /** background-color: var(--jp-brand-color3); **/
   color: var(--jp-ui-font-color3);
 }
 
 /* columns which are not being sorted on and are selected */
 table.dataTable tbody tr.selected {
   background-color: var(--jp-brand-color2);
-  color: var(--jp-ui-font-color2);
+  /** color: var(--jp-ui-font-color2); **/
+}
+
+table.dataTable tbody tr.processing {
+  background-color: var(--jp-brand-color3);
+  /** color: var(--jp-ui-font-color2); **/
 }
 
 /* columns which are being sorted on and are unselected */
