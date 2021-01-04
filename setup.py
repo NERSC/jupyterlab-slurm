@@ -12,7 +12,7 @@ data_files = [
     ("etc/jupyter/jupyter_notebook_config.d", [
         "jupyter-config/jupyter_notebook_config.d/jupyterlab_slurm.json"
     ])
-]       
+]
 
 setup(
     name='jupyterlab_slurm',
@@ -22,8 +22,8 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=("node_modules",)),
     include_package_data=True,
-    data_files = data_files,
-    author='NERSC, Jon Hays, William Krinsman',
+    data_files=data_files,
+    author='NERSC, Jon Hays, William Krinsman, Justin Ley',
     license='BSD 3-Clause',
     url='https://github.com/NERSC/jupyterlab-slurm',
     keywords=['Jupyter', 'Jupyterlab', 'Slurm', 'NERSC'],

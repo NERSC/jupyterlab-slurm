@@ -9,7 +9,7 @@ from .slurm import UserFetchHandler
 from notebook.utils import url_path_join
 from os import path
 
-__version__ = "2.0.0-dev"
+__version__ = "2.0.0"
 
 
 def _jupyter_server_extension_paths():

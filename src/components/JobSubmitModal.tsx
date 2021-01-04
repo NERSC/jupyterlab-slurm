@@ -72,7 +72,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
               <Form.Label>File path</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="path relative to filebrowser"
+                placeholder="Path to Slurm script"
                 onChange={(e) => this.updateFilepath(e.target.value)}
                 disabled={this.props.disabled}
               />
@@ -80,7 +80,7 @@ export default class JobSubmitModal extends Component<types.Props, types.State> 
           }
           {inputType !== 'path' &&
             <Form.Group>
-              <Form.Label>Write your script here</Form.Label>
+              <Form.Label>Enter your Slurm script here</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={10}
