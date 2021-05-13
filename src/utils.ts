@@ -34,8 +34,10 @@ export async function makeRequest(request: types.Request) {
   }
   if (body) {
     if (typeof (body) == "string") {
-      requestInit.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      requestInit.headers['Content-Type'] = 'application/json';
     } else if (body instanceof URLSearchParams) {
+      requestInit.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else if (body instanceof FormData) {
       requestInit.headers['Content-Type'] = 'application/x-www-form-urlencoded';
     }
     requestInit.body = body;
