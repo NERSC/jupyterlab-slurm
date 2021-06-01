@@ -1,22 +1,15 @@
-import React, { Component } from 'react';
-import {
-  Alert,
-  AlertProps,
-  Form,
-} from 'react-bootstrap';
+import React from 'react';
+import { Alert, AlertProps, Form } from 'react-bootstrap';
 
-import {
-  FileBrowser,
-} from '@jupyterlab/filebrowser';
+import { FileBrowser } from '@jupyterlab/filebrowser';
 
-import {
-  v4 as uuidv4
-} from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 // Local
-import { makeRequest } from '../utils';
+import { requestAPI } from '../handler';
 import DataTable from './DataTable';
 import JobSubmitModal from './JobSubmitModal';
+
 import * as config from '../slurm-config/config.json';
 
 namespace types {
@@ -43,10 +36,14 @@ namespace types {
     processingJobs: boolean;
     userOnly: boolean;
     reloading: boolean;
+    userSubmit: boolean;
   };
 }
 
-export default class SlurmManager extends Component<types.Props, types.State> {
+export default class SlurmManager extends React.Component<
+  types.Props,
+  types.State
+> {
   // The column index of job ID
   readonly JOBID_IDX = 0;
   // The column index of the username
@@ -62,7 +59,8 @@ export default class SlurmManager extends Component<types.Props, types.State> {
       jobSubmitModalVisible: false,
       userOnly: config['userOnly'],
       processingJobs: false,
-      reloading: false
+      reloading: false,
+      userSubmit: false
     };
   }
 
@@ -85,29 +83,34 @@ export default class SlurmManager extends Component<types.Props, types.State> {
   }
 
   private async makeJobRequest(route: string, method: string, body: string) {
-    const beforeResponse = () => {
+    const requestID = uuidv4();
+
+    try {
+      console.log(`Request for ${method} ${route}`);
       this.setState({ processingJobs: true });
-      const requestID = uuidv4();
       this.requestStatusTable.set(requestID, 'sent');
-      return [requestID];
-    }
-    const afterResponse = async (response: Response, requestID: string) => {
-      if (response.status !== 200) {
-        this.requestStatusTable.set(requestID, 'error');
-        this.setState({ processingJobs: false });
-        throw Error(response.statusText);
-      }
-      else {
-        const json = await response.json();
-        let alert: types.Alert = { message: json.responseMessage };
-        if (json.returncode === 0) {
+      requestAPI<any>(route, new URLSearchParams(), {
+        body: body,
+        method: method,
+        headers: { 'Content-Type': 'application/json' }
+      }).then(async result => {
+        console.log('makeJobRequest()', result);
+        //const result = await response.json();
+        const alert: types.Alert = {
+          message:
+            result.responseMessage.length > 0
+              ? result.responseMessage
+              : result.errorMessage
+        };
+        if (result.returncode === 0) {
           alert.variant = 'success';
           this.requestStatusTable.set(requestID, 'received');
-        }
-        else {
+          // trigger a refresh of the table
+          this.setState({ userSubmit: true });
+        } else {
           alert.variant = 'danger';
           this.requestStatusTable.set(requestID, 'error');
-          console.log(json.errorMessage);
+          console.error(result.errorMessage);
         }
         this.addAlert(alert);
         // Remove request pending classes from the element;
@@ -117,12 +120,9 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         // if (element) {
         //   element.removeClass("pending");
         // }
-        this.setState({ processingJobs: false });
-
         // TODO: the alert and removing of the pending class
         // should probably occur after table reload completes,
         //  but we'll need to rework synchronization here..
-
         // If all current jobs have finished executing,
         // reload the queue (using squeue)
         let allJobsFinished = true;
@@ -134,12 +134,17 @@ export default class SlurmManager extends Component<types.Props, types.State> {
         if (allJobsFinished) {
           console.log('All jobs finished.');
         }
-      }
+      });
+    } catch (reason) {
+      this.requestStatusTable.set(requestID, 'error');
+      console.error(`Error on ${method} ${route}\n${reason}`);
+    } finally {
+      this.setState({ processingJobs: false, userSubmit: false });
     }
-    makeRequest({ route, method, body, beforeResponse, afterResponse } as const)
   }
 
-  processSelectedJobs(action: types.JobAction, rows: string[][]) {
+  processSelectedJobs(action: types.JobAction, rows: string[][]): void {
+    console.log(`processSelectedJobs(${action}, ${rows})`);
     const { route, method } = (action => {
       switch (action) {
         case 'kill':
@@ -159,88 +164,115 @@ export default class SlurmManager extends Component<types.Props, types.State> {
 
   private submitJob(input: string, inputType: string) {
     this.setState({ jobSubmitDisabled: true, processingJobs: true });
-    let { serverRoot, filebrowser } = this.props;
-    const fileBrowserRelativePath = filebrowser.model.path;
-    if (serverRoot !== '/') { // Add trailing slash, but not to '/'
+    let serverRoot = this.props.serverRoot;
+    const filebrowser = this.props.filebrowser;
+    //const fileBrowserRelativePath = filebrowser.model.path;
+    if (serverRoot !== '/') {
+      // Add trailing slash, but not to '/'
       serverRoot += '/';
     }
-    const fileBrowserPath = serverRoot + fileBrowserRelativePath;
+    const fileBrowserPath = serverRoot + filebrowser.model.path;
     const outputDir = encodeURIComponent(fileBrowserPath);
-    makeRequest({
-      route: 'sbatch',
-      method: 'POST',
-      query: `?inputType=${inputType}&outputDir=${outputDir}`,
-      body: JSON.stringify({ "input": input }),
-      afterResponse: async (response: Response) => {
-        if (response.ok) {
-          return await response.json();
+
+    console.log('input', input);
+    console.log('inputType', inputType);
+
+    requestAPI<any>(
+      'sbatch',
+      new URLSearchParams(`?inputType=${inputType}&outputDir=${outputDir}`),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: input })
+      }
+    )
+      .then(result => {
+        console.log('sbatch result', result);
+        if (result['returncode'] !== 0) {
+          this.setState({
+            jobSubmitError:
+              result['errorMessage'] === ''
+                ? result['responseMessage']
+                : result['errorMessage'],
+            jobSubmitDisabled: false,
+            processingJobs: false
+          });
+        } else {
+          this.setState({ userSubmit: true });
+          this.hideJobSubmitModal();
+          this.setState({
+            jobSubmitDisabled: false,
+            processingJobs: false
+          });
         }
-        return null;
-      }
-    }).then((result) => {
-      if (result === null) {
+      })
+      .catch(error => {
         this.setState({
-          jobSubmitError: "Unknown error encountered while submitting the script. Try again later.",
-          jobSubmitDisabled: false,
-          processingJobs: false
-        })
-      }
-      if (result["returncode"] !== 0) {
-        this.setState({
-          jobSubmitError: result["errorMessage"] == "" ? result["responseMessage"] : result["errorMessage"],
+          jobSubmitError: `Unknown error encountered while submitting the script. Try again later. Error: ${error}`,
           jobSubmitDisabled: false,
           processingJobs: false
         });
-      } else {
-        this.hideJobSubmitModal();
-        this.setState({ jobSubmitDisabled: false, processingJobs: false });
-      }
-    });
+      });
   }
 
-  render() {
-    /** We should get rid of this. If we need a higher level item to perform actions, we can create a dispatch system */
-    const buttons = [{
-      name: 'Submit Job',
-      id: 'submit-job',
-      action: () => { this.showJobSubmitModal(); },
-      props: {
-        variant: 'primary' as const,
+  render(): React.ReactNode {
+    /** TODO - We should get rid of this. If we need a higher level item to perform actions, we can create a dispatch system */
+    const buttons = [
+      {
+        name: 'Submit Job',
+        id: 'submit-job',
+        action: () => {
+          this.showJobSubmitModal();
+        },
+        props: {
+          variant: 'primary' as const
+        }
       },
-    }, {
-      action: 'reload' as const,
-      id: 'reload',
-      props: {
-        variant: 'secondary' as const,
+      {
+        action: 'reload' as const,
+        id: 'reload',
+        props: {
+          variant: 'secondary' as const
+        }
       },
-    }, {
-      action: 'clear-selected' as const,
-      id: 'clear-selected',
-      props: {
-        variant: 'warning' as const,
+      {
+        action: 'clear-selected' as const,
+        id: 'clear-selected',
+        props: {
+          variant: 'warning' as const
+        }
       },
-    }, {
-      name: 'Kill Selected Job(s)',
-      id: 'kill-selected',
-      action: (rows) => { this.processSelectedJobs('kill', rows); },
-      props: {
-        variant: 'danger' as const,
+      {
+        name: 'Kill Selected Job(s)',
+        id: 'kill-selected',
+        action: (rows: string[][]) => {
+          this.processSelectedJobs('kill', rows);
+        },
+        props: {
+          variant: 'danger' as const
+        }
       },
-    }, {
-      name: 'Hold Selected Job(s)',
-      id: 'hold-selected',
-      action: (rows) => { this.processSelectedJobs('hold', rows); },
-      props: {
-        variant: 'danger' as const,
+      {
+        name: 'Hold Selected Job(s)',
+        id: 'hold-selected',
+        action: (rows: string[][]) => {
+          this.processSelectedJobs('hold', rows);
+        },
+        props: {
+          variant: 'danger' as const
+        }
       },
-    }, {
-      name: 'Release Selected Job(s)',
-      id: 'release-selected',
-      action: (rows) => { this.processSelectedJobs('release', rows); },
-      props: {
-        variant: 'danger' as const,
-      },
-    }];
+      {
+        name: 'Release Selected Job(s)',
+        id: 'release-selected',
+        action: (rows: string[][]) => {
+          this.processSelectedJobs('release', rows);
+        },
+        props: {
+          variant: 'danger' as const
+        }
+      }
+    ];
     const { alerts, jobSubmitModalVisible } = this.state;
     return (
       <>
@@ -250,6 +282,7 @@ export default class SlurmManager extends Component<types.Props, types.State> {
           userOnly={this.state.userOnly}
           processing={this.state.processingJobs}
           reloading={this.state.reloading}
+          userSubmit={this.state.userSubmit}
         />
         <div>
           <Form.Check
@@ -257,15 +290,20 @@ export default class SlurmManager extends Component<types.Props, types.State> {
             id="user-only-checkbox"
             label="Show my jobs only"
             onChange={this.toggleUserOnly.bind(this)}
-            defaultChecked={config["userOnly"]}
+            defaultChecked={config['userOnly']}
           />
         </div>
         <div id="alertContainer" className="container alert-container">
           {alerts.map((alert, index) => (
-            <Alert variant={alert.variant} key={`alert-${index}`} dismissible onClose={() => {
-              this.state.alerts.splice(index, 1);
-              this.setState({});
-            }}>
+            <Alert
+              variant={alert.variant}
+              key={`alert-${index}`}
+              dismissible
+              onClose={() => {
+                this.state.alerts.splice(index, 1);
+                this.setState({});
+              }}
+            >
               {alert.message}
             </Alert>
           ))}

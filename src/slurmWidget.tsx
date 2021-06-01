@@ -1,29 +1,22 @@
 import React from 'react';
 
-import {
-  ReactWidget,
-} from '@jupyterlab/apputils';
+import { ReactWidget, UseSignal } from '@jupyterlab/apputils';
 
-import {
-  PageConfig,
-} from '@jupyterlab/coreutils';
+import { PageConfig } from '@jupyterlab/coreutils';
 
-import {
-  FileBrowser,
-} from '@jupyterlab/filebrowser';
+import { FileBrowser } from '@jupyterlab/filebrowser';
 
-import {
-  UseSignal,
-} from '@jupyterlab/apputils';
-
-import {
-  Signal,
-} from '@lumino/signaling';
+import { Signal } from '@lumino/signaling';
 
 // Local
-import { makeRequest } from './utils';
+import { requestAPI } from './handler';
 import SlurmManager from './components/SlurmManager';
 import { uniqueId } from 'lodash';
+
+type UserData = {
+  user: string;
+  exception: string;
+};
 
 export default class SlurmWidget extends ReactWidget {
   /**
@@ -62,39 +55,36 @@ export default class SlurmWidget extends ReactWidget {
     this.userChanged.emit(user);
   }
 
-  private async fetchUser() {
-    const user = await makeRequest({
-      route: 'user',
-      method: 'GET',
-      afterResponse: async (response) => {
-        if (response.status !== 200) {
-          throw Error(response.statusText);
-        }
-        else {
-          return response.text();
-        }
-      }
-    });
-    this.user = user;
+  private async fetchUser(): Promise<UserData> {
+    try {
+      requestAPI<any>('user')
+        .then(data => {
+          return { user: data.user };
+        })
+        .catch(reason => {
+          console.log('fetchUser error', reason);
+          throw Error(reason);
+        });
+    } catch (e) {
+      console.log(e);
+      const err = e.message;
+      return { user: '', exception: err };
+    }
   }
 
-  onAfterAttach() {
+  onAfterAttach(): void {
     this.fetchUser();
   }
-  
-  render() {
+
+  render(): any {
     return (
-      <UseSignal
-        signal={this.userChanged}
-        initialSender={this}
-        initialArgs={''}
-      >
-        {(_, user) => (
+      <UseSignal signal={this.userChanged}>
+        {(_: any, user: string) => (
           <SlurmManager
-            serverRoot={this.serverRoot}
             filebrowser={this.filebrowser}
-            user={user}>
-          </SlurmManager>
+            serverRoot={this.serverRoot}
+            user={user}
+          />
         )}
       </UseSignal>
     );
