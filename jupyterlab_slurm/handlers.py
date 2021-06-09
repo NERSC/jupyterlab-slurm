@@ -15,10 +15,22 @@ logger = logging.Logger(__file__)
 
 jobIDMatcher = re.compile("^[0-9]+$")
 
-class InvalidJobID(Exception):
+
+class MissingSlurmJobID(Exception):
+    def __init__(self, message):
+        self.message = message
+
+
+class InvalidSlurmJobID(Exception):
     def __init__(self, jobid, message):
         self.jobid = jobid
         self.message = message
+
+
+class MissingBatchScript(Exception):
+    def __init__(self, message):
+        self.message = message
+
 
 class InvalidCommand(Exception):
     def __init__(self, command, message):
@@ -26,24 +38,9 @@ class InvalidCommand(Exception):
         self.message = message
 
 
-async def run_command(command, stdin=None, cwd=None):
-    commands = shlex.split(command)
-    process = await asyncio.create_subprocess_exec(*commands,
-                                                   stdout=asyncio.subprocess.PIPE,
-                                                   stderr=asyncio.subprocess.PIPE,
-                                                   stdin=stdin,
-                                                   cwd=cwd)
-    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
-    # decode stdout and from bytes to str, and return stdout, stderr, and returncode
-    return {
-        "stdout": stdout.decode().strip(),
-        "stderr": stderr.decode().strip(),
-        "returncode": process.returncode
-        }
-
-
 class ExampleHandler(APIHandler):
     def initialize(self, log=logger):
+        super().initialize()
         self._serverlog = log
         self._serverlog.info("ExampleHandler.initialize()")
 
@@ -63,7 +60,8 @@ class ExampleHandler(APIHandler):
 # A simple request handler for retrieving the username
 class UserFetchHandler(APIHandler):
     def initialize(self, log=logger):
-        self._serverlog = logger
+        super().initialize()
+        self._serverlog = log
         self._serverlog.info("UserFetchHandler.initialize()")
 
     @tornado.web.authenticated
@@ -79,6 +77,109 @@ class UserFetchHandler(APIHandler):
             self.finish(json.dumps(e))
 
 
+class SlurmCommandHandler(APIHandler):
+    def initialize(self, command: str = None, log=logger):
+        super().initialize()
+        self._slurm_command = command
+        self._serverlog = log
+        self._serverlog.info("SlurmCommandHandler.initialize(): {} {}".format(self._slurm_command, self._serverlog))
+
+    def get_jobid(self):
+        if self.request.headers['Content-Type'] == 'application/json':
+            body = json.loads(self.request.body)
+            if "jobID" not in body:
+                raise MissingSlurmJobID("")
+            jobID = body["jobID"]
+        else:
+            jobID = self.get_body_arguments('jobID')[0]
+
+        if not jobIDMatcher.search(jobID):
+            raise InvalidSlurmJobID(jobID, "jobID {} is invalid".format(jobID))
+
+        return jobID
+
+    async def _run_command(self, command: str = None, stdin=None, cwd=None):
+        self._serverlog.info('SlurmCommandHandler._run_command(): {} {} {}'.format(command, stdin, cwd))
+        commands = shlex.split(command)
+        self._serverlog.info('SlurmCommandHandler._run_command(): {}'.format(commands))
+        process = await asyncio.create_subprocess_exec(*commands,
+                                                       stdout=asyncio.subprocess.PIPE,
+                                                       stderr=asyncio.subprocess.PIPE,
+                                                       stdin=stdin,
+                                                       cwd=cwd)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+        # decode stdout and from bytes to str, and return stdout, stderr, and returncode
+        return {
+            "stdout": stdout.decode().strip(),
+            "stderr": stderr.decode().strip(),
+            "returncode": process.returncode
+            }
+
+    async def run_command(self, args: list = None):
+        responseMessage = ""
+        errorMessage = "{} did not run!".format(self._slurm_command)
+        returncode = -1
+        try:
+            jobID = self.get_jobid()
+
+            if args is None:
+                args = []
+
+            out = await self._run_command("{} {} {}".format(self._slurm_command, " ".join(args), jobID))
+
+            returncode = out["returncode"]
+            cmd_stdout = ""
+            if "stdout" in out and len(out["stdout"].strip()) > 0:
+                cmd_stdout = out["stdout"]
+
+            cmd_stderr = ""
+            if "stderr" in out and len(out["stderr"].strip()) > 0:
+                cmd_stderr = out["stderr"]
+
+            if returncode != 0:
+                responseMessage = "Failure: {} {} {}".format(self._slurm_command, jobID, cmd_stdout)
+                errorMessage = cmd_stderr
+            else:
+                responseMessage = "Success: {} {}".format(self._slurm_command, jobID)
+                errorMessage = ""
+        except KeyError as ke:
+            self._serverlog.exception(ke)
+            try:
+                jobID is not None
+            except NameError:
+                jobID = "No jobID parsed"
+
+            responseMessage = "Failure: {} {}".format(self._slurm_command, jobID)
+            errorMessage = "Missing key before running command: {}".format(str(ke))
+            returncode = -1
+        except MissingSlurmJobID as emj:
+            self._serverlog.exception(emj)
+            responseMessage = "Failure: {} missing jobID".format(self._slurm_command)
+            errorMessage = emj.message
+            returncode = -1
+        except InvalidSlurmJobID as eij:
+            self._serverlog.exception(eij)
+            responseMessage = "Failure: {} invalid jobID {}".format(self._slurm_command, eij.jobid)
+            errorMessage = eij.message
+            returncode = -1
+        except Exception as e:
+            self._serverlog.exception(e)
+            try:
+                jobID is not None
+            except NameError:
+                jobID = "No jobID parsed"
+
+            responseMessage = "Failure: {} {}".format(self._slurm_command, jobID)
+            errorMessage = "Unhandled Exception: {}".format(str(e))
+            returncode = -1
+        finally:
+            return {
+                "responseMessage": responseMessage,
+                "returncode": returncode,
+                "errorMessage": errorMessage
+                }
+
+
 # Conventions: Query arguments: always settings for how to use or options provided by a SLURM command. Body
 # arguments: always job designators, e.g. job ID, paths to SLURM scripts, input streams of SLURM script contents,
 # etc. Path arguments: always commands (including commands sent to `scontrol`, e.g. `scontrol hold`/`scontrol resume`)
@@ -86,265 +187,272 @@ class UserFetchHandler(APIHandler):
 # Unsurprisingly, the job ID's are always (for scancel and scontrol) the body argument named 'jobID'
 
 # Since this is idempotent, hypothetically one could also use PUT instead of DELETE here.
-class ScancelHandler(APIHandler):
-    def initialize(self, scancel: str = None, log=logger):
-        self._serverlog = log
-        self.scancel = scancel
-        self._serverlog.info("ScancelHandler.initialize()")
+class ScancelHandler(SlurmCommandHandler):
+    def initialize(self, scancel: str = "scancel", log=logger):
+        super().initialize(scancel, log)
+        self._serverlog.info("ScancelHandler.initialize(): {} {}".format(self._slurm_command, self._serverlog))
 
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     @tornado.web.authenticated
     async def delete(self):
-        self._serverlog.info('ScancelHandler.delete() - request: {}, command: {}'.format(self.request, self.scancel))
+        self._serverlog.info('ScancelHandler.delete() - request: {}, command: {}'.format(self.request, self._slurm_command))
 
-        responseMessage = ""
-        errorMessage = "Command did not run!"
-        returncode = -1
         try:
-            if self.request.headers['Content-Type'] == 'application/json':
-                jobID = json.loads(self.request.body)["jobID"]
-            else:
-                jobID = self.get_body_arguments('jobID')[0]
-
-            if not jobIDMatcher.search(jobID):
-                raise InvalidJobID(jobID, "jobID {} is invalid".format(jobID))
-
-            out = await run_command(self.scancel + " " + jobID)
-
-            self._serverlog.info("ScancelHandler.delete() command output: {}".format(out))
-
-            returncode = out["returncode"]
-            if "stderr" in out:
-                responseMessage = ""
-                errorMessage = out["stderr"]
-            else:
-                # stdout will be empty on success -- hence the custom success message
-                responseMessage = "Success: scancel {}".format(jobID)
-                errorMessage = ""
-        except KeyError as ke:
-            self._serverlog.exception(ke)
-            responseMessage = ""
-            errorMessage = "Missing key before running command: {}".format(str(ke))
-            returncode = -1
-        except InvalidJobID as eij:
-            self._serverlog.exception(eij)
-            responseMessage = ""
-            errorMessage = eij.message
-            returncode = -1
+            results = await self.run_command()
         except Exception as e:
-            self._serverlog.exception(e)
-            responseMessage = ""
-            errorMessage = "Unhandled Exception: {}".format(str(e))
-            returncode = -1
+            results = {
+                "responseMessage": "Failure {}".format(self._slurm_command),
+                "errorMessage": str(e),
+                "returncode": -1
+                }
         finally:
-            self.finish(json.dumps({
-                "responseMessage": responseMessage,
-                "returncode": returncode,
-                "errorMessage": errorMessage
-            }))
+            self.finish(json.dumps(results))
 
 
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties,
 # so POST also is not ideal
-class ScontrolHandler(APIHandler):
-    def initialize(self, scontrol: str = None, log=logger):
-        self._serverlog = log
-        self.scontrol = scontrol
+class ScontrolHandler(SlurmCommandHandler):
+    def initialize(self, scontrol: str = "scontrol", log=logger):
+        super().initialize(scontrol, log)
         self._serverlog.info("ScontrolHandler.initialize()")
 
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     @tornado.web.authenticated
-    async def patch(self, command):
+    async def patch(self, action):
+        self._serverlog.info("ScontrolHandler.patch(): {} {}".format(self._slurm_command, action))
         try:
-            if self.request.headers['Content-Type'] == 'application/json':
-                jobID = json.loads(self.request.body)["jobID"]
-            else:
-                jobID = self.get_body_arguments('jobID')[0]
-
-            if not jobIDMatcher.search(jobID):
-                raise InvalidJobID(jobID, "jobID {} is invalid".format(jobID))
-            if command not in {'hold', 'release'}:
-                raise InvalidCommand(command, "Invalid command: {}".format(command))
-
-            out = await run_command("{} {} {}".format(self.scontrol, command, jobID))
-            if "returncode" in out and out["returncode"] != 0:
-                if "stderr" in out:
-                    out["responseMessage"] = out["stderr"]
-                    out["errorMessage"] = out["stderr"]
-                else:
-                    out["responseMessage"] = ""
-                    out["errorMessage"] = "No stderr found"
-            else:
-                # stdout will be empty on success -- hence the custom success message
-                out["responseMessage"] = "Success: scontrol " + command + " " + jobID
-                out["errorMessage"] = ""
-        except InvalidJobID as eij:
-            self._serverlog.exception(eij)
-            out = {
-                "responseMessage": "",
-                "errorMessage": eij.message,
-                "returncode": -1
-                }
-        except InvalidCommand as eic:
-            self._serverlog.exception(eic)
-            out = {
-                "responseMessage": "",
-                "errorMessage": eic.message,
-                "returncode": -1
-                }
+            results = await self.run_command([action])
         except Exception as e:
-            self._serverlog.exception("Unhandled Exception: {}".format(e))
-            out = {
-                "responseMessage": "",
-                "errorMessage": "Unhandled Exception: {}".format(str(e)),
+            results = {
+                "responseMessage": "Failure {} {}".format(self._slurm_command, action),
+                "errorMessage": str(e),
                 "returncode": -1
                 }
         finally:
-            self.finish(json.dumps(out))
+            self.finish(json.dumps(results))
 
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for
 # the C in CRUD here, not PUT
-class SbatchHandler(APIHandler):
-    def initialize(self, sbatch: str = None, temporary_directory: str = None, log=logger):
-        self._serverlog = log
-        self.sbatch = sbatch if sbatch is not None else "sbatch"
+class SbatchHandler(SlurmCommandHandler):
+    def initialize(self, sbatch: str = "sbatch", temporary_directory: str = None, log=logger):
+        super().initialize(sbatch, log)
         self.temp_dir = temporary_directory
-        self._serverlog.info("SbatchHandler.initialize()")
+        self._serverlog.debug("SbatchHandler.initialize()")
 
-    # Add `-H "Authorization: token <token>"` to the curl command for any POST request
-    @tornado.web.authenticated
-    async def post(self):
-        inputType = self.get_query_argument('inputType')
-        outputDir = self.get_query_argument('outputDir', default='')
-        sbatch_command = self.sbatch + ' '
-
-        self._serverlog.info('SbatchHandler.post() - sbatch request: {} {}, inputType: {}, outputDir: {}'.format(
-            self.request, self.request.body, inputType, outputDir))
-
+    def get_batch_script(self):
         script_data = None
-        if self.request.headers['Content-Type'] == 'application/json':
-            script_data = json.loads(self.request.body)["input"]
-        else:
-            script_data = self.get_body_argument('input')
+        try:
+            if self.request.headers['Content-Type'] == 'application/json':
+                body = json.loads(self.request.body)
+                if "input" in body:
+                    script_data = json.loads(self.request.body)["input"]
+                else:
+                    raise MissingBatchScript("'input' argument was not found for a batch script!")
+            else:
+                script_data = self.get_body_argument('input')
+        finally:
+            return script_data
 
-        out = {}
-        # Have two options to specify SLURM script in the request body: either with a path to the script, or with the
-        # script's text contents
-        if inputType:
+    async def run_command(self, script_data: str = None, inputType: str = None, outputDir: str = None):
+        responseMessage = ""
+        errorMessage = "{} did not run!".format(self._slurm_command)
+        returncode = -1
+        try:
             if inputType == 'path':
                 try:
                     self._serverlog.info("SbatchHandler.post() - sbatch call - {} {} {}".format(
-                        sbatch_command, script_data, outputDir))
-                    out = await run_command(sbatch_command + script_data, cwd=outputDir)
+                        self._slurm_command, script_data, outputDir))
+                    out = await self._run_command("{} {}".format(
+                        self._slurm_command, script_data), cwd=outputDir)
                     out["errorMessage"] = ""
                 except Exception as e:
                     out = {
                         "stdout": "",
                         "stderr": "Attempted to run: " + \
-                             "command - {}, path - {}, dir - {}. Check console for more details.".format(
-                         sbatch_command,
-                         script_data,
-                         outputDir
-                         ),
+                                  "command - {}, path - {}, dir - {}. Check console for more details.".format(
+                                      self._slurm_command,
+                                      script_data,
+                                      outputDir
+                                      ),
                         "returncode": 1,
                         "errorMessage": str(e)
-                    }
+                        }
                     self._serverlog.error("Error running sbatch: {}".format(out["stderr"]))
                     self._serverlog.exception(e)
             elif inputType == 'contents':
                 self._serverlog.info("Writing script data to temp file for sbatch: {}".format(script_data))
                 with tempfile.TemporaryFile(mode='w+b', dir=self.temp_dir) as temp:
-                    temp.write(str.encode(script_data))
+                    buffer = str.encode(script_data)
+                    temp.write(buffer)
                     temp.flush()
                     temp.seek(0)
                     try:
                         self._serverlog.info("sbatch call - {} {} {}".format(
-                            sbatch_command, "<stdin from tempfile>", outputDir))
-                        out = await run_command(sbatch_command, stdin=temp.fileno(), cwd=outputDir)
+                            self._slurm_command, buffer, outputDir))
+                        out = await self._run_command(self._slurm_command, stdin=temp.fileno(), cwd=outputDir)
                         out["errorMessage"] = ""
                     except Exception as e:
                         out = {
-                        "stdout": "",
-                        "stderr": "Attempted to run: " + \
-                                 "command - {}, script - {}, dir - {}. Check console for more details.".format(
-                            sbatch_command,
-                            script_data,
-                            outputDir
-                            ),
+                            "stdout": "",
+                            "stderr": "Attempted to run: " + \
+                                      "command - {}, script - {}, dir - {}. Check console for more details.".format(
+                                          self._slurm_command,
+                                          script_data,
+                                          outputDir
+                                          ),
                             "returncode": 1,
                             "errorMessage": str(e)
-                        }
+                            }
                         self._serverlog.error("Error running sbatch: {}".format(out["stderr"]))
                         self._serverlog.exception(e)
             else:
                 raise Exception(
                     'The query argument inputType needs to be either \'path\' or \'contents\', received {}.'.format(
                         inputType))
-        else:
-            raise tornado.web.MissingArgumentError('inputType')
 
-        self._serverlog.info("out: {}".format(out))
+            returncode = out["returncode"]
+            cmd_stdout = ""
+            if "stdout" in out and len(out["stdout"].strip()) > 0:
+                cmd_stdout = out["stdout"]
+
+            cmd_stderr = ""
+            if "stderr" in out and len(out["stderr"].strip()) > 0:
+                cmd_stderr = out["stderr"]
+
+            if returncode != 0:
+                responseMessage = "Failure: {} {}".format(self._slurm_command, cmd_stdout)
+                errorMessage = cmd_stderr
+            else:
+                responseMessage = "Success: {}".format(self._slurm_command)
+                errorMessage = ""
+        except KeyError as ke:
+            self._serverlog.exception(ke)
+            responseMessage = "Failure: {}".format(self._slurm_command)
+            errorMessage = "Missing key before running command: {}".format(str(ke))
+            returncode = -1
+        except Exception as e:
+            self._serverlog.exception(e)
+            responseMessage = "Failure: {}".format(self._slurm_command)
+            errorMessage = "Unhandled Exception: {}".format(str(e))
+            returncode = -1
+        finally:
+            return {
+                "responseMessage": responseMessage,
+                "returncode": returncode,
+                "errorMessage": errorMessage
+                }
+
+    # Add `-H "Authorization: token <token>"` to the curl command for any POST request
+    @tornado.web.authenticated
+    async def post(self):
+        self._serverlog.debug('SbatchHandler.post()')
+
+        inputType = self.get_query_argument('inputType')
+        outputDir = self.get_query_argument('outputDir', default='')
+
+        self._serverlog.info('SbatchHandler.post() - sbatch request: {} {}, inputType: {}, outputDir: {}'.format(
+            self.request, self.request.body, inputType, outputDir))
+
+        # try:
+        #    script_data = self.get_batch_script()
+        # except Exception as e:
+        #    self._serverlog.error("Unexpected exception parsing sbatch input script data!")
+        #    self._serverlog.exception(e)
+        #    self.finish(json.dumps({
+        #        "responseMessage": "Unexpected exception parsing sbatch input script data!",
+        #        "returncode": -1,
+        #        "errorMessage": str(e)
+        #        }))
 
         responseMessage = ""
-        if "returncode" in out:
-            if out["returncode"] == 0:
-                responseMessage = "Success: " + out["stdout"]
-            else:
-                responseMessage = "Failure: " + out["stderr"]
-        else:
-            responseMessage = "Missing returncode from out: {}".format(out)
-            self._serverlog.info(responseMessage)
-            out["returncode"] = 1
+        errorMessage = ""
+        returncode = -1
+        try:
+            out = {}
+            # Have two options to specify SLURM script in the request body: either with a path to the script, or with the
+            # script's text contents
 
-        # jobID = re.compile('([0-9]+)$').search(stdout).group(1)
-        self.finish(json.dumps({
-            "responseMessage": responseMessage,
-            "returncode": out["returncode"],
-            "errorMessage": out["errorMessage"]
-            }))
+            script_data = self.get_batch_script()
+
+            if inputType:
+                out = await self.run_command(script_data, inputType, outputDir)
+            else:
+                raise tornado.web.MissingArgumentError('inputType')
+
+            self._serverlog.info("out: {}".format(out))
+
+            responseMessage = out["responseMessage"]
+            errorMessage = out["errorMessage"]
+            returncode = out["returncode"]
+        except Exception as e:
+            self._serverlog.exception(e)
+            responseMessage = "Failure: {}".format(self._slurm_command)
+            errorMessage = "Unhandled Exception: {}".format(str(e))
+            returncode = -1
+        finally:
+            self.finish(json.dumps({
+                "responseMessage": responseMessage,
+                "errorMessage": errorMessage,
+                "returncode": returncode
+                }))
 
 
 # all squeue does is request information from SLURM scheduler, which is idempotent (for the "server-side"),
 # so clearly GET request is appropriate here
-class SqueueHandler(APIHandler):
+class SqueueHandler(SlurmCommandHandler):
     def initialize(self, squeue: str = None, log=logger):
-        self._serverlog = log
-        self.squeue = squeue
+        super().initialize(squeue, log)
+        self._serverlog.debug("SqueueHandler.initialize()")
 
-    @tornado.web.authenticated
-    async def get(self):
-        self._serverlog.info("SqueueHandler.get() {}".format(self.squeue))
+        # squeue -h automatically removes the header row -o <format string> ensures that the output is in a
+        # format expected by the extension Hard-coding this is not great -- ideally we would allow the user to
+        # customize this, or have the default output be the user's output stdout, stderr, _ = await
+        # run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
+        self.output_formatting = '-o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h'
 
-        out = {
-            "returncode": -1,
-            "stderr": "Command did not run!",
-            "stdout": ""
-            }
-        data_dict = {"data": []}
+    def get_command(self):
+        userOnly = self.get_query_argument('userOnly')
+
+        if userOnly == 'true':
+            exec_command = "{} -u {} {}".format(self._slurm_command, os.environ["USER"], self.output_formatting)
+        else:
+            exec_command = "{} {}".format(self._slurm_command, self.output_formatting)
+
+        return exec_command
+
+    async def run_command(self):
+        responseMessage = ""
+        errorMessage = "{} did not run!".format(self._slurm_command)
+        returncode = -1
         try:
-            # what to keep in the mind if we want to add a view user's jobs only button -- it would just add the -u
-            # flag to the command
-            userOnly = self.get_query_argument('userOnly')
-            if userOnly == 'true':
-                self._serverlog.info(self.squeue + ' -u ' + os.environ["USER"] + ' -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-                out = await run_command(
-                    self.squeue + ' -u ' + os.environ["USER"] + ' -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-            else:
-                self._serverlog.info(self.squeue + ' -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-                out = await run_command(self.squeue + ' -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
-            # squeue -h automatically removes the header row -o <format string> ensures that the output is in a
-            # format expected by the extension Hard-coding this is not great -- ideally we would allow the user to
-            # customize this, or have the default output be the user's output stdout, stderr, _ = await
-            # run_command('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R" -h')
 
+            out = {
+                "returncode": -1,
+                "stderr": "Command did not run!",
+                "stdout": ""
+                }
+            data_dict = {"data": []}
+            exec_command = self.get_command()
+            self._serverlog.info("SqueueHandler.run_command(): {}".format(exec_command))
+            out = await self._run_command(exec_command)
             self._serverlog.info("SqueueHandler response: {}".format(out))
 
-            if out["returncode"] != 0:
-                self._serverlog.warning("Non-zero return code from squeue: {}".format(out["returncode"]))
-                self.send_error(500, out)
-            elif len(out["stderr"]) > 0:
-                self._serverlog.warning("stderr from squeue: {}".format(out["stderr"]))
+            returncode = out["returncode"]
+            cmd_stdout = ""
+            if "stdout" in out and len(out["stdout"].strip()) > 0:
+                cmd_stdout = out["stdout"]
+
+            cmd_stderr = ""
+            if "stderr" in out and len(out["stderr"].strip()) > 0:
+                cmd_stderr = out["stderr"]
+
+            if returncode != 0:
+                responseMessage = "Failure: {} {}".format(exec_command, cmd_stdout)
+                errorMessage = cmd_stderr
+            else:
+                responseMessage = "Success: {}".format(exec_command)
+                errorMessage = ""
 
             data = out["stdout"].splitlines()
             self._serverlog.info("SqueueHandler stdout: {}".format(data))
@@ -363,7 +471,48 @@ class SqueueHandler(APIHandler):
                                    for entry in row.split(maxsplit=7)]]
                 else:
                     continue
-            data_dict['data'] = data_list[:]
+        except KeyError as ke:
+            self._serverlog.exception(ke)
+            responseMessage = "Failure: {}".format(self._slurm_command)
+            errorMessage = "Missing key before running command: {}".format(str(ke))
+            returncode = -1
+            data_list = []
+        except Exception as e:
+            self._serverlog.exception(e)
+            responseMessage = "Failure: {}".format(self._slurm_command)
+            errorMessage = "Unhandled Exception: {}".format(str(e))
+            returncode = -1
+            data_list = []
+        finally:
+            return {
+                "data": data_list[:],
+                "squeue": {
+                    "responseMessage": responseMessage,
+                    "returncode": returncode,
+                    "errorMessage": errorMessage
+                    }
+                }
+
+    @tornado.web.authenticated
+    async def get(self):
+        self._serverlog.info("SqueueHandler.get() {}".format(self._slurm_command))
+
+        out = {
+            "returncode": -1,
+            "stderr": "Command did not run!",
+            "stdout": ""
+            }
+        data_dict = {"data": []}
+        try:
+            out = await self.run_command()
+            self._serverlog.info("SqueueHandler response: {}".format(out))
+            data = out["data"]
+            self._serverlog.info("SqueueHandler stdout: {}".format(data))
+
+            data_dict = {
+                "data": data,
+                "squeue": out
+                }
         except Exception as e:
             self._serverlog.exception("Unhandled Exception: {}".format(e))
             data_dict = {"data": [], "squeue": out}
@@ -398,9 +547,9 @@ def setup_handlers(web_app, temporary_directory=None, log=None):
         (url_path_join(base_url, 'jupyterlab_slurm', 'squeue'), SqueueHandler, dict(squeue=squeue_path, log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'scancel'), ScancelHandler, dict(scancel=scancel_path, log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'scontrol', '(?P<command>.*)'), ScontrolHandler,
-            dict(scontrol=scontrol_path, log=log)),
+         dict(scontrol=scontrol_path, log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'sbatch'), SbatchHandler,
-            dict(sbatch=sbatch_path, temporary_directory=temporary_directory, log=log))
+         dict(sbatch=sbatch_path, temporary_directory=temporary_directory, log=log))
         ]
 
     if log:
@@ -411,6 +560,6 @@ def setup_handlers(web_app, temporary_directory=None, log=None):
         log.info("Starting up handlers....\n")
         for h in handlers:
             log.info("Handler: {}\tURI: {}\tdict: {}\n".format(
-            h[1].__name__, h[0], h[2]))
+                h[1].__name__, h[0], h[2]))
 
     web_app.add_handlers(host_pattern, handlers)

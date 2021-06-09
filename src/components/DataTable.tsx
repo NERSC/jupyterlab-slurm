@@ -55,13 +55,13 @@ export default class DataTable extends Component<types.Props, types.State> {
 
   changeItemsPerPage(value: string): void {
     console.log('changeItemsPerPage: ', value);
-    this.setState({ itemsPerPage: parseInt(value) });
-    this.clearSelectedRows();
+    this.setState({ currentPage: 1, itemsPerPage: parseInt(value) });
+    //this.clearSelectedRows();
   }
 
   changePage(value: number): void {
     this.setState({ currentPage: value });
-    this.clearSelectedRows();
+    //this.clearSelectedRows();
   }
 
   clearSelectedRows(): void {
@@ -73,15 +73,33 @@ export default class DataTable extends Component<types.Props, types.State> {
     event: React.MouseEvent<HTMLTableRowElement, MouseEvent>
   ): void {
     event.stopPropagation();
+
+    console.log('selectRow() : ', rowIdx);
+
     if (this.props.processing) {
       return;
     }
-    let { focusedRowIdx, selectedRowIdxs } = this.state;
-    if (focusedRowIdx !== -1) {
+    let focusedRowIdx = this.state.focusedRowIdx;
+    let selectedRowIdxs = this.state.selectedRowIdxs;
+
+    console.log('selectRow(): this.state ', focusedRowIdx, selectedRowIdxs);
+
+    console.log(focusedRowIdx !== -1);
+    if (focusedRowIdx === -1) {
+      // first row selected or previously cleared
+      focusedRowIdx = rowIdx;
+      selectedRowIdxs = [rowIdx];
+    } else {
+      console.log('selectRow(): event ', event);
       if (event.shiftKey) {
+        // shift adds contiguous selected rows
+        console.log('event shift key');
+
         const [start, end] = [focusedRowIdx, rowIdx].sort();
-        selectedRowIdxs = range(start, end + 1);
+        selectedRowIdxs = range(start, end + 1).reverse();
       } else if (event.ctrlKey || event.metaKey) {
+        // ctrl or meta (cmd for mac) deselect rows
+        console.log('event ctrl or meta', event.ctrlKey, event.metaKey);
         const selectionIdx = selectedRowIdxs.indexOf(rowIdx);
         if (selectionIdx) {
           // The row was already selected
@@ -118,14 +136,62 @@ export default class DataTable extends Component<types.Props, types.State> {
         } else {
           // The row was not selected
           focusedRowIdx = rowIdx;
-          selectedRowIdxs = selectedRowIdxs.concat([rowIdx]).sort();
+          selectedRowIdxs = selectedRowIdxs.concat([rowIdx]).sort().reverse();
+        }
+      } else {
+        // click event - select if not already selected, otherwise deselect
+        focusedRowIdx = rowIdx;
+
+        const found = selectedRowIdxs.indexOf(rowIdx);
+        console.log(
+          'found, selectedRowIdxs.length',
+          found,
+          selectedRowIdxs.length
+        );
+        if (found > -1) {
+          // deselect, remove row
+          if (selectedRowIdxs.length > 1) {
+            if (found === 0) {
+              selectedRowIdxs = selectedRowIdxs.slice(
+                1,
+                selectedRowIdxs.length
+              );
+            } else if (found === selectedRowIdxs.length - 1) {
+              selectedRowIdxs = selectedRowIdxs.slice(
+                0,
+                selectedRowIdxs.length - 1
+              );
+            } else {
+              const left = selectedRowIdxs.slice(0, found);
+              const right = selectedRowIdxs.slice(
+                found + 1,
+                selectedRowIdxs.length
+              );
+              selectedRowIdxs = left.concat(right);
+              console.log('cutting row from middle', left, right);
+            }
+          } else {
+            // last row, reset selections
+            focusedRowIdx = -1;
+            selectedRowIdxs = [];
+          }
+        } else {
+          // new select, add row
+          selectedRowIdxs.push(rowIdx);
+          selectedRowIdxs = selectedRowIdxs.sort().reverse();
         }
       }
-    } else {
-      focusedRowIdx = rowIdx;
-      selectedRowIdxs = [rowIdx];
     }
-    this.setState({ focusedRowIdx, selectedRowIdxs });
+
+    console.log(
+      'focusedRowIdx, selectedRowIdx',
+      focusedRowIdx,
+      selectedRowIdxs
+    );
+    this.setState({
+      focusedRowIdx: focusedRowIdx,
+      selectedRowIdxs: selectedRowIdxs
+    });
   }
 
   async getData(): Promise<string[][]> {

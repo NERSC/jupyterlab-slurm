@@ -70,7 +70,7 @@ export default class SlurmManager extends React.Component<
   }
 
   private showJobSubmitModal() {
-    this.setState({ jobSubmitModalVisible: true });
+    this.setState({ jobSubmitModalVisible: true, userSubmit: false });
   }
 
   private hideJobSubmitModal() {
@@ -195,14 +195,16 @@ export default class SlurmManager extends React.Component<
                 ? result['responseMessage']
                 : result['errorMessage'],
             jobSubmitDisabled: false,
-            processingJobs: false
+            processingJobs: false,
+            userSubmit: false
           });
         } else {
           this.setState({ userSubmit: true });
           this.hideJobSubmitModal();
           this.setState({
             jobSubmitDisabled: false,
-            processingJobs: false
+            processingJobs: false,
+            userSubmit: true
           });
         }
       })
@@ -210,7 +212,8 @@ export default class SlurmManager extends React.Component<
         this.setState({
           jobSubmitError: `Unknown error encountered while submitting the script. Try again later. Error: ${error}`,
           jobSubmitDisabled: false,
-          processingJobs: false
+          processingJobs: false,
+          userSubmit: false
         });
       });
   }
