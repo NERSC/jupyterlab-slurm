@@ -7,8 +7,8 @@ providing simple and intuitive controls for viewing and managing jobs on the que
 
 ## Prerequisites
 
-* JupyterLab >= 1.0
-* Node.js 5+
+* JupyterLab >= 3.0
+* Node.js 14+
 * Slurm
 
 
@@ -19,7 +19,6 @@ Jupyter notebook server extension. Install these using the command line with
 
 ```bash
 pip install jupyterlab_slurm
-jupyter labextension install jupyterlab-slurm
 ```
 
 If you are running Notebook 5.2 or earlier, enable the server extension by running
@@ -37,24 +36,33 @@ of the palette and the launcher.
 
 As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io/en/stable/developer/extension_dev.html#extension-authoring) for a development install of the labextension you can run the following in this directory:
 
+### Setup a local slurm cluster
+
 ```bash
-jlpm install   # Install npm package dependencies
-jlpm run build  # Compile the TypeScript sources to Javascript
-jupyter labextension install  # Install the current directory as an extension
+git clone https://github.com/giovtorres/slurm-docker-cluster
+cd slurm-docker-cluster
+git clone https://github.com/NERSC/jupyterlab_slurm
+cp jupyterlab-slurm/slurm_cluster/docker-compose.yml .
+# from slurm-docker-cluster README
+docker build -t slurm-docker-cluster:19.05.1 .
+# this will build the jupyterlab image minimal-notebook with a slurm client
+docker-compose build
+# start the cluster
+docker-compose up -d
+# register the slurm cluster
+./register_cluster.sh
+# run munged on the jupyterlab instance to get the slurm commands to connect
+docker-compose exec jupyterlab bash
+runuser -u slurm -- munged
+# test that squeue comes back with a header, if it gets stuck you can't connect
+squeue
 ```
 
-To rebuild the extension:
+### Install jupyterlab-slurm into your environment
 
 ```bash
-jlpm run build
-```
-
-If you run JupyterLab in watch mode (`jupyter lab --watch`) it will automatically pick
-up changes to the built extension and rebundle itself.
-
-To run an editable install of the server extension, run
-
-```bash
-pip install -e .
-jupyter serverextension enable --sys-prefix jupyterlab_slurm
+docker-compose exec jupyterlab bash
+cd /usr/local/jupyterlab_slurm
+# -U forces an install if you are running it multiple times
+pip install . -U
 ```
