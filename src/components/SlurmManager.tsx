@@ -201,9 +201,7 @@ export default class SlurmManager extends React.Component<
     const fileBrowserPath = serverRoot + filebrowser.model.path;
     const outputDir = encodeURIComponent(fileBrowserPath);
 
-    if (inputType === 'contents') {
-      contents = serverRoot + input;
-    } else if (inputType === 'path' && !input.startsWith('/')) {
+    if (inputType === 'path' && !input.startsWith('/')) {
       contents = serverRoot + input;
     } else {
       contents = input;
