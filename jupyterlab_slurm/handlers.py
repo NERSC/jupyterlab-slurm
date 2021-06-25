@@ -10,6 +10,7 @@ import tempfile
 from jupyter_server.base.handlers import APIHandler
 from jupyter_server.utils import url_path_join
 import tornado
+import tornado.web
 
 logger = logging.Logger(__file__)
 
@@ -38,6 +39,7 @@ class InvalidCommand(Exception):
         self.message = message
 
 
+# Here mainly as a sanity check that the extension is installed and running
 class ExampleHandler(APIHandler):
     def initialize(self, log=logger):
         super().initialize()
@@ -47,7 +49,7 @@ class ExampleHandler(APIHandler):
     @tornado.web.authenticated
     def get(self):
         try:
-            self._serverlog.info("get_example")
+            self._serverlog.info("ExampleHandler.get()")
             self.finish(json.dumps({
                 "data": "This is the /jupyterlab_slurm/get_example endpoint!"
                 }))
@@ -68,7 +70,7 @@ class UserFetchHandler(APIHandler):
     def get(self):
         try:
             username = os.environ.get('USER')
-            self._serverlog.info(username)
+            self._serverlog.info("UserFetchHandler.get() {}".format(username))
             self.finish(json.dumps({
                 "user": username
                 }))
@@ -76,7 +78,8 @@ class UserFetchHandler(APIHandler):
             self._serverlog.exception(e)
             self.finish(json.dumps(e))
 
-
+# common utility methods for running slurm commands, and defaults to the run_command() for scancel and scontrol
+# sbatch and squeue need special handling of the command and override run_command()
 class SlurmCommandHandler(APIHandler):
     def initialize(self, command: str = None, log=logger):
         super().initialize()
@@ -195,8 +198,13 @@ class ScancelHandler(SlurmCommandHandler):
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     @tornado.web.authenticated
     async def delete(self):
-        self._serverlog.info('ScancelHandler.delete() - request: {}, command: {}'.format(self.request, self._slurm_command))
-
+        self._serverlog.info('ScancelHandler.delete() - request: {}, command: {}'.format(
+            self.request, self._slurm_command))
+        results = {
+            "responseMessage": "{} has not run yet!".format(self._slurm_command),
+            "errorMessage": "",
+            "returncode": -1
+            }
         try:
             results = await self.run_command()
         except Exception as e:
@@ -206,7 +214,7 @@ class ScancelHandler(SlurmCommandHandler):
                 "returncode": -1
                 }
         finally:
-            self.finish(json.dumps(results))
+            await self.finish(json.dumps(results))
 
 
 # scontrol isn't idempotent, so PUT isn't appropriate, and in general scontrol only modifies a subset of properties,
@@ -220,6 +228,11 @@ class ScontrolHandler(SlurmCommandHandler):
     @tornado.web.authenticated
     async def patch(self, action):
         self._serverlog.info("ScontrolHandler.patch(): {} {}".format(self._slurm_command, action))
+        results = {
+            "responseMessage": "{} has not run yet!".format(self._slurm_command),
+            "errorMessage": "",
+            "returncode": -1
+            }
         try:
             results = await self.run_command([action])
         except Exception as e:
@@ -229,7 +242,7 @@ class ScontrolHandler(SlurmCommandHandler):
                 "returncode": -1
                 }
         finally:
-            self.finish(json.dumps(results))
+            await self.finish(json.dumps(results))
 
 
 # sbatch clearly isn't idempotent, and resource ID (i.e. job ID) isn't known when running it, so only POST works for
@@ -256,7 +269,7 @@ class SbatchHandler(SlurmCommandHandler):
 
     async def run_command(self, script_data: str = None, inputType: str = None, outputDir: str = None):
         responseMessage = ""
-        errorMessage = "{} did not run!".format(self._slurm_command)
+        errorMessage = "{} has not run yet!".format(self._slurm_command)
         returncode = -1
         try:
             if inputType == 'path':
@@ -269,7 +282,7 @@ class SbatchHandler(SlurmCommandHandler):
                 except Exception as e:
                     out = {
                         "stdout": "",
-                        "stderr": "Attempted to run: " + \
+                        "stderr": "Attempted to run: " +
                                   "command - {}, path - {}, dir - {}. Check console for more details.".format(
                                       self._slurm_command,
                                       script_data,
@@ -295,7 +308,7 @@ class SbatchHandler(SlurmCommandHandler):
                     except Exception as e:
                         out = {
                             "stdout": "",
-                            "stderr": "Attempted to run: " + \
+                            "stderr": "Attempted to run: " +
                                       "command - {}, script - {}, dir - {}. Check console for more details.".format(
                                           self._slurm_command,
                                           script_data,
@@ -354,18 +367,7 @@ class SbatchHandler(SlurmCommandHandler):
         self._serverlog.info('SbatchHandler.post() - sbatch request: {} {}, inputType: {}, outputDir: {}'.format(
             self.request, self.request.body, inputType, outputDir))
 
-        # try:
-        #    script_data = self.get_batch_script()
-        # except Exception as e:
-        #    self._serverlog.error("Unexpected exception parsing sbatch input script data!")
-        #    self._serverlog.exception(e)
-        #    self.finish(json.dumps({
-        #        "responseMessage": "Unexpected exception parsing sbatch input script data!",
-        #        "returncode": -1,
-        #        "errorMessage": str(e)
-        #        }))
-
-        responseMessage = ""
+        responseMessage = "{} has not run yet!".format(self._slurm_command)
         errorMessage = ""
         returncode = -1
         try:
@@ -391,7 +393,7 @@ class SbatchHandler(SlurmCommandHandler):
             errorMessage = "Unhandled Exception: {}".format(str(e))
             returncode = -1
         finally:
-            self.finish(json.dumps({
+            await self.finish(json.dumps({
                 "responseMessage": responseMessage,
                 "errorMessage": errorMessage,
                 "returncode": returncode
@@ -421,18 +423,12 @@ class SqueueHandler(SlurmCommandHandler):
 
         return exec_command
 
-    async def run_command(self):
+    async def run_command(self, args: list = None):
         responseMessage = ""
         errorMessage = "{} did not run!".format(self._slurm_command)
         returncode = -1
+        data_list = []
         try:
-
-            out = {
-                "returncode": -1,
-                "stderr": "Command did not run!",
-                "stdout": ""
-                }
-            data_dict = {"data": []}
             exec_command = self.get_command()
             self._serverlog.info("SqueueHandler.run_command(): {}".format(exec_command))
             out = await self._run_command(exec_command)
@@ -457,8 +453,6 @@ class SqueueHandler(SlurmCommandHandler):
             data = out["stdout"].splitlines()
             self._serverlog.info("SqueueHandler stdout: {}".format(data))
 
-            data_dict = {}
-            data_list = []
             for row in data:
                 # maxsplit=7 so we can still display squeue entries with final columns with spaces like the
                 # following: (burst_buffer/cray: dws_data_in: DataWarp REST API error: offline namespaces: [34831] -
@@ -493,10 +487,10 @@ class SqueueHandler(SlurmCommandHandler):
                     }
                 }
 
+    # we want to limit the rate at which this is called for a user
     @tornado.web.authenticated
     async def get(self):
         self._serverlog.info("SqueueHandler.get() {}".format(self._slurm_command))
-
         out = {
             "returncode": -1,
             "stderr": "Command did not run!",
@@ -519,7 +513,7 @@ class SqueueHandler(SlurmCommandHandler):
         finally:
             # finish(chunk) writes chunk to the output
             # buffer and ends the HTTP request
-            self.finish(json.dumps(data_dict))
+            await self.finish(json.dumps(data_dict))
 
 
 def setup_handlers(web_app, temporary_directory=None, log=None):
@@ -546,7 +540,7 @@ def setup_handlers(web_app, temporary_directory=None, log=None):
         (url_path_join(base_url, "jupyterlab_slurm", "user"), UserFetchHandler, dict(log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'squeue'), SqueueHandler, dict(squeue=squeue_path, log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'scancel'), ScancelHandler, dict(scancel=scancel_path, log=log)),
-        (url_path_join(base_url, 'jupyterlab_slurm', 'scontrol', '(?P<command>.*)'), ScontrolHandler,
+        (url_path_join(base_url, 'jupyterlab_slurm', 'scontrol', '(?P<action>.*)'), ScontrolHandler,
          dict(scontrol=scontrol_path, log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'sbatch'), SbatchHandler,
          dict(sbatch=sbatch_path, temporary_directory=temporary_directory, log=log))

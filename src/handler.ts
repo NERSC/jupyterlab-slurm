@@ -41,7 +41,6 @@ export async function requestAPI<T>(
       settings,
       error
     );
-    //throw new ServerConnection.NetworkError(error);
   }
 
   let data = null;
