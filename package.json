@@ -22,7 +22,8 @@
   "files": [
     "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
     "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}",
-    "style/index.js"
+    "style/index.js",
+    "schema/**/*.json"
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -65,26 +66,21 @@
     "@jupyterlab/testutils": "^2.1.2",
     "@lumino/widgets": "1.19.0",
     "@types/bootstrap": "^4.3.0",
-    "@types/datatables.net": "^1.10.12",
-    "@types/datatables.net-buttons": "^1.4.0",
-    "@types/datatables.net-select": "^1.2.4",
     "@types/fs-extra": "^5.0.5",
-    "@types/jquery": "^3.3.31",
     "@types/lodash": "^4.14.138",
     "@types/node": "^11.13.7",
     "@types/react": "^17.0.4",
+    "@types/styled-components": "^5.1.10",
     "bootstrap": "^4.2.1",
-    "datatables.net-buttons-dt": "^1.5.4",
-    "datatables.net-dt": "^1.10.19",
-    "datatables.net-plugins": "^1.10.19",
-    "datatables.net-select-dt": "^1.2.4",
     "fs-extra": "^7.0.1",
-    "jquery": "^3.4.1",
     "lodash": "^4.17.15",
     "popper.js": "^1.15.0",
     "react": "^17.0.1",
     "react-bootstrap": "^1.0.1",
+    "react-data-table-component": "^6.11.7",
     "react-dom": "^17.0.1",
+    "react-icons": "^4.2.0",
+    "styled-components": "^5.3.0",
     "uuid": "^8.1.0",
     "yarn-deduplicate": "^1.1.1"
   },
@@ -119,6 +115,7 @@
       }
     },
     "extension": true,
+    "schemaDir": "schema",
     "outputDir": "jupyterlab_slurm/labextension"
   },
   "resolutions": {

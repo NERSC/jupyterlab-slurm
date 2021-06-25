@@ -1,0 +1,367 @@
+import React, { Component, ReactNode, useEffect } from 'react';
+import {
+  Badge,
+  Button,
+  ButtonToolbar,
+  Col,
+  Row,
+  ToggleButton
+} from 'react-bootstrap';
+import {
+  BsArrowRepeat,
+  BsTrashFill,
+  BsPauseFill,
+  BsPlayFill,
+  BsArrowCounterclockwise
+} from 'react-icons/bs';
+import DataTable from 'react-data-table-component';
+
+// Local
+import { requestAPI } from '../handler';
+import { JobAction } from '../types';
+
+namespace types {
+  export type Props = {
+    availableColumns: string[];
+    defaultColumns?: string[];
+    itemsPerPage: number;
+    itemsPerPageOptions: Array<number>;
+    userOnly: boolean;
+    processing: boolean;
+    reloadQueue: boolean;
+    autoReload: boolean;
+    reloadRate: number;
+    theme: string;
+    processJobAction: (
+      action: JobAction,
+      rows: Record<string, unknown>[]
+    ) => void;
+  };
+
+  export type State = {
+    rows: string[][];
+    selectedRows: Record<string, unknown>[];
+    clearSelected: boolean;
+    displayedColumns: string[];
+    itemsPerPage: number;
+    filterQuery: '';
+    lastSqueueFetch: Date;
+    autoReload: boolean;
+    reloadRate: number;
+    userOnly: boolean;
+  };
+}
+
+export default class SqueueDataTable extends Component<
+  types.Props,
+  types.State
+> {
+  constructor(props: types.Props) {
+    super(props);
+
+    let reloadRate = this.props.reloadRate;
+    if (this.props.reloadRate < 5000) {
+      console.log(
+        'jupyterlab-slurm has a floor for reloadRate of 5 seconds, you passed ' +
+          this.props.reloadRate
+      );
+      reloadRate = 5000;
+    }
+
+    this.state = {
+      rows: [],
+      selectedRows: [],
+      clearSelected: false,
+      displayedColumns: props.defaultColumns
+        ? props.defaultColumns
+        : props.availableColumns,
+      itemsPerPage: this.props.itemsPerPage, // make this prop dependent
+      filterQuery: '',
+      lastSqueueFetch: new Date(),
+      autoReload: props.autoReload,
+      reloadRate: reloadRate,
+      userOnly: props.userOnly
+    };
+  }
+
+  clearSelectedRows(): void {
+    this.setState({ selectedRows: [], clearSelected: true });
+  }
+
+  private toggleUserOnly() {
+    const { userOnly } = this.state;
+    this.setState({ userOnly: !userOnly });
+  }
+
+  onSelectedRows(rowState: {
+    allSelected: boolean;
+    selectedCount: number;
+    selectedRows: Record<string, unknown>[];
+  }): void {
+    console.log('onSelectedRows() : ', rowState);
+
+    this.setState({
+      selectedRows: rowState.selectedRows,
+      clearSelected: false
+    });
+  }
+
+  handleJobAction(action: JobAction): void {
+    this.props.processJobAction(action, this.state.selectedRows);
+
+    if (action === 'kill') {
+      this.clearSelectedRows();
+    }
+  }
+
+  async getData(): Promise<string[][]> {
+    const { userOnly } = this.props;
+    const squeueParams = new URLSearchParams(`userOnly=${userOnly}`);
+
+    return await requestAPI<any>('squeue', squeueParams)
+      .then(data => {
+        console.log('SqueueDataTable getData() squeue', squeueParams, data);
+        this.setState({ lastSqueueFetch: new Date(), rows: data.data });
+      })
+      .catch(error => {
+        console.error('SqueueDataTable getData() error', error);
+        return null;
+      });
+  }
+
+  async reload(): Promise<void> {
+    this.setState({
+      displayedColumns: this.props.defaultColumns
+        ? this.props.defaultColumns
+        : this.props.availableColumns,
+      filterQuery: '',
+      clearSelected: false
+    });
+  }
+
+  async componentWillMount(): Promise<void> {
+    console.log('componentWillMount()');
+    await this.getData().then(async () => {
+      await this.reload();
+    });
+  }
+
+  async componentDidMount(): Promise<void> {
+    if (this.state.autoReload) {
+      useEffect(() => {
+        const interval = setInterval(async () => {
+          await this.getData();
+        }, this.state.reloadRate);
+        return () => clearInterval(interval);
+      }, []);
+    }
+  }
+
+  async componentDidUpdate(
+    prevProps: Readonly<types.Props>,
+    prevState: Readonly<types.State>
+  ): Promise<void> {
+    // reset the clear state to re-enable selections
+    if (this.state.clearSelected) {
+      this.setState({ clearSelected: false });
+    }
+
+    console.log(
+      'componentDidUpdate() this.props.reloadQueue ',
+      this.props.reloadQueue
+    );
+
+    // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
+    // we need to limit the frequency of squeue requests
+    if (this.props.reloadQueue) {
+      const currentDT = new Date();
+      const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
+      console.log(
+        'componentDidUpdate() ',
+        String(delta),
+        String(this.state.reloadRate)
+      );
+      if (delta >= this.state.reloadRate) {
+        console.log('componentDidUpdate() calling reload()');
+        await this.getData();
+      }
+    }
+  }
+
+  render(): ReactNode {
+    const clearSelected = this.state.clearSelected;
+    const selectedRows = this.state.selectedRows;
+    const userOnly = this.state.userOnly;
+
+    let data: Record<string, unknown>[] = [];
+    if (this.state.rows.length > 0) {
+      data = this.state.rows.map(x => {
+        const item: Record<string, unknown> = { id: Number(x[0]) };
+        let i, col, colValue;
+        for (
+          i = 0, col = 0;
+          col < this.state.displayedColumns.length;
+          i++, col++
+        ) {
+          colValue = this.state.displayedColumns[col];
+          item[colValue] = x[i];
+        }
+
+        return item;
+      });
+    }
+
+    const columns = this.state.displayedColumns.map(x => {
+      return { name: x, selector: x, sortable: true };
+    });
+
+    /*
+    console.log({
+      rows: this.state.rows,
+      columns: columns,
+      data: data,
+      rows_length: this.state.rows.length,
+      itemsPerPage: this.state.itemsPerPage,
+      selectedRows: selectedRows,
+      displayedColumns: this.state.displayedColumns
+    });
+    */
+    return (
+      <>
+        <Row className={'justify-content-start jp-SlurmWidget-row'}>
+          <ButtonToolbar>
+            <Col md>
+              <ToggleButton
+                type="checkbox"
+                id="user-only-checkbox"
+                variant="outline-light"
+                onChange={this.toggleUserOnly.bind(this)}
+                checked={userOnly}
+                value="1"
+              >
+                Display my jobs only
+              </ToggleButton>
+            </Col>
+          </ButtonToolbar>
+        </Row>
+        <Row className={'justify-content-start jp-SlurmWidget-row'}>
+          <ButtonToolbar>
+            <Col md>
+              <Button
+                className="jp-SlurmWidget-table-button"
+                variant="outline-secondary"
+                onClick={this.reload.bind(this)}
+              >
+                <BsArrowRepeat />
+                Update Queue
+              </Button>
+            </Col>
+            <Col md>
+              <Button
+                className="jp-SlurmWidget-table-button"
+                disabled={selectedRows.length === 0}
+                variant={'outline-secondary'}
+                onClick={this.clearSelectedRows.bind(this)}
+              >
+                <BsArrowCounterclockwise />
+                Clear Selections
+                {selectedRows.length > 0 && (
+                  <Badge
+                    variant="light"
+                    pill={true}
+                    className={'jp-SlurmWidget-table-button-badge'}
+                  >
+                    {selectedRows.length}
+                  </Badge>
+                )}
+              </Button>
+            </Col>
+            <Col md>
+              <Button
+                className="jp-SlurmWidget-table-button"
+                disabled={selectedRows.length === 0}
+                variant={'outline-danger'}
+                onClick={() => {
+                  this.handleJobAction('kill');
+                }}
+              >
+                <BsTrashFill />
+                Kill Job(s)
+                {selectedRows.length > 0 && (
+                  <Badge
+                    variant="light"
+                    pill={true}
+                    className={'jp-SlurmWidget-table-button-badge'}
+                  >
+                    {selectedRows.length}
+                  </Badge>
+                )}
+              </Button>
+            </Col>
+            <Col md>
+              <Button
+                className="jp-SlurmWidget-table-button"
+                disabled={selectedRows.length === 0}
+                variant={'outline-danger'}
+                onClick={() => {
+                  this.handleJobAction('hold');
+                }}
+              >
+                <BsPauseFill />
+                Hold Job(s)
+                {selectedRows.length > 0 && (
+                  <Badge
+                    variant="light"
+                    pill={true}
+                    className={'jp-SlurmWidget-table-button-badge'}
+                  >
+                    {selectedRows.length}
+                  </Badge>
+                )}
+              </Button>
+            </Col>
+            <Col md>
+              <Button
+                className="jp-SlurmWidget-table-button"
+                disabled={selectedRows.length === 0}
+                variant={'outline-danger'}
+                onClick={() => {
+                  this.handleJobAction('release');
+                }}
+              >
+                <BsPlayFill />
+                Release Job(s)
+                {selectedRows.length > 0 && (
+                  <Badge
+                    variant="light"
+                    pill={true}
+                    className={'jp-SlurmWidget-table-button-badge'}
+                  >
+                    {selectedRows.length}
+                  </Badge>
+                )}
+              </Button>
+            </Col>
+          </ButtonToolbar>
+        </Row>
+        <Row className={'justify-content-center jp-SlurmWidget-row'}>
+          <DataTable
+            data={data}
+            columns={columns}
+            striped
+            highlightOnHover
+            pagination
+            selectableRows
+            clearSelectedRows={clearSelected}
+            onSelectedRowsChange={this.onSelectedRows.bind(this)}
+            noDataComponent={'No jobs currently queued.'}
+            paginationPerPage={this.props.itemsPerPage}
+            paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
+            theme={this.props.theme}
+            className={'jp-SlurmWidget-table'}
+          />
+        </Row>
+      </>
+    );
+  }
+}

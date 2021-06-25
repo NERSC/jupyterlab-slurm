@@ -1,11 +1,26 @@
-/* ordering of stylesheet corresponds approximately to locations on page: */
-/* first priority: top to bottom direction, second priority: left to right direction */
-
 .jp-SlurmWidget {
-    display: inline-block;
-    background-color: var(--jp-layout-color1);
-    flex-direction: column;
-    overflow: auto;
+  /* make sure text looks Jupytery */
+  font-size: var(--jp-ui-font-size2);
+  font-family: var(--jp-ui-font-family);
+}
+
+.jp-SlurmWidget-main {
+  position: relative;
+  width: 100%;
+}
+
+/* Force the table elements to inherit the jupyter font size */
+.rdt_TableHeader,
+.jp-SlurmWidget-table .rdt_Table,
+.jp-SlurmWidget-table .rdt_TableHead,
+.jp-SlurmWidget-table .rdt_TableHeadRow,
+.jp-SlurmWidget-table .rdt_TableCol,
+.jp-SlurmWidget-table .rdt_TableBody,
+.jp-SlurmWidget-table .rdt_TableRow,
+.jp-SlurmWidget-table .rdt_TableCell,
+.rdt_Pagination {
+  font-size: inherit !important;
+  font-family: inherit !important;
 }
 
 .jp-NerscLaunchIcon {
@@ -16,234 +31,29 @@
   background-image: url("nersc_icon_small.png");
 }
 
-/* The message alerts container */
-.alert-container {
-  margin-top: 20px;
-  margin-left: 2em;
-  width: 50%;
-}
-
-
-.modal, .modal-backdrop {
-  position: absolute !important;
-}
-
-/* The alert itself -- this class is originally defined by bootstrap */
-.alert {
-  /* height: 1.5em; */
-  line-height: 1.4;
-  padding: 0px 7.5px 0px 15px;
-  margin-bottom: .25em;
-  font-size: .9em;
-  vertical-align: middle;
-  /* text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden; */
-}
-
-.toggle-switch {
-  margin-left: 3.35em;
-  font-size: .9em;
-  margin-top: 10px;
-
-}
-
-#queue {
-  font: 14px;
-  width: 100%;
-}
-
-/* basically all of the substance/content of the widget */
-#queue_wrapper {
-  margin-left: 3em;
-  margin-right: 3em;
-  /* centers the SLURM script entry prompt below it */
-  text-align: center;
-}
-
-/* most of the text outside of the table */
-.dataTables_wrapper .dataTables_length,
-.dataTables_wrapper .dataTables_filter,
-.dataTables_wrapper .dataTables_info,
-.dataTables_wrapper .dataTables_processing,
-.dataTables_wrapper .dataTables_paginate,
-.dataTables_wrapper .dataTables_paginate .paginate_button,
-.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
-.dataTables_scrollHeadInner {
-  /* The !important is unnecessary for everything except the paginate classes */
-  /* the dataTables developers hard-coded !important into their CSS for those classes */
-  color: var(--jp-ui-font-color1) !important;
+.jp-SlurmWidget-table-button-badge {
+  margin-left: 5px;
   font-size: var(--jp-ui-font-size1);
-  font-family: var(--jp-ui-font-family);
-  /* the only way to beat an !important is with an !important of a higher specificity */
 }
 
-/* space storing the buttons and search bar at the top of the table */
-.toolbar {
-  margin-top: 1em;
-  margin-bottom: 1em;
-  /* see here: https://stackoverflow.com/questions/9519841/why-does-this-css-margin-top-style-not-work#9519933 */;
-  overflow: hidden;
+.jp-SlurmWidget-table-button {
+  min-width: 12rem;
+  font-family: inherit;
 }
 
-/* attributes of the buttons at the top of the table */
-.button {
-  font-size: var(--jp-ui-font-size1);
-  color: var(--jp-ui-font-color1);
-  border-width: var(--jp-border-width);
-  border-color: var(--jp-border-color2);
-  border-radius: var(--jp-border-radius);
-  font-family: var(--jp-ui-font-family);
-  background-color: var(--jp-layout-color2);
-  box-shadow: var(--jp-toolbar-box-shadow);
-  margin: 0.3em;
-  /* copy-pasted from dataTables CSS for .dataTables_wrapper .dataTables_paginate .paginate_button */
-  cursor: pointer;
-  *cursor: hand;
+label .btn #user-only-checkbox {
+  min-width: 12rem;
+  font-family: inherit;
+  font-size: inherit;
 }
 
-.pending {
-  opacity: 0.6;
+#user-only-checkbox input[type="checkbox"] {
+  margin-right: 0.5em;
 }
 
-/* modal form groups */
-.form-group {
-  margin-bottom: 3rem;
-}
-
-/* modal form inputs */
-.form-control {
-  font-size: 14px;
-}
-
-/* modal from buttons */
-.btn {
-  float: right;
-  margin-top: 1em;
-  margin-bottom: .8em;
-  margin-left: .5em;
-}
-
-/* space containing the buttons only, not the search bar */
-.dt-buttons {
-  float: left;
-}
-
-/* user search bar -- necessary to have space between it and the buttons */
-.dataTables_filter {
-  float: right;
-}
-
-/* Header and footer of queue table */
-table.dataTable thead th, table.dataTable thead td {
-  font-weight: normal;
-  border-bottom-color: var(--jp-border-color1);
-  border-width: var(--jp-border-width);
-}
-
-/* queue tables cells/boxes (specifically their borders) */
-table.dataTable.cell-border tbody th, table.dataTable.cell-border tbody td {
-  border-color: var(--jp-border-color1);
-  font-weight: normal;
-  font-size: var(--jp-ui-font-size1);
-  border-width: var(--jp-border-width);
-}
-
-/* left side of queue table */
-table.dataTable.cell-border tbody tr th:first-child,
-table.dataTable.cell-border tbody tr td:first-child {
-  border-left-width: var(--jp-border-width);
-  border-left-color: var(--jp-border-color1);
-  border-left-style: solid;
-}
-
-/* columns which are not being sorted on and are unselected */
-table.dataTable tbody tr.unselected {
-  /** background-color: var(--jp-brand-color3); **/
-  color: var(--jp-ui-font-color3);
-}
-
-/* columns which are not being sorted on and are selected */
-table.dataTable tbody tr.selected {
-  background-color: var(--jp-brand-color2);
-  /** color: var(--jp-ui-font-color2); **/
-}
-
-table.dataTable tbody tr.processing {
-  background-color: var(--jp-brand-color3);
-  /** color: var(--jp-ui-font-color2); **/
-}
-
-/* columns which are being sorted on and are unselected */
-table.dataTable.order-column tbody tr > .sorting_1,
-table.dataTable.order-column tbody tr > .sorting_2,
-table.dataTable.order-column tbody tr > .sorting_3, table.dataTable.display tbody tr > .sorting_1,
-table.dataTable.display tbody tr > .sorting_2,
-table.dataTable.display tbody tr > .sorting_3 {
-  background-color: var(--jp-brand-color1);
-  color: var(--jp-ui-font-color1);
-}
-
-/* columns which are being sorted on and are selected */
-table.dataTable.order-column tbody tr.selected > .sorting_1,
-table.dataTable.order-column tbody tr.selected > .sorting_2,
-table.dataTable.order-column tbody tr.selected > .sorting_3, table.dataTable.display tbody tr.selected > .sorting_1,
-table.dataTable.display tbody tr.selected > .sorting_2,
-table.dataTable.display tbody tr.selected > .sorting_3 {
-  background-color: var(--jp-brand-color0);
-  color: var(--jp-ui-font-color0);
-}
-
-/* bottom of the table */
-.dataTables_wrapper.no-footer .dataTables_scrollBody {
-  border-bottom-color: var(--jp-border-color1);
-  border-bottom-width: var(--jp-border-width);
-  margin-bottom: 1.5em;
-}
-
-/* Information stating how many rows have been selected */
-.select-item {
-  margin-left: 3em;
-}
-
-/* button for the currently selected "page" in the table */
-.dataTables_wrapper .dataTables_paginate .paginate_button.current,
-.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-  background-color: var(--jp-layout-color0);
-  color: var(--jp-ui-font-color0) !important;
-  background-image: none;
-}
-
-/* settings for all buttons for the "pages" of the table */
-.dataTables_wrapper .dataTables_paginate .paginate_button,
-.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
-.dataTables_wrapper .dataTables_paginate .paginate_button.current,
-.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-  font-size: var(--jp-ui-font-size1);
-  border-width: var(--jp-border-width);
-  border-color: var(--jp-border-color2);
-  border-radius: var(--jp-border-radius);
-  font-family: var(--jp-ui-font-family);
-  box-shadow: var(--jp-toolbar-box-shadow);
-}
-
-/* area containing text entry box, submit, and cancel buttons */
-#submit_script {
-  display: block;
-  position: relative;
-  /* centers this section https://developer.mozilla.org/en-US/docs/Web/CSS/margin-left  */
-  /* when combined with text-align: center for the #queue_wrapper */
-  margin-left: auto;
-  margin-right: auto;
-  clear: both;
-  /* seemingly the top margin needs to be at least 3ish em before it becomes visible when using display block */
-  /* when using display: inline-block the position is jutted much higher up into the display-wrapper, */
-  /* so I guess for em's smaller than 3 most of the top margin is wasted nullifying that (wasted when display:block
-  since the necessary pushing down is done automatically in that case, but not necessarily wasted when display: inline-block) */
-  /* behavior of the number of necessary ems seemingly would then be a function of the number of rows of the textarea */
-  margin-top: 4em;
-  /* make sure text looks Jupytery */
-  color: var(--jp-ui-font-color1);
-  font-size: var(--jp-ui-font-size1);
-  font-family: var(--jp-ui-font-family);
+.jp-SlurmWidget-row {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 15px;
+  padding-right: 15px;
 }
