@@ -30,6 +30,7 @@ namespace types {
   };
 }
 
+/*
 function delayUserInput(
   input: string,
   callback: (s: string) => any,
@@ -41,6 +42,7 @@ function delayUserInput(
     clearTimeout(timeout);
   };
 }
+*/
 
 export default class JobSubmitForm extends React.Component<
   types.Props,
@@ -230,12 +232,15 @@ export default class JobSubmitForm extends React.Component<
                             defaultValue={this.props.filebrowser.model.path}
                             value={this.state.filepath}
                             onChange={e => {
+                              /*
                               console.log('calling delayUserInput()');
                               delayUserInput(
                                 e.target.value,
                                 this.updateFilepath,
                                 500
                               );
+                              */
+                              this.updateFilepath(e.target.value);
                             }}
                             disabled={this.props.disabled}
                           />
