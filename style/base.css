@@ -52,6 +52,31 @@ label .btn #user-only-checkbox {
   font-size: inherit;
 }
 
+#button-toolbar {
+  width: 100%;
+}
+
+#filter-input-label {
+  font-size: 1rem !important;
+  font-family: inherit !important;
+}
+
+#filter-input {
+  background-color: #f8f9fa;
+}
+
+#filter-input-group {
+  padding: .375rem .75rem;
+  float: right;
+}
+
+#squeue-loading {
+  position: absolute;
+  top: 50vh;
+  z-index: 1;
+  background-color: var(--jp-border-color0);
+}
+
 #user-only-checkbox input[type="checkbox"] {
   margin-right: 0.5em;
 }

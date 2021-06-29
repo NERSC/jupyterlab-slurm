@@ -5,7 +5,9 @@ import {
   ButtonToolbar,
   Col,
   Row,
-  ToggleButton
+  ToggleButton,
+  InputGroup,
+  FormControl
 } from 'react-bootstrap';
 import {
   BsArrowRepeat,
@@ -50,6 +52,7 @@ namespace types {
     reloadRate: number;
     reloadLimit: number;
     userOnly: boolean;
+    loading: boolean;
   };
 }
 
@@ -84,7 +87,8 @@ export default class SqueueDataTable extends Component<
       autoReload: props.autoReload,
       reloadRate: reloadRate,
       reloadLimit: 5000,
-      userOnly: props.userOnly
+      userOnly: props.userOnly,
+      loading: false
     };
   }
 
@@ -119,7 +123,7 @@ export default class SqueueDataTable extends Component<
   }
 
   async getData(rateLimit = 0): Promise<string[][]> {
-    const { userOnly } = this.props;
+    const { userOnly } = this.state;
     const squeueParams = new URLSearchParams(`userOnly=${userOnly}`);
 
     if (rateLimit > 0) {
@@ -130,10 +134,19 @@ export default class SqueueDataTable extends Component<
       }
     }
 
+    if (this.state.loading) {
+      return;
+    }
+
+    this.setState({ loading: true });
+    console.log('loading...');
+
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
         console.log('SqueueDataTable getData() squeue', squeueParams, data);
         this.setState({ lastSqueueFetch: new Date(), rows: data.data });
+        this.setState({ loading: false});
+        console.log('loading finished');
       })
       .catch(error => {
         console.error('SqueueDataTable getData() error', error);
@@ -240,14 +253,32 @@ export default class SqueueDataTable extends Component<
     }
   }
 
+  handleFilter(event: any): void {
+    console.log(event);
+    this.setState({ filterQuery: event.target.value});
+    console.log(this.state.filterQuery);
+  }
+
   render(): ReactNode {
     const clearSelected = this.state.clearSelected;
     const selectedRows = this.state.selectedRows;
     const userOnly = this.state.userOnly;
 
+    // id, partition, name, user, status, state, time, nodes, nodelist
+
     let data: Record<string, unknown>[] = [];
     if (this.state.rows.length > 0) {
-      data = this.state.rows.map(x => {
+      data = this.state.rows.filter(row => {
+        const filterQuery = this.state.filterQuery;    
+        
+        for (const el of row) {
+          if (el.includes(filterQuery)) {
+            // console.log(`true for ${row}`);
+            return true;
+          }
+        }
+        return false;
+      }).map(x => {
         const item: Record<string, unknown> = { id: Number(x[0]) };
         let i, col, colValue;
         for (
@@ -281,11 +312,12 @@ export default class SqueueDataTable extends Component<
     return (
       <>
         <Row className={'justify-content-start jp-SlurmWidget-row'}>
-          <ButtonToolbar>
+          <ButtonToolbar id="button-toolbar">
             <Col md>
               <ToggleButton
                 type="checkbox"
                 id="user-only-checkbox"
+                // to fix styling edit this
                 variant="outline-light"
                 onChange={this.toggleUserOnly.bind(this)}
                 checked={userOnly}
@@ -293,6 +325,20 @@ export default class SqueueDataTable extends Component<
               >
                 Display my jobs only
               </ToggleButton>
+            </Col>
+            <Col md>
+                <InputGroup id="filter-input-group">
+                  <InputGroup.Prepend>
+                    <InputGroup.Text>
+                      Filter by text:
+                    </InputGroup.Text>
+                  </InputGroup.Prepend>
+                  <FormControl 
+                    id="filter-input" 
+                    value={this.state.filterQuery} 
+                    onChange={this.handleFilter.bind(this)}
+                  />
+                </InputGroup>
             </Col>
           </ButtonToolbar>
         </Row>
@@ -396,6 +442,11 @@ export default class SqueueDataTable extends Component<
             </Col>
           </ButtonToolbar>
         </Row>
+        {this.state.loading &&
+          <Row className={'justify-content-center jp-SlurmWidget-row'}>
+            <p id="squeue-loading">Loading...</p>
+          </Row>
+        }
         <Row className={'justify-content-center jp-SlurmWidget-row'}>
           <DataTable
             data={data}

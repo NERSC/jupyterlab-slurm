@@ -92,7 +92,7 @@ export default class SlurmManager extends React.Component<
       jobsPending: 0,
       jobErrors: [],
       queueCols: queueCols,
-      reloadQueue: false,
+      reloadQueue: true,
       autoReload: autoReload,
       autoReloadRate: autoReloadRate,
       theme: 'default'
