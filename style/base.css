@@ -9,6 +9,11 @@
   width: 100%;
 }
 
+.jp-SlurmWidget-table {
+  overflow: auto !important;  /* override the react-data-table-component behavior for scrolling */
+  height: 650px;
+}
+
 /* Force the table elements to inherit the jupyter font size */
 .rdt_TableHeader,
 .jp-SlurmWidget-table .rdt_Table,

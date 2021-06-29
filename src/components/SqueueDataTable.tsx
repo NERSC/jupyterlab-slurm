@@ -48,6 +48,7 @@ namespace types {
     lastSqueueFetch: Date;
     autoReload: boolean;
     reloadRate: number;
+    reloadLimit: number;
     userOnly: boolean;
   };
 }
@@ -58,6 +59,8 @@ export default class SqueueDataTable extends Component<
 > {
   constructor(props: types.Props) {
     super(props);
+
+    this.sortRows = this.sortRows.bind(this);
 
     let reloadRate = this.props.reloadRate;
     if (this.props.reloadRate < 5000) {
@@ -80,6 +83,7 @@ export default class SqueueDataTable extends Component<
       lastSqueueFetch: new Date(),
       autoReload: props.autoReload,
       reloadRate: reloadRate,
+      reloadLimit: 5000,
       userOnly: props.userOnly
     };
   }
@@ -114,9 +118,17 @@ export default class SqueueDataTable extends Component<
     }
   }
 
-  async getData(): Promise<string[][]> {
+  async getData(rateLimit = 0): Promise<string[][]> {
     const { userOnly } = this.props;
     const squeueParams = new URLSearchParams(`userOnly=${userOnly}`);
+
+    if (rateLimit > 0) {
+      const currentDT = new Date();
+      const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
+      if (delta < rateLimit) {
+        return;
+      }
+    }
 
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
@@ -127,6 +139,56 @@ export default class SqueueDataTable extends Component<
         console.error('SqueueDataTable getData() error', error);
         return null;
       });
+  }
+
+  private sortRows(
+    rows: Record<string, unknown>[],
+    field: string,
+    direction: string
+  ): Record<string, unknown>[] {
+    const maxIDLength = String(
+      rows
+        .map(r => {
+          return Number(r[0]);
+        })
+        .sort()[-1]
+    ).length;
+    const sortedRows: Record<string, unknown>[] = rows.map(r => {
+      const jobID = String(r[this.props.availableColumns[0]]).padStart(
+        maxIDLength,
+        '0'
+      );
+      const row: Record<string, unknown> = {};
+
+      let k;
+      for (k in r) {
+        row[k] = r[k];
+      }
+
+      row[this.props.availableColumns[0]] = jobID;
+      return row;
+    });
+    console.log('sortedRows', sortedRows);
+
+    const finalRows = sortedRows.map(r => {
+      r[this.props.availableColumns[0]] = String(
+        Number(r[this.props.availableColumns[0]])
+      );
+      return r;
+    });
+
+    console.log('finalRows', finalRows);
+    return finalRows;
+  }
+
+  async onReloadButtonClick(): Promise<void> {
+    await this.reload();
+    const currentDT = new Date();
+    const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
+    if (delta >= this.state.reloadLimit) {
+      console.log('onReloadButtonClick() calling reload()');
+      await this.getData();
+    }
   }
 
   async reload(): Promise<void> {
@@ -147,10 +209,21 @@ export default class SqueueDataTable extends Component<
   }
 
   async componentDidMount(): Promise<void> {
+    console.log(
+      'componentDidMount() this.props.reloadQueue ',
+      this.props.reloadQueue
+    );
+
+    // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
+    // we need to limit the frequency of squeue requests
+    if (this.props.reloadQueue) {
+      this.getData(this.state.reloadLimit);
+    }
+
     if (this.state.autoReload) {
       useEffect(() => {
         const interval = setInterval(async () => {
-          await this.getData();
+          await this.getData(this.state.reloadRate);
         }, this.state.reloadRate);
         return () => clearInterval(interval);
       }, []);
@@ -164,27 +237,6 @@ export default class SqueueDataTable extends Component<
     // reset the clear state to re-enable selections
     if (this.state.clearSelected) {
       this.setState({ clearSelected: false });
-    }
-
-    console.log(
-      'componentDidUpdate() this.props.reloadQueue ',
-      this.props.reloadQueue
-    );
-
-    // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
-    // we need to limit the frequency of squeue requests
-    if (this.props.reloadQueue) {
-      const currentDT = new Date();
-      const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
-      console.log(
-        'componentDidUpdate() ',
-        String(delta),
-        String(this.state.reloadRate)
-      );
-      if (delta >= this.state.reloadRate) {
-        console.log('componentDidUpdate() calling reload()');
-        await this.getData();
-      }
     }
   }
 
@@ -250,7 +302,7 @@ export default class SqueueDataTable extends Component<
               <Button
                 className="jp-SlurmWidget-table-button"
                 variant="outline-secondary"
-                onClick={this.reload.bind(this)}
+                onClick={this.onReloadButtonClick.bind(this)}
               >
                 <BsArrowRepeat />
                 Update Queue
@@ -348,6 +400,8 @@ export default class SqueueDataTable extends Component<
           <DataTable
             data={data}
             columns={columns}
+            defaultSortField={this.props.availableColumns[0]}
+            sortFunction={this.sortRows}
             striped
             highlightOnHover
             pagination

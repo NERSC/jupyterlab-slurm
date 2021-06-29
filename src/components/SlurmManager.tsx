@@ -111,18 +111,22 @@ export default class SlurmManager extends React.Component<
         {message}
       </Alert>
     );
-    this.setState({ alerts: this.state.alerts.concat([alert]) });
+    this.setState(prevState => {
+      return { alerts: this.state.alerts.concat([alert]) };
+    });
   }
 
   removeAlert(id: string): void {
-    const updated_alerts = [];
+    const updated_alerts: React.ReactElement[] = [];
     let i;
     for (i = 0; i < this.state.alerts.length; i++) {
       if (this.state.alerts[i].props.id !== id) {
         updated_alerts.push(this.state.alerts[i]);
       }
     }
-    this.setState({ alerts: updated_alerts });
+    this.setState(prevState => {
+      return { alerts: updated_alerts };
+    });
   }
 
   private async makeJobRequest(
@@ -179,17 +183,26 @@ export default class SlurmManager extends React.Component<
     // TODO: Decide if it makes sense to combine requests for fewer calls
     rows.map(async row => {
       const jobID = String(row[this.JOBID_IDX]);
-      this.setState({ jobsPending: this.state.jobsPending + 1 });
+      this.setState(prevState => {
+        return { jobsPending: prevState.jobsPending + 1 };
+      });
       await this.makeJobRequest(route, method, jobID).then(() => {
-        this.setState({ jobsPending: this.state.jobsPending - 1 });
+        console.log(this.state.jobsPending);
+        if (this.state.jobsPending > 0) {
+          this.setState(prevState => {
+            return { jobsPending: prevState.jobsPending - 1 };
+          });
+        }
       });
     });
   }
 
   private submitJob(input: string, inputType: string) {
-    this.setState({
-      jobSubmitDisabled: true,
-      jobsPending: this.state.jobsPending + 1
+    this.setState(prevState => {
+      return {
+        jobSubmitDisabled: true,
+        jobsPending: this.state.jobsPending + 1
+      };
     });
     let serverRoot = this.props.serverRoot;
     let contents;
@@ -231,10 +244,12 @@ export default class SlurmManager extends React.Component<
           );
           reload = false;
         }
-        this.setState({
-          reloadQueue: reload,
-          jobSubmitDisabled: false,
-          jobsPending: this.state.jobsPending - 1
+        this.setState(prevState => {
+          return {
+            reloadQueue: reload,
+            jobSubmitDisabled: false,
+            jobsPending: prevState.jobsPending - 1
+          };
         });
       })
       .catch(error => {
@@ -243,9 +258,11 @@ export default class SlurmManager extends React.Component<
             error,
           'danger'
         );
-        this.setState({
-          jobSubmitDisabled: false,
-          jobsPending: this.state.jobsPending - 1
+        this.setState(prevState => {
+          return {
+            jobSubmitDisabled: false,
+            jobsPending: prevState.jobsPending - 1
+          };
         });
       });
   }
