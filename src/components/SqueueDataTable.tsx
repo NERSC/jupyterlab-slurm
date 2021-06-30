@@ -145,7 +145,7 @@ export default class SqueueDataTable extends Component<
       .then(data => {
         console.log('SqueueDataTable getData() squeue', squeueParams, data);
         this.setState({ lastSqueueFetch: new Date(), rows: data.data });
-        this.setState({ loading: false});
+        this.setState({ loading: false });
         console.log('loading finished');
       })
       .catch(error => {
@@ -255,7 +255,7 @@ export default class SqueueDataTable extends Component<
 
   handleFilter(event: any): void {
     console.log(event);
-    this.setState({ filterQuery: event.target.value});
+    this.setState({ filterQuery: event.target.value });
     console.log(this.state.filterQuery);
   }
 
@@ -268,30 +268,32 @@ export default class SqueueDataTable extends Component<
 
     let data: Record<string, unknown>[] = [];
     if (this.state.rows.length > 0) {
-      data = this.state.rows.filter(row => {
-        const filterQuery = this.state.filterQuery;    
-        
-        for (const el of row) {
-          if (el.includes(filterQuery)) {
-            // console.log(`true for ${row}`);
-            return true;
-          }
-        }
-        return false;
-      }).map(x => {
-        const item: Record<string, unknown> = { id: Number(x[0]) };
-        let i, col, colValue;
-        for (
-          i = 0, col = 0;
-          col < this.state.displayedColumns.length;
-          i++, col++
-        ) {
-          colValue = this.state.displayedColumns[col];
-          item[colValue] = x[i];
-        }
+      data = this.state.rows
+        .filter(row => {
+          const filterQuery = this.state.filterQuery;
 
-        return item;
-      });
+          for (const el of row) {
+            if (el.includes(filterQuery)) {
+              // console.log(`true for ${row}`);
+              return true;
+            }
+          }
+          return false;
+        })
+        .map(x => {
+          const item: Record<string, unknown> = { id: Number(x[0]) };
+          let i, col, colValue;
+          for (
+            i = 0, col = 0;
+            col < this.state.displayedColumns.length;
+            i++, col++
+          ) {
+            colValue = this.state.displayedColumns[col];
+            item[colValue] = x[i];
+          }
+
+          return item;
+        });
     }
 
     const columns = this.state.displayedColumns.map(x => {
@@ -327,18 +329,16 @@ export default class SqueueDataTable extends Component<
               </ToggleButton>
             </Col>
             <Col md>
-                <InputGroup id="filter-input-group">
-                  <InputGroup.Prepend>
-                    <InputGroup.Text>
-                      Filter by text:
-                    </InputGroup.Text>
-                  </InputGroup.Prepend>
-                  <FormControl 
-                    id="filter-input" 
-                    value={this.state.filterQuery} 
-                    onChange={this.handleFilter.bind(this)}
-                  />
-                </InputGroup>
+              <InputGroup id="filter-input-group">
+                <InputGroup.Prepend>
+                  <InputGroup.Text>Filter by text:</InputGroup.Text>
+                </InputGroup.Prepend>
+                <FormControl
+                  id="filter-input"
+                  value={this.state.filterQuery}
+                  onChange={this.handleFilter.bind(this)}
+                />
+              </InputGroup>
             </Col>
           </ButtonToolbar>
         </Row>
@@ -442,11 +442,11 @@ export default class SqueueDataTable extends Component<
             </Col>
           </ButtonToolbar>
         </Row>
-        {this.state.loading &&
+        {this.state.loading && (
           <Row className={'justify-content-center jp-SlurmWidget-row'}>
             <p id="squeue-loading">Loading...</p>
           </Row>
-        }
+        )}
         <Row className={'justify-content-center jp-SlurmWidget-row'}>
           <DataTable
             data={data}
