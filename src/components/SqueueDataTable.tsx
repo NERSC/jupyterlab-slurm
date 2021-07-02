@@ -313,8 +313,12 @@ export default class SqueueDataTable extends Component<
     return (
       <>
         {this.state.loading && (
-          <div id='squeue-loading' className={'justify-content-center'}>
-            <RotateLoader color={'#DF772E'} loading={this.state.loading} speedMultiplier={0.5} />
+          <div id="squeue-loading" className={'justify-content-center'}>
+            <RotateLoader
+              color={'#DF772E'}
+              loading={this.state.loading}
+              speedMultiplier={0.5}
+            />
           </div>
         )}
 
