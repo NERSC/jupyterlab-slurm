@@ -17,6 +17,7 @@ import {
   BsArrowCounterclockwise
 } from 'react-icons/bs';
 import DataTable from 'react-data-table-component';
+import RotateLoader from 'react-spinners/RotateLoader';
 
 // Local
 import { requestAPI } from '../handler';
@@ -139,14 +140,12 @@ export default class SqueueDataTable extends Component<
     }
 
     this.setState({ loading: true });
-    console.log('loading...');
 
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
         console.log('SqueueDataTable getData() squeue', squeueParams, data);
         this.setState({ lastSqueueFetch: new Date(), rows: data.data });
         this.setState({ loading: false });
-        console.log('loading finished');
       })
       .catch(error => {
         console.error('SqueueDataTable getData() error', error);
@@ -181,7 +180,7 @@ export default class SqueueDataTable extends Component<
       row[this.props.availableColumns[0]] = jobID;
       return row;
     });
-    console.log('sortedRows', sortedRows);
+    // console.log('sortedRows', sortedRows);
 
     const finalRows = sortedRows.map(r => {
       r[this.props.availableColumns[0]] = String(
@@ -190,7 +189,7 @@ export default class SqueueDataTable extends Component<
       return r;
     });
 
-    console.log('finalRows', finalRows);
+    // console.log('finalRows', finalRows);
     return finalRows;
   }
 
@@ -253,9 +252,9 @@ export default class SqueueDataTable extends Component<
     }
   }
 
-  handleFilter(event: any): void {
+  async handleFilter(event: any): Promise<void> {
     console.log(event);
-    this.setState({ filterQuery: event.target.value });
+    await this.setState({ filterQuery: event.target.value });
     console.log(this.state.filterQuery);
   }
 
@@ -313,6 +312,12 @@ export default class SqueueDataTable extends Component<
     */
     return (
       <>
+        {this.state.loading && (
+          <div id='squeue-loading' className={'justify-content-center'}>
+            <RotateLoader color={'#DF772E'} loading={this.state.loading} speedMultiplier={0.5} />
+          </div>
+        )}
+
         <Row className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar id="button-toolbar">
             <Col md>
@@ -442,11 +447,6 @@ export default class SqueueDataTable extends Component<
             </Col>
           </ButtonToolbar>
         </Row>
-        {this.state.loading && (
-          <Row className={'justify-content-center jp-SlurmWidget-row'}>
-            <p id="squeue-loading">Loading...</p>
-          </Row>
-        )}
         <Row className={'justify-content-center jp-SlurmWidget-row'}>
           <DataTable
             data={data}
@@ -464,6 +464,8 @@ export default class SqueueDataTable extends Component<
             paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
             theme={this.props.theme}
             className={'jp-SlurmWidget-table'}
+            // fixedHeader={true}
+            // fixedHeaderScrollHeight={'55vh'}
           />
         </Row>
       </>

@@ -72,9 +72,11 @@ label .btn #user-only-checkbox {
 
 #squeue-loading {
   position: absolute;
-  top: 50vh;
+  top: 40%;
   z-index: 1;
-  background-color: var(--jp-border-color0);
+  margin: auto;
+  width: 100%;
+  text-align: center;
 }
 
 #user-only-checkbox input[type="checkbox"] {
