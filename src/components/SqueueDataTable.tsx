@@ -323,35 +323,6 @@ export default class SqueueDataTable extends Component<
         )}
 
         <Row className={'justify-content-start jp-SlurmWidget-row'}>
-          <ButtonToolbar id="button-toolbar">
-            <Col md>
-              <ToggleButton
-                type="checkbox"
-                id="user-only-checkbox"
-                // to fix styling edit this
-                variant="outline-light"
-                onChange={this.toggleUserOnly.bind(this)}
-                checked={userOnly}
-                value="1"
-              >
-                Display my jobs only
-              </ToggleButton>
-            </Col>
-            <Col md>
-              <InputGroup id="filter-input-group">
-                <InputGroup.Prepend>
-                  <InputGroup.Text>Filter by text:</InputGroup.Text>
-                </InputGroup.Prepend>
-                <FormControl
-                  id="filter-input"
-                  value={this.state.filterQuery}
-                  onChange={this.handleFilter.bind(this)}
-                />
-              </InputGroup>
-            </Col>
-          </ButtonToolbar>
-        </Row>
-        <Row className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar>
             <Col md>
               <Button
@@ -448,6 +419,34 @@ export default class SqueueDataTable extends Component<
                   </Badge>
                 )}
               </Button>
+            </Col>
+          </ButtonToolbar>
+        </Row>
+        <Row xs={3} className={'justify-content-start jp-SlurmWidget-row'}>
+          <ButtonToolbar id="button-toolbar">
+            <Col>
+              <ToggleButton
+                type="checkbox"
+                id="user-only-checkbox"
+                variant="outline-light"
+                onChange={this.toggleUserOnly.bind(this)}
+                checked={userOnly}
+                value="1"
+              >
+                Display my jobs only
+              </ToggleButton>
+            </Col>
+            <Col md>
+              <InputGroup id="filter-input-group">
+                <InputGroup.Prepend>
+                  <InputGroup.Text>Filter:</InputGroup.Text>
+                </InputGroup.Prepend>
+                <FormControl
+                  id="filter-input"
+                  value={this.state.filterQuery}
+                  onChange={this.handleFilter.bind(this)}
+                />
+              </InputGroup>
             </Col>
           </ButtonToolbar>
         </Row>

@@ -10,8 +10,8 @@
 }
 
 .jp-SlurmWidget-table {
-  overflow: auto !important;  /* override the react-data-table-component behavior for scrolling */
-  height: 650px;
+  max-height: 551px;
+  overflow-y: scroll !important;
 }
 
 /* Force the table elements to inherit the jupyter font size */
@@ -66,17 +66,24 @@ label .btn #user-only-checkbox {
 }
 
 #filter-input-group {
-  padding: .375rem .75rem;
-  float: right;
+  max-width: 200px;
 }
 
 #squeue-loading {
   position: absolute;
-  top: 40%;
+  top: 40vh;
   z-index: 1;
   margin: auto;
   width: 100%;
   text-align: center;
+}
+
+#button-toolbar {
+  margin: 10px 0px 10px 0px;
+}
+
+#user-only-checkbox {
+  color: #212529;
 }
 
 #user-only-checkbox input[type="checkbox"] {
@@ -86,6 +93,8 @@ label .btn #user-only-checkbox {
 .jp-SlurmWidget-row {
   margin-left: 0;
   margin-right: 0;
+  margin-top: 10px;
+  margin-bottom: 10px;
   padding-left: 15px;
   padding-right: 15px;
 }
