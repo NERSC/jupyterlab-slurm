@@ -2,6 +2,7 @@
   /* make sure text looks Jupytery */
   font-size: var(--jp-ui-font-size2);
   font-family: var(--jp-ui-font-family);
+  overflow-y: scroll;
 }
 
 .jp-SlurmWidget-main {
@@ -10,7 +11,6 @@
 }
 
 .jp-SlurmWidget-table {
-  max-height: 551px;
   overflow-y: scroll !important;
 }
 
@@ -97,4 +97,8 @@ label .btn #user-only-checkbox {
   margin-bottom: 10px;
   padding-left: 15px;
   padding-right: 15px;
+}
+
+textarea.form-control {
+  max-height: 55vh;
 }

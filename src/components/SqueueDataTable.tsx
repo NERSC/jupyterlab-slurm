@@ -253,9 +253,7 @@ export default class SqueueDataTable extends Component<
   }
 
   async handleFilter(event: any): Promise<void> {
-    console.log(event);
-    await this.setState({ filterQuery: event.target.value });
-    console.log(this.state.filterQuery);
+    this.setState({ filterQuery: event.target.value });
   }
 
   render(): ReactNode {
@@ -270,17 +268,29 @@ export default class SqueueDataTable extends Component<
       data = this.state.rows
         .filter(row => {
           const filterQuery = this.state.filterQuery;
+          if (filterQuery === '') {
+            return true;
+          }
 
           for (const el of row) {
-            if (el.includes(filterQuery)) {
-              // console.log(`true for ${row}`);
+            if (el.includes(filterQuery) && !Number.isNaN(el)) {
+              // console.log(`true for ${row}, ${typeof el}`);
               return true;
             }
           }
           return false;
         })
         .map(x => {
-          const item: Record<string, unknown> = { id: Number(x[0]) };
+          const item: Record<string, unknown> = {
+            id: Number(
+              x[0]
+                .replace('_', '0')
+                .replace('-', '0')
+                .replace('[', '0')
+                .replace(']', '0')
+            )
+          };
+
           let i, col, colValue;
           for (
             i = 0, col = 0;
@@ -463,12 +473,10 @@ export default class SqueueDataTable extends Component<
             clearSelectedRows={clearSelected}
             onSelectedRowsChange={this.onSelectedRows.bind(this)}
             noDataComponent={'No jobs currently queued.'}
-            paginationPerPage={this.props.itemsPerPage}
+            paginationPerPage={this.state.itemsPerPage}
             paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
             theme={this.props.theme}
             className={'jp-SlurmWidget-table'}
-            // fixedHeader={true}
-            // fixedHeaderScrollHeight={'55vh'}
           />
         </Row>
       </>
