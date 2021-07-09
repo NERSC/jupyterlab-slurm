@@ -274,7 +274,6 @@ export default class SqueueDataTable extends Component<
 
           for (const el of row) {
             if (el.includes(filterQuery) && !Number.isNaN(el)) {
-              // console.log(`true for ${row}, ${typeof el}`);
               return true;
             }
           }
@@ -306,7 +305,7 @@ export default class SqueueDataTable extends Component<
     }
 
     const columns = this.state.displayedColumns.map(x => {
-      return { name: x, selector: x, sortable: true };
+      return { name: x, selector: x, sortable: true, maxWidth: '200px' };
     });
 
     /*
@@ -320,15 +319,12 @@ export default class SqueueDataTable extends Component<
       displayedColumns: this.state.displayedColumns
     });
     */
+
     return (
       <>
         {this.state.loading && (
           <div id="squeue-loading" className={'justify-content-center'}>
-            <RotateLoader
-              color={'#DF772E'}
-              loading={this.state.loading}
-              speedMultiplier={0.5}
-            />
+            <RotateLoader color={'#DF772E'} speedMultiplier={0.5} />
           </div>
         )}
 
@@ -465,7 +461,8 @@ export default class SqueueDataTable extends Component<
             data={data}
             columns={columns}
             defaultSortField={this.props.availableColumns[0]}
-            sortFunction={this.sortRows}
+            defaultSortAsc={false}
+            // sortFunction={this.sortRows}
             striped
             highlightOnHover
             pagination
@@ -476,6 +473,7 @@ export default class SqueueDataTable extends Component<
             paginationPerPage={this.state.itemsPerPage}
             paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
             theme={this.props.theme}
+            noHeader={true}
             className={'jp-SlurmWidget-table'}
           />
         </Row>

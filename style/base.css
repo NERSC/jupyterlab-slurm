@@ -14,6 +14,15 @@
   overflow-y: scroll !important;
 }
 
+.jp-SlurmWidget-row {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
 /* Force the table elements to inherit the jupyter font size */
 .rdt_TableHeader,
 .jp-SlurmWidget-table .rdt_Table,
@@ -46,10 +55,22 @@
   font-family: inherit;
 }
 
+#button-toolbar {
+  margin: 10px 0px 10px 0px;
+}
+
 label .btn #user-only-checkbox {
   min-width: 12rem;
   font-family: inherit;
   font-size: inherit;
+}
+
+#user-only-checkbox {
+  color: #212529;
+}
+
+#user-only-checkbox input[type="checkbox"] {
+  margin-right: 0.5em;
 }
 
 #button-toolbar {
@@ -73,30 +94,8 @@ label .btn #user-only-checkbox {
   position: absolute;
   top: 40vh;
   z-index: 1;
-  margin: auto;
-  width: 100%;
-  text-align: center;
-}
-
-#button-toolbar {
-  margin: 10px 0px 10px 0px;
-}
-
-#user-only-checkbox {
-  color: #212529;
-}
-
-#user-only-checkbox input[type="checkbox"] {
-  margin-right: 0.5em;
-}
-
-.jp-SlurmWidget-row {
-  margin-left: 0;
-  margin-right: 0;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  padding-left: 15px;
-  padding-right: 15px;
+  left: 50%;
+  transform: translate(-50%, 0);
 }
 
 textarea.form-control {
