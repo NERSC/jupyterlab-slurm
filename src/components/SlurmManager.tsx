@@ -112,7 +112,10 @@ export default class SlurmManager extends React.Component<
       </Alert>
     );
     this.setState(prevState => {
-      return { alerts: this.state.alerts.concat([alert]) };
+      // add new alert to previous alerts
+      // return { alerts: this.state.alerts.concat([alert]) };
+      // reset alerts to be only 1 element
+      return { alerts: [alert] };
     });
   }
 

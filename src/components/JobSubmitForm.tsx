@@ -23,6 +23,7 @@ namespace types {
   };
 
   export type State = {
+    filebrowser: FileBrowser;
     inputType: string;
     inputPathSelectType: string;
     filepath: string;
@@ -51,6 +52,7 @@ export default class JobSubmitForm extends React.Component<
   constructor(props: types.Props) {
     super(props);
     this.state = {
+      filebrowser: this.props.filebrowser,
       inputType: 'path',
       inputPathSelectType: 'dropdown',
       filepath: '',
@@ -146,6 +148,9 @@ export default class JobSubmitForm extends React.Component<
     const { inputType, filepath, inlineScript } = this.state;
     const input = inputType === 'path' ? filepath : inlineScript;
     this.props.submitJob(input, inputType);
+
+    const variant = 'success';
+    this.props.addAlert('Job submitted', variant);
   }
 
   /*
@@ -153,7 +158,7 @@ export default class JobSubmitForm extends React.Component<
    */
   displayFiles(): React.ReactNode {
     const fileListing = [];
-    const iter = this.props.filebrowser.model.items();
+    const iter = this.state.filebrowser.model.items();
     let i = iter.next();
     while (i) {
       fileListing.push(i.path);
@@ -169,7 +174,7 @@ export default class JobSubmitForm extends React.Component<
   render(): React.ReactNode {
     const inputType = this.state.inputType;
     const fileListing = [];
-    const iter = this.props.filebrowser.model.items();
+    const iter = this.state.filebrowser.model.items();
     let i = iter.next();
     while (i) {
       if (i.type === 'file') {
@@ -228,8 +233,8 @@ export default class JobSubmitForm extends React.Component<
                         <Form.Group>
                           <Form.Control
                             type="text"
-                            placeholder={this.props.filebrowser.model.path}
-                            defaultValue={this.props.filebrowser.model.path}
+                            placeholder={this.state.filebrowser.model.path}
+                            defaultValue={this.state.filebrowser.model.path}
                             value={this.state.filepath}
                             onChange={e => {
                               /*
@@ -277,7 +282,11 @@ export default class JobSubmitForm extends React.Component<
                           <Form.Control
                             as="select"
                             id={'fileselect-dropdown'}
-                            onClick={this.handleFileSelect.bind(this)}
+                            value={this.state.filepath}
+                            onChange={e =>
+                              this.setState({ filepath: e.target.value })
+                            }
+                            // onClick={this.handleFileSelect.bind(this)}
                             disabled={this.props.disabled}
                           >
                             {fileItems}
