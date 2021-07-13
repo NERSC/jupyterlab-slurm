@@ -428,7 +428,7 @@ export default class SqueueDataTable extends Component<
             </Col>
           </ButtonToolbar>
         </Row>
-        <Row xs={3} className={'justify-content-start jp-SlurmWidget-row'}>
+        <Row xs={2} className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar id="button-toolbar">
             <Col>
               <ToggleButton

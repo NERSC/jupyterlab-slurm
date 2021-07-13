@@ -236,17 +236,20 @@ export default class JobSubmitForm extends React.Component<
                             placeholder={this.state.filebrowser.model.path}
                             defaultValue={this.state.filebrowser.model.path}
                             value={this.state.filepath}
-                            onChange={e => {
-                              /*
-                              console.log('calling delayUserInput()');
-                              delayUserInput(
-                                e.target.value,
-                                this.updateFilepath,
-                                500
-                              );
-                              */
-                              this.updateFilepath(e.target.value);
-                            }}
+                            // onChange={e => {
+                            //   /*
+                            //   console.log('calling delayUserInput()');
+                            //   delayUserInput(
+                            //     e.target.value,
+                            //     this.updateFilepath,
+                            //     500
+                            //   );
+                            //   */
+                            //   this.updateFilepath(e.target.value);
+                            // }}
+                            onChange={e =>
+                              this.setState({ filepath: e.target.value })
+                            }
                             disabled={this.props.disabled}
                           />
                         </Form.Group>
