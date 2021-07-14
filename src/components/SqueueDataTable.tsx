@@ -139,12 +139,12 @@ export default class SqueueDataTable extends Component<
       return;
     }
 
-    this.setState({ loading: true });
+    this.setState({ loading: true, lastSqueueFetch: new Date() });
 
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
         console.log('SqueueDataTable getData() squeue', squeueParams, data);
-        this.setState({ lastSqueueFetch: new Date(), rows: data.data });
+        this.setState({ rows: data.data });
         this.setState({ loading: false });
       })
       .catch(error => {
