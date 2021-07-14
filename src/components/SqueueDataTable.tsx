@@ -1,4 +1,4 @@
-import React, { Component, ReactNode, useEffect } from 'react';
+import React, { Component, ReactNode } from 'react';
 import {
   Badge,
   Button,
@@ -232,13 +232,23 @@ export default class SqueueDataTable extends Component<
       this.getData(this.state.reloadLimit);
     }
 
+    // if (this.state.autoReload) {
+    //   useEffect(() => {
+    //     const interval = setInterval(async () => {
+    //       await this.getData(this.state.reloadRate);
+    //     }, this.state.reloadRate);
+    //     return () => clearInterval(interval);
+    //   }, []);
+    // }
     if (this.state.autoReload) {
-      useEffect(() => {
-        const interval = setInterval(async () => {
-          await this.getData(this.state.reloadRate);
-        }, this.state.reloadRate);
-        return () => clearInterval(interval);
-      }, []);
+      const reload = async () => {
+        this.setState({ loading: true });
+        await this.getData(this.state.reloadRate);
+        this.setState({ loading: false });
+
+        setTimeout(reload, this.state.reloadRate);
+      };
+      reload();
     }
   }
 

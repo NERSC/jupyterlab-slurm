@@ -24,6 +24,7 @@ namespace types {
 
   export type State = {
     filebrowser: FileBrowser;
+    fileitems: JSX.Element[];
     inputType: string;
     inputPathSelectType: string;
     filepath: string;
@@ -53,6 +54,7 @@ export default class JobSubmitForm extends React.Component<
     super(props);
     this.state = {
       filebrowser: this.props.filebrowser,
+      fileitems: [],
       inputType: 'path',
       inputPathSelectType: 'dropdown',
       filepath: '',
@@ -60,6 +62,7 @@ export default class JobSubmitForm extends React.Component<
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
+    this.updateFileitems();
   }
 
   /*
@@ -171,10 +174,9 @@ export default class JobSubmitForm extends React.Component<
     });
   }
 
-  render(): React.ReactNode {
-    const inputType = this.state.inputType;
+  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
     const fileListing = [];
-    const iter = this.state.filebrowser.model.items();
+    const iter = filebrowser.model.items();
     let i = iter.next();
     while (i) {
       if (i.type === 'file') {
@@ -186,7 +188,23 @@ export default class JobSubmitForm extends React.Component<
     const fileItems = fileListing.map(x => {
       return <option key={x}>{x}</option>;
     });
-    console.log(fileItems);
+
+    return fileItems;
+  }
+
+  private updateFileitems(): void {
+    const currentFileItems = this.getFileItems(this.state.filebrowser);
+    if (currentFileItems !== this.state.fileitems) {
+      this.setState({ fileitems: currentFileItems });
+    }
+    setTimeout(() => {
+      this.updateFileitems();
+    }, 100);
+  }
+
+  render(): React.ReactNode {
+    const inputType = this.state.inputType;
+
     return (
       <>
         <Form>
@@ -292,7 +310,7 @@ export default class JobSubmitForm extends React.Component<
                             // onClick={this.handleFileSelect.bind(this)}
                             disabled={this.props.disabled}
                           >
-                            {fileItems}
+                            {this.state.fileitems}
                           </Form.Control>
                         </Form.Group>
                         <Button

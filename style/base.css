@@ -88,6 +88,7 @@ label .btn #user-only-checkbox {
 
 #filter-input-group {
   max-width: 200px;
+  min-width: 150px;
 }
 
 #squeue-loading {
