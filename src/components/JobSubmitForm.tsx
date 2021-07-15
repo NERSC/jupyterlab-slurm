@@ -27,6 +27,7 @@ namespace types {
     inputPathSelectType: string;
     filepath: string;
     inlineScript: string;
+    inputTimeout: number;
   };
 }
 
@@ -54,7 +55,8 @@ export default class JobSubmitForm extends React.Component<
       inputType: 'path',
       inputPathSelectType: 'dropdown',
       filepath: '',
-      inlineScript: ''
+      inlineScript: '',
+      inputTimeout: 0
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
@@ -64,7 +66,12 @@ export default class JobSubmitForm extends React.Component<
    * Switch between submitting a file and creating a script in a text box
    * */
   changeInputType(inputType: string): void {
-    this.setState({ inputType, filepath: '', inlineScript: '' });
+    this.setState({
+      inputType,
+      filepath: '',
+      inlineScript: '',
+      inputTimeout: 0
+    });
   }
 
   /*
@@ -98,34 +105,8 @@ export default class JobSubmitForm extends React.Component<
    * */
   updateFilepath(s: string): void {
     console.log('updateFilepath() ', s);
-    const userPath = s;
-    console.log('updateFilepath() userPath=', userPath);
-    const userFilename = userPath.split('/')[-1];
-    const userBasePath = userPath.split(userFilename)[0];
-
-    try {
-      // try to find userPath with filebrowser
-      this.props.filebrowser.model.cd(userBasePath).then(() => {
-        // check that this is a file
-        const iter = this.props.filebrowser.model.items();
-        let i = iter.next();
-        while (i) {
-          if (i.name === userFilename && i.type !== 'file') {
-            this.props.addAlert(
-              'This path does not reference a file! name=' +
-                userFilename +
-                ' type=' +
-                i.type,
-              'danger'
-            );
-          }
-          i = iter.next();
-        }
-        this.setState({ filepath: userPath });
-      });
-    } finally {
-      console.log(`No errors with ${userPath}`);
-    }
+    // any path validation here has to happen server-side
+    this.setState({ filepath: s });
   }
 
   /*
@@ -230,7 +211,6 @@ export default class JobSubmitForm extends React.Component<
                             type="text"
                             placeholder={this.props.filebrowser.model.path}
                             defaultValue={this.props.filebrowser.model.path}
-                            value={this.state.filepath}
                             onChange={e => {
                               /*
                               console.log('calling delayUserInput()');
@@ -240,7 +220,12 @@ export default class JobSubmitForm extends React.Component<
                                 500
                               );
                               */
-                              this.updateFilepath(e.target.value);
+                              const timeout = setTimeout(() => {
+                                this.updateFilepath(e.target.value);
+                              });
+                              return () => {
+                                clearTimeout(timeout);
+                              };
                             }}
                             disabled={this.props.disabled}
                           />

@@ -10,8 +10,8 @@
 }
 
 .jp-SlurmWidget-table {
-  overflow: auto !important;  /* override the react-data-table-component behavior for scrolling */
-  height: 650px;
+  display: flex;
+  overflow: auto !important;
 }
 
 /* Force the table elements to inherit the jupyter font size */
@@ -28,11 +28,11 @@
   font-family: inherit !important;
 }
 
-.jp-NerscLaunchIcon {
+.jp-SlurmWidget-NerscLaunchIcon {
   background-image: url("nersc_icon.png");
 }
 
-.jp-NerscTabIcon {
+.jp-SlurmWidget-NerscTabIcon {
   background-image: url("nersc_icon_small.png");
 }
 
@@ -41,43 +41,48 @@
   font-size: var(--jp-ui-font-size1);
 }
 
+.jp-SlurmWidget-table-button-toolbar {
+  width: 100%;
+}
+
 .jp-SlurmWidget-table-button {
   min-width: 12rem;
   font-family: inherit;
 }
 
-label .btn #user-only-checkbox {
+label .btn .jp-SlurmWidget-user-only-checkbox {
   min-width: 12rem;
   font-family: inherit;
   font-size: inherit;
 }
 
-#button-toolbar {
-  width: 100%;
+.jp-SlurmWidget-table-row {
+  height: 75vh;
 }
 
-#filter-input-label {
-  font-size: 1rem !important;
-  font-family: inherit !important;
+.jp-SlurmWidget-table-filter-row {
+  position: relative;
+  top: 2em;
+  z-index: 5000;   /* this is to keep the content in front of the table margin at the top */
 }
 
-#filter-input {
-  background-color: #f8f9fa;
+.jp-SlurmWidget-table-filter-label {
+  color: var(--secondary);
+  border-color: var(--secondary);
 }
 
-#filter-input-group {
-  padding: .375rem .75rem;
-  float: right;
+.jp-SlurmWidget-table-filter-input {
+  border-color: var(--secondary);
 }
 
-#squeue-loading {
+.jp-SlurmWidget-squeue-loading {
   position: absolute;
   top: 50vh;
   z-index: 1;
   background-color: var(--jp-border-color0);
 }
 
-#user-only-checkbox input[type="checkbox"] {
+.jp-SlurmWidget-user-only-checkbox input[type="checkbox"] {
   margin-right: 0.5em;
 }
 

@@ -25,8 +25,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
  * The class names for the Slurm extension icon, for launcher and
  * tab, respectively
  */
-const SLURM_ICON_CLASS_LAUNCHER = 'jp-NerscLaunchIcon';
-const SLURM_ICON_CLASS_TAB = 'jp-NerscTabIcon';
+const SLURM_ICON_CLASS_LAUNCHER = 'jp-SlurmWidget-NerscLaunchIcon';
+const SLURM_ICON_CLASS_TAB = 'jp-SlurmWidget-NerscTabIcon';
 const PLUGIN_ID = 'jupyterlab-slurm:plugin';
 
 /**

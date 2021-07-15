@@ -10,13 +10,14 @@ import {
   FormControl
 } from 'react-bootstrap';
 import {
+  BsArrowCounterclockwise,
   BsArrowRepeat,
-  BsTrashFill,
   BsPauseFill,
   BsPlayFill,
-  BsArrowCounterclockwise
+  BsFilter,
+  BsTrashFill
 } from 'react-icons/bs';
-import DataTable from 'react-data-table-component';
+import DataTable, { IDataTableColumn } from 'react-data-table-component';
 
 // Local
 import { requestAPI } from '../handler';
@@ -43,10 +44,12 @@ namespace types {
   export type State = {
     rows: string[][];
     selectedRows: Record<string, unknown>[];
+    displayRows: Record<string, unknown>[];
     clearSelected: boolean;
-    displayedColumns: string[];
+    columns: string[];
+    displayColumns: IDataTableColumn<Record<string, unknown>>[];
     itemsPerPage: number;
-    filterQuery: '';
+    filterQuery: string;
     lastSqueueFetch: Date;
     autoReload: boolean;
     reloadRate: number;
@@ -74,13 +77,19 @@ export default class SqueueDataTable extends Component<
       reloadRate = 5000;
     }
 
+    const columns = props.defaultColumns
+      ? props.defaultColumns
+      : props.availableColumns;
+
     this.state = {
       rows: [],
+      displayRows: [],
       selectedRows: [],
       clearSelected: false,
-      displayedColumns: props.defaultColumns
-        ? props.defaultColumns
-        : props.availableColumns,
+      columns: columns,
+      displayColumns: columns.map(x => {
+        return { name: x, selector: x, sortable: true };
+      }),
       itemsPerPage: this.props.itemsPerPage, // make this prop dependent
       filterQuery: '',
       lastSqueueFetch: new Date(),
@@ -144,9 +153,18 @@ export default class SqueueDataTable extends Component<
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
         console.log('SqueueDataTable getData() squeue', squeueParams, data);
-        this.setState({ lastSqueueFetch: new Date(), rows: data.data });
-        this.setState({ loading: false});
-        console.log('loading finished');
+
+        this.setState(
+          {
+            lastSqueueFetch: new Date(),
+            rows: data.data,
+            loading: false
+          },
+          () => {
+            this.updateDisplayRows();
+            console.log('loading finished');
+          }
+        );
       })
       .catch(error => {
         console.error('SqueueDataTable getData() error', error);
@@ -159,39 +177,64 @@ export default class SqueueDataTable extends Component<
     field: string,
     direction: string
   ): Record<string, unknown>[] {
-    const maxIDLength = String(
-      rows
-        .map(r => {
-          return Number(r[0]);
-        })
-        .sort()[-1]
-    ).length;
-    const sortedRows: Record<string, unknown>[] = rows.map(r => {
-      const jobID = String(r[this.props.availableColumns[0]]).padStart(
-        maxIDLength,
-        '0'
-      );
-      const row: Record<string, unknown> = {};
+    function getSortValue(
+      a: Record<string, unknown>,
+      b: Record<string, unknown>
+    ): number {
+      let val_a = a[field];
+      let val_b = b[field];
 
-      let k;
-      for (k in r) {
-        row[k] = r[k];
+      if (!isNaN(Number(a[field]))) {
+        val_a = Number(a[field]);
+        val_b = Number(b[field]);
       }
 
-      row[this.props.availableColumns[0]] = jobID;
-      return row;
-    });
-    console.log('sortedRows', sortedRows);
+      const greater = val_a > val_b;
+      if (direction === 'desc') {
+        if (greater) {
+          return 1;
+        } else {
+          return -1;
+        }
+      } else {
+        if (greater) {
+          return -1;
+        } else {
+          return 1;
+        }
+      }
+    }
 
-    const finalRows = sortedRows.map(r => {
-      r[this.props.availableColumns[0]] = String(
-        Number(r[this.props.availableColumns[0]])
-      );
-      return r;
-    });
+    const sorted_rows = rows.slice(0);
+    sorted_rows.sort(getSortValue);
+    return sorted_rows;
+  }
 
-    console.log('finalRows', finalRows);
-    return finalRows;
+  private updateDisplayRows() {
+    const displayRows = this.state.rows
+      .filter((row: string[]) => {
+        const filterQuery = this.state.filterQuery.toLowerCase();
+
+        for (const el of row) {
+          if (el.toLowerCase().includes(filterQuery)) {
+            // console.log(`true for ${row}`);
+            return true;
+          }
+        }
+        return false;
+      })
+      .map((x: string[]) => {
+        const item: Record<string, unknown> = { id: Number(x[0]) };
+        let i, col, colValue;
+        for (i = 0, col = 0; col < this.state.columns.length; i++, col++) {
+          colValue = this.state.columns[col];
+          item[colValue] = x[i];
+        }
+
+        return item;
+      });
+
+    this.setState({ displayRows: displayRows });
   }
 
   async onReloadButtonClick(): Promise<void> {
@@ -206,10 +249,6 @@ export default class SqueueDataTable extends Component<
 
   async reload(): Promise<void> {
     this.setState({
-      displayedColumns: this.props.defaultColumns
-        ? this.props.defaultColumns
-        : this.props.availableColumns,
-      filterQuery: '',
       clearSelected: false
     });
   }
@@ -253,51 +292,13 @@ export default class SqueueDataTable extends Component<
     }
   }
 
-  handleFilter(event: any): void {
-    console.log(event);
-    this.setState({ filterQuery: event.target.value});
+  handleFilter(filter: string): void {
+    console.log(filter);
+    this.setState({ filterQuery: filter }, this.updateDisplayRows);
     console.log(this.state.filterQuery);
   }
 
   render(): ReactNode {
-    const clearSelected = this.state.clearSelected;
-    const selectedRows = this.state.selectedRows;
-    const userOnly = this.state.userOnly;
-
-    // id, partition, name, user, status, state, time, nodes, nodelist
-
-    let data: Record<string, unknown>[] = [];
-    if (this.state.rows.length > 0) {
-      data = this.state.rows.filter(row => {
-        const filterQuery = this.state.filterQuery;    
-        
-        for (const el of row) {
-          if (el.includes(filterQuery)) {
-            // console.log(`true for ${row}`);
-            return true;
-          }
-        }
-        return false;
-      }).map(x => {
-        const item: Record<string, unknown> = { id: Number(x[0]) };
-        let i, col, colValue;
-        for (
-          i = 0, col = 0;
-          col < this.state.displayedColumns.length;
-          i++, col++
-        ) {
-          colValue = this.state.displayedColumns[col];
-          item[colValue] = x[i];
-        }
-
-        return item;
-      });
-    }
-
-    const columns = this.state.displayedColumns.map(x => {
-      return { name: x, selector: x, sortable: true };
-    });
-
     /*
     console.log({
       rows: this.state.rows,
@@ -312,33 +313,19 @@ export default class SqueueDataTable extends Component<
     return (
       <>
         <Row className={'justify-content-start jp-SlurmWidget-row'}>
-          <ButtonToolbar id="button-toolbar">
+          <ButtonToolbar>
             <Col md>
               <ToggleButton
                 type="checkbox"
-                id="user-only-checkbox"
+                className="jp-SlurmWidget-user-only-checkbox"
                 // to fix styling edit this
                 variant="outline-light"
                 onChange={this.toggleUserOnly.bind(this)}
-                checked={userOnly}
+                checked={this.state.userOnly}
                 value="1"
               >
                 Display my jobs only
               </ToggleButton>
-            </Col>
-            <Col md>
-                <InputGroup id="filter-input-group">
-                  <InputGroup.Prepend>
-                    <InputGroup.Text>
-                      Filter by text:
-                    </InputGroup.Text>
-                  </InputGroup.Prepend>
-                  <FormControl 
-                    id="filter-input" 
-                    value={this.state.filterQuery} 
-                    onChange={this.handleFilter.bind(this)}
-                  />
-                </InputGroup>
             </Col>
           </ButtonToolbar>
         </Row>
@@ -357,19 +344,19 @@ export default class SqueueDataTable extends Component<
             <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
-                disabled={selectedRows.length === 0}
+                disabled={this.state.selectedRows.length === 0}
                 variant={'outline-secondary'}
                 onClick={this.clearSelectedRows.bind(this)}
               >
                 <BsArrowCounterclockwise />
                 Clear Selections
-                {selectedRows.length > 0 && (
+                {this.state.selectedRows.length > 0 && (
                   <Badge
                     variant="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
-                    {selectedRows.length}
+                    {this.state.selectedRows.length}
                   </Badge>
                 )}
               </Button>
@@ -377,7 +364,7 @@ export default class SqueueDataTable extends Component<
             <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
-                disabled={selectedRows.length === 0}
+                disabled={this.state.selectedRows.length === 0}
                 variant={'outline-danger'}
                 onClick={() => {
                   this.handleJobAction('kill');
@@ -385,13 +372,13 @@ export default class SqueueDataTable extends Component<
               >
                 <BsTrashFill />
                 Kill Job(s)
-                {selectedRows.length > 0 && (
+                {this.state.selectedRows.length > 0 && (
                   <Badge
                     variant="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
-                    {selectedRows.length}
+                    {this.state.selectedRows.length}
                   </Badge>
                 )}
               </Button>
@@ -399,7 +386,7 @@ export default class SqueueDataTable extends Component<
             <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
-                disabled={selectedRows.length === 0}
+                disabled={this.state.selectedRows.length === 0}
                 variant={'outline-danger'}
                 onClick={() => {
                   this.handleJobAction('hold');
@@ -407,13 +394,13 @@ export default class SqueueDataTable extends Component<
               >
                 <BsPauseFill />
                 Hold Job(s)
-                {selectedRows.length > 0 && (
+                {this.state.selectedRows.length > 0 && (
                   <Badge
                     variant="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
-                    {selectedRows.length}
+                    {this.state.selectedRows.length}
                   </Badge>
                 )}
               </Button>
@@ -421,7 +408,7 @@ export default class SqueueDataTable extends Component<
             <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
-                disabled={selectedRows.length === 0}
+                disabled={this.state.selectedRows.length === 0}
                 variant={'outline-danger'}
                 onClick={() => {
                   this.handleJobAction('release');
@@ -429,35 +416,63 @@ export default class SqueueDataTable extends Component<
               >
                 <BsPlayFill />
                 Release Job(s)
-                {selectedRows.length > 0 && (
+                {this.state.selectedRows.length > 0 && (
                   <Badge
                     variant="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
-                    {selectedRows.length}
+                    {this.state.selectedRows.length}
                   </Badge>
                 )}
               </Button>
             </Col>
           </ButtonToolbar>
         </Row>
-        {this.state.loading &&
+        <Row
+          className={
+            'justify-content-start jp-SlurmWidget-row jp-SlurmWidget-table-filter-row'
+          }
+        >
+          <ButtonToolbar>
+            <Col lg>
+              <InputGroup className="jp-SlurmWidget-table-filter-input-group">
+                <InputGroup.Prepend>
+                  <InputGroup.Text className="jp-SlurmWidget-table-filter-label">
+                    <BsFilter />
+                  </InputGroup.Text>
+                </InputGroup.Prepend>
+                <FormControl
+                  className="jp-SlurmWidget-table-filter-input"
+                  value={this.state.filterQuery}
+                  onChange={e => {
+                    this.handleFilter(e.target.value);
+                  }}
+                />
+              </InputGroup>
+            </Col>
+          </ButtonToolbar>
+        </Row>
+        {this.state.loading && (
           <Row className={'justify-content-center jp-SlurmWidget-row'}>
-            <p id="squeue-loading">Loading...</p>
+            <p className={'jp-SlurmWidget-squeue-loading'}>Loading...</p>
           </Row>
-        }
-        <Row className={'justify-content-center jp-SlurmWidget-row'}>
+        )}
+        <Row
+          className={
+            'justify-content-center jp-SlurmWidget-row jp-SlurmWidget-table-row'
+          }
+        >
           <DataTable
-            data={data}
-            columns={columns}
+            data={this.state.displayRows}
+            columns={this.state.displayColumns}
             defaultSortField={this.props.availableColumns[0]}
             sortFunction={this.sortRows}
             striped
             highlightOnHover
             pagination
             selectableRows
-            clearSelectedRows={clearSelected}
+            clearSelectedRows={this.state.clearSelected}
             onSelectedRowsChange={this.onSelectedRows.bind(this)}
             noDataComponent={'No jobs currently queued.'}
             paginationPerPage={this.props.itemsPerPage}
