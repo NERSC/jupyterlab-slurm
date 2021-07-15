@@ -441,18 +441,6 @@ export default class SqueueDataTable extends Component<
         </Row>
         <Row xs={2} className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar id="button-toolbar">
-            <Col>
-              <ToggleButton
-                type="checkbox"
-                id="user-only-checkbox"
-                variant="outline-light"
-                onChange={this.toggleUserOnly.bind(this)}
-                checked={userOnly}
-                value="1"
-              >
-                Display my jobs only
-              </ToggleButton>
-            </Col>
             <Col md>
               <InputGroup id="filter-input-group">
                 <InputGroup.Prepend>
@@ -464,6 +452,18 @@ export default class SqueueDataTable extends Component<
                   onChange={this.handleFilter.bind(this)}
                 />
               </InputGroup>
+            </Col>
+            <Col>
+              <ToggleButton
+                type="checkbox"
+                id="user-only-checkbox"
+                variant="outline-light"
+                onChange={this.toggleUserOnly.bind(this)}
+                checked={userOnly}
+                value="1"
+              >
+                Display my jobs only
+              </ToggleButton>
             </Col>
           </ButtonToolbar>
         </Row>
