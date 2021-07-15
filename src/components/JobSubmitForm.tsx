@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Col,
-  Dropdown,
   Form,
   Row,
   ToggleButton,
@@ -20,6 +19,7 @@ namespace types {
     addAlert: (message: string, variant: string) => void;
     disabled?: boolean;
     theme: string;
+    active: boolean;
   };
 
   export type State = {
@@ -62,7 +62,63 @@ export default class JobSubmitForm extends React.Component<
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
-    this.updateFileitems();
+
+    // const [fileBrowser] = useState(this.state.filebrowser);
+    // useEffect(() => {
+    //   console.log('filebrowser changed');
+    // }, [fileBrowser]);
+  }
+
+  /*
+   * Checks to see if the "active" prop has changed (i.e. the
+   * component was clicked on and is now visible). If changed
+   * to true, it calls the updateFileitems() function
+   */
+  componentDidUpdate(prevProps: types.Props, prevState: types.State): void {
+    if (prevProps.active !== this.props.active) {
+      if (this.props.active) {
+        this.updateFileitems();
+      }
+    }
+  }
+
+  /*
+   * Parses the filebrowser variable to choose only valid files
+   * and creates an array of <option> elements for each file
+   */
+  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
+    const fileListing = [];
+    const iter = filebrowser.model.items();
+    let i = iter.next();
+    while (i) {
+      if (i.type === 'file') {
+        fileListing.push(i.path);
+      }
+      i = iter.next();
+    }
+
+    const fileItems = fileListing.map(x => {
+      return <option key={x}>{x}</option>;
+    });
+
+    return fileItems;
+  }
+
+  /*
+   * If the component is "active," this checks to see if the filebrowser
+   * has changed since we last got the files. It then calls itself again
+   * after 0.1s. When the component is no longer active, the function stops
+   */
+  private updateFileitems(): void {
+    if (this.props.active) {
+      const currentFileItems = this.getFileItems(this.state.filebrowser);
+      if (currentFileItems !== this.state.fileitems) {
+        this.setState({ fileitems: currentFileItems });
+      }
+      setTimeout(() => {
+        this.updateFileitems();
+      }, 100);
+    }
   }
 
   /*
@@ -159,48 +215,20 @@ export default class JobSubmitForm extends React.Component<
   /*
    * Return a list of dropdown items that show files in the current directory
    */
-  displayFiles(): React.ReactNode {
-    const fileListing = [];
-    const iter = this.state.filebrowser.model.items();
-    let i = iter.next();
-    while (i) {
-      fileListing.push(i.path);
-      i = iter.next();
-    }
+  // displayFiles(): React.ReactNode {
+  //   const fileListing = [];
+  //   const iter = this.state.filebrowser.model.items();
+  //   let i = iter.next();
+  //   while (i) {
+  //     fileListing.push(i.path);
+  //     i = iter.next();
+  //   }
 
-    console.log('displayFiles', fileListing);
-    return fileListing.map(x => {
-      return <Dropdown.Item key={x}>{x}</Dropdown.Item>;
-    });
-  }
-
-  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
-    const fileListing = [];
-    const iter = filebrowser.model.items();
-    let i = iter.next();
-    while (i) {
-      if (i.type === 'file') {
-        fileListing.push(i.path);
-      }
-      i = iter.next();
-    }
-
-    const fileItems = fileListing.map(x => {
-      return <option key={x}>{x}</option>;
-    });
-
-    return fileItems;
-  }
-
-  private updateFileitems(): void {
-    const currentFileItems = this.getFileItems(this.state.filebrowser);
-    if (currentFileItems !== this.state.fileitems) {
-      this.setState({ fileitems: currentFileItems });
-    }
-    setTimeout(() => {
-      this.updateFileitems();
-    }, 100);
-  }
+  //   console.log('displayFiles', fileListing);
+  //   return fileListing.map(x => {
+  //     return <Dropdown.Item key={x}>{x}</Dropdown.Item>;
+  //   });
+  // }
 
   render(): React.ReactNode {
     const inputType = this.state.inputType;

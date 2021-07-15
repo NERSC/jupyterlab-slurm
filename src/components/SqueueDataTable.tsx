@@ -291,6 +291,7 @@ export default class SqueueDataTable extends Component<
         })
         .map(x => {
           const item: Record<string, unknown> = {
+            // REPLACE WITH BETTER FUNCTION
             id: Number(
               x[0]
                 .replace('_', '0')
