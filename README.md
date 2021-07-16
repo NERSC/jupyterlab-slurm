@@ -65,7 +65,20 @@ docker-compose exec -u jovyan jupyterlab bash
 cd /usr/local/jupyterlab-slurm/
 # install jupyter_packaging which is a missing dependency
 pip install jupyter_packaging
+# this command takes a while the first it is run
 pip install -e .
 # point the labextension dev install at current dir
 jupyter labextension develop --overwrite .
+
+# rerun this if there are updates:
+jlpm run build
+```
+
+### Restart the jupyterlab docker container
+```bash
+docker compose restart jupyterlab
+
+# rerun munged on the jupyterlab instance
+docker compose exec jupyterlab bash
+runuser -u slurm -- munged
 ```
