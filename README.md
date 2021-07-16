@@ -41,7 +41,7 @@ As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io
 ```bash
 git clone https://github.com/giovtorres/slurm-docker-cluster
 cd slurm-docker-cluster
-git clone https://github.com/NERSC/jupyterlab_slurm
+git clone --branch lab3 https://github.com/NERSC/jupyterlab-slurm.git
 cp jupyterlab-slurm/slurm_cluster/docker-compose.yml .
 # from slurm-docker-cluster README
 docker build -t slurm-docker-cluster:19.05.1 .
@@ -61,8 +61,11 @@ squeue
 ### Install jupyterlab-slurm into your environment
 
 ```bash
-docker-compose exec jupyterlab bash
-cd /usr/local/jupyterlab_slurm
-# -U forces an install if you are running it multiple times
-pip install . -U
+docker-compose exec -u jovyan jupyterlab bash
+cd /usr/local/jupyterlab-slurm/
+# install jupyter_packaging which is a missing dependency
+pip install jupyter_packaging
+pip install -e .
+# point the labextension dev install at current dir
+jupyter labextension develop --overwrite .
 ```
