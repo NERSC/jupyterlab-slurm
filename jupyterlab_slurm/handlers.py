@@ -432,7 +432,7 @@ class SqueueHandler(SlurmCommandHandler):
             exec_command = self.get_command()
             self._serverlog.info("SqueueHandler.run_command(): {}".format(exec_command))
             out = await self._run_command(exec_command)
-            self._serverlog.info("SqueueHandler response: {}".format(out))
+            # self._serverlog.info("SqueueHandler response: {}".format(out))
 
             returncode = out["returncode"]
             cmd_stdout = ""
@@ -451,7 +451,7 @@ class SqueueHandler(SlurmCommandHandler):
                 errorMessage = ""
 
             data = out["stdout"].splitlines()
-            self._serverlog.info("SqueueHandler stdout: {}".format(data))
+            # self._serverlog.info("SqueueHandler stdout: {}".format(data))
 
             for row in data:
                 # maxsplit=7 so we can still display squeue entries with final columns with spaces like the
@@ -499,9 +499,9 @@ class SqueueHandler(SlurmCommandHandler):
         data_dict = {"data": []}
         try:
             out = await self.run_command()
-            self._serverlog.info("SqueueHandler response: {}".format(out))
+            # self._serverlog.info("SqueueHandler response: {}".format(out))
             data = out["data"]
-            self._serverlog.info("SqueueHandler stdout: {}".format(data))
+            # self._serverlog.info("SqueueHandler stdout: {}".format(data))
 
             data_dict = {
                 "data": data,
