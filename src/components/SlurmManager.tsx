@@ -316,6 +316,7 @@ export default class SlurmManager extends React.Component<
               disabled={this.state.jobSubmitDisabled}
               addAlert={this.addAlert}
               theme={getCurrentTheme()}
+              active={this.state.activeTab === 'jobSubmit'}
             />
           </Tab>
           <Tab

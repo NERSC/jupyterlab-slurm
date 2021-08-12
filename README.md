@@ -41,10 +41,12 @@ As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io
 ```bash
 git clone https://github.com/giovtorres/slurm-docker-cluster
 cd slurm-docker-cluster
-git clone https://github.com/NERSC/jupyterlab_slurm
+git clone --branch lab3 https://github.com/NERSC/jupyterlab-slurm.git
 cp jupyterlab-slurm/slurm_cluster/docker-compose.yml .
 # from slurm-docker-cluster README
 docker build -t slurm-docker-cluster:19.05.1 .
+# if you encounter an error with the PGP key step
+# update line 46 with gpg --keyserver pgp.mit.edu ...
 # this will build the jupyterlab image minimal-notebook with a slurm client
 docker-compose build
 # start the cluster
@@ -61,8 +63,24 @@ squeue
 ### Install jupyterlab-slurm into your environment
 
 ```bash
-docker-compose exec jupyterlab bash
-cd /usr/local/jupyterlab_slurm
-# -U forces an install if you are running it multiple times
-pip install . -U
+docker-compose exec -u jovyan jupyterlab bash
+cd /usr/local/jupyterlab-slurm/
+# install jupyter_packaging which is a missing dependency
+pip install jupyter_packaging
+# this command takes a while the first it is run
+pip install -e .
+# point the labextension dev install at current dir
+jupyter labextension develop --overwrite .
+
+# rerun this if there are updates:
+jlpm run build
+```
+
+### Restart the jupyterlab docker container
+```bash
+docker compose restart jupyterlab
+
+# rerun munged on the jupyterlab instance
+docker compose exec jupyterlab bash
+runuser -u slurm -- munged
 ```

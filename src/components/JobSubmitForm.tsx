@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Col,
-  Dropdown,
   Form,
   Row,
   ToggleButton,
@@ -20,6 +19,7 @@ namespace types {
     addAlert: (message: string, variant: string) => void;
     disabled?: boolean;
     theme: string;
+    active: boolean;
   };
 
   export type State = {
@@ -50,8 +50,77 @@ export default class JobSubmitForm extends React.Component<
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
-    this.updateFileitems();
   }
+
+  /*
+   * Checks to see if the "active" prop has changed (i.e. the
+   * component was clicked on and is now visible). If changed
+   * to true, it calls the updateFileitems() function
+   */
+  componentDidUpdate(prevProps: types.Props, prevState: types.State): void {
+    if (prevProps.active !== this.props.active) {
+      if (this.props.active) {
+        this.updateFileitems();
+      }
+    }
+  }
+
+  /*
+   * Parses the filebrowser variable to choose only valid files
+   * and creates an array of <option> elements for each file.
+   * If there are no files in the current directory, an empty entry is created.
+   */
+    private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
+    const fileListing = [];
+    const iter = filebrowser.model.items();
+    let i = iter.next();
+    while (i) {
+      if (i.type === 'file') {
+        fileListing.push(i.path);
+      }
+      i = iter.next();
+    }
+
+    let fileItems;
+
+    if (fileListing.length > 0) {
+      fileItems = fileListing.map(x => {
+        return <option key={x}>{x}</option>;
+      });
+    } else {
+      fileItems = [<option key={''}>{''}</option>];
+    }
+
+    return fileItems;
+  }
+
+  /*
+   * If the component is "active," this checks to see if the filebrowser
+   * has changed since we last got the files. It then calls itself again
+   * after 0.1s. When the component is no longer active, the function stops
+   */
+  private updateFileitems(): void {
+    const currentFileItems = this.getFileItems(this.state.filebrowser);
+    if (currentFileItems !== this.state.fileitems) {
+      this.setState({ fileitems: currentFileItems });
+
+      let i;
+      let found = false;
+      for (i = 0; i < currentFileItems.length; i++) {
+        if (String(currentFileItems[i].key) === this.state.filepath) {
+          found = true;
+        }
+      }
+      // if the last selected filepath does not exist here, choose the first entry
+      if (found === false) {
+        this.setState({ filepath: String(currentFileItems[0].key) });
+      }
+    }
+    setTimeout(() => {
+      this.updateFileitems();
+    }, 100);
+  }
+
 
   /*
    * Switch between submitting a file and creating a script in a text box
@@ -102,68 +171,6 @@ export default class JobSubmitForm extends React.Component<
     this.props.addAlert('Job submitted', variant);
   }
 
-  /*
-   * Return a list of dropdown items that show files in the current directory
-   */
-  displayFiles(): React.ReactNode {
-    const fileListing = [];
-    const iter = this.state.filebrowser.model.items();
-    let i = iter.next();
-    while (i) {
-      fileListing.push(i.path);
-      i = iter.next();
-    }
-
-    return fileListing.map(x => {
-      return <Dropdown.Item key={x}>{x}</Dropdown.Item>;
-    });
-  }
-
-  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
-    const fileListing = [];
-    const iter = filebrowser.model.items();
-    let i = iter.next();
-    while (i) {
-      if (i.type === 'file') {
-        fileListing.push(i.path);
-      }
-      i = iter.next();
-    }
-
-    let fileItems;
-
-    if (fileListing.length > 0) {
-      fileItems = fileListing.map(x => {
-        return <option key={x}>{x}</option>;
-      });
-    } else {
-      fileItems = [<option key={''}>{''}</option>];
-    }
-
-    return fileItems;
-  }
-
-  private updateFileitems(): void {
-    const currentFileItems = this.getFileItems(this.state.filebrowser);
-    if (currentFileItems !== this.state.fileitems) {
-      this.setState({ fileitems: currentFileItems });
-
-      let i;
-      let found = false;
-      for (i = 0; i < currentFileItems.length; i++) {
-        if (String(currentFileItems[i].key) === this.state.filepath) {
-          found = true;
-        }
-      }
-      // if the last selected filepath does not exist here, choose the first entry
-      if (found === false) {
-        this.setState({ filepath: String(currentFileItems[0].key) });
-      }
-    }
-    setTimeout(() => {
-      this.updateFileitems();
-    }, 100);
-  }
 
   render(): React.ReactNode {
     const inputType = this.state.inputType;
