@@ -31,7 +31,7 @@ export async function requestAPI<T>(
 
   let response: Response;
   try {
-    console.log('requestAPI new request', requestUrl, init, settings);
+    //console.log('requestAPI new request', requestUrl, init, settings);
     response = await ServerConnection.makeRequest(requestUrl, init, settings);
   } catch (error) {
     console.error(
@@ -46,7 +46,7 @@ export async function requestAPI<T>(
   let data = null;
   if (!response.ok) {
     data = await response.text();
-    console.log('Error code: ', response.status);
+    console.error('Error code: ', response.status);
     throw new ServerConnection.ResponseError(response, data);
   } else {
     data = await response.json();
@@ -57,7 +57,7 @@ export async function requestAPI<T>(
       console.log('response data', requestUrl, urlParams, init, data);
       data = JSON.parse(data);
     } catch (error) {
-      console.log(
+      console.error(
         'requestAPI: Not a JSON response body.',
         endPoint,
         urlParams,

@@ -23,6 +23,8 @@ namespace types {
   };
 
   export type State = {
+    filebrowser: FileBrowser;
+    fileitems: JSX.Element[];
     inputType: string;
     inputPathSelectType: string;
     filepath: string;
@@ -31,20 +33,6 @@ namespace types {
   };
 }
 
-/*
-function delayUserInput(
-  input: string,
-  callback: (s: string) => any,
-  delay: number
-) {
-  console.log('inside delayUserInput()', input);
-  const timeout: number = setTimeout(callback(input), delay);
-  return () => {
-    clearTimeout(timeout);
-  };
-}
-*/
-
 export default class JobSubmitForm extends React.Component<
   types.Props,
   types.State
@@ -52,6 +40,8 @@ export default class JobSubmitForm extends React.Component<
   constructor(props: types.Props) {
     super(props);
     this.state = {
+      filebrowser: this.props.filebrowser,
+      fileitems: [],
       inputType: 'path',
       inputPathSelectType: 'dropdown',
       filepath: '',
@@ -60,6 +50,7 @@ export default class JobSubmitForm extends React.Component<
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
+    this.updateFileitems();
   }
 
   /*
@@ -68,8 +59,6 @@ export default class JobSubmitForm extends React.Component<
   changeInputType(inputType: string): void {
     this.setState({
       inputType,
-      filepath: '',
-      inlineScript: '',
       inputTimeout: 0
     });
   }
@@ -77,34 +66,14 @@ export default class JobSubmitForm extends React.Component<
   /*
    * Handles selecting a file path from the current directory
    */
-  handleFileSelect(): void {
-    const items = this.props.filebrowser.model.items();
-    let path =
-      'Select a path containing your script from the filebrowser on the left';
-    try {
-      const i = items.next();
-      console.log(`handleFileSelect() ${i}`);
-      if (i && i.type === 'file') {
-        path = i.path;
-      } else {
-        const message = 'No files in ' + this.props.filebrowser.model.path;
-        const variant = 'warning';
-        this.props.addAlert(message, variant);
-      }
-    } catch (e) {
-      console.error(e);
-      const variant = 'warning';
-      this.props.addAlert(e.message, variant);
-    }
-    console.log(`handleFileSelect() path=${path}`);
-    this.setState({ filepath: path });
+  handleFileSelect(event: React.ChangeEvent<HTMLInputElement>): void {
+    this.setState({ filepath: event.target.value });
   }
 
   /*
    * Update the path to the batch script that will be submitted to sbatch
    * */
   updateFilepath(s: string): void {
-    console.log('updateFilepath() ', s);
     // any path validation here has to happen server-side
     this.setState({ filepath: s });
   }
@@ -126,7 +95,11 @@ export default class JobSubmitForm extends React.Component<
   handleSubmit(): void {
     const { inputType, filepath, inlineScript } = this.state;
     const input = inputType === 'path' ? filepath : inlineScript;
+
     this.props.submitJob(input, inputType);
+
+    const variant = 'success';
+    this.props.addAlert('Job submitted', variant);
   }
 
   /*
@@ -134,23 +107,21 @@ export default class JobSubmitForm extends React.Component<
    */
   displayFiles(): React.ReactNode {
     const fileListing = [];
-    const iter = this.props.filebrowser.model.items();
+    const iter = this.state.filebrowser.model.items();
     let i = iter.next();
     while (i) {
       fileListing.push(i.path);
       i = iter.next();
     }
 
-    console.log('displayFiles', fileListing);
     return fileListing.map(x => {
       return <Dropdown.Item key={x}>{x}</Dropdown.Item>;
     });
   }
 
-  render(): React.ReactNode {
-    const inputType = this.state.inputType;
+  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
     const fileListing = [];
-    const iter = this.props.filebrowser.model.items();
+    const iter = filebrowser.model.items();
     let i = iter.next();
     while (i) {
       if (i.type === 'file') {
@@ -159,10 +130,44 @@ export default class JobSubmitForm extends React.Component<
       i = iter.next();
     }
 
-    const fileItems = fileListing.map(x => {
-      return <option key={x}>{x}</option>;
-    });
-    console.log(fileItems);
+    let fileItems;
+
+    if (fileListing.length > 0) {
+      fileItems = fileListing.map(x => {
+        return <option key={x}>{x}</option>;
+      });
+    } else {
+      fileItems = [<option key={''}>{''}</option>];
+    }
+
+    return fileItems;
+  }
+
+  private updateFileitems(): void {
+    const currentFileItems = this.getFileItems(this.state.filebrowser);
+    if (currentFileItems !== this.state.fileitems) {
+      this.setState({ fileitems: currentFileItems });
+
+      let i;
+      let found = false;
+      for (i = 0; i < currentFileItems.length; i++) {
+        if (String(currentFileItems[i].key) === this.state.filepath) {
+          found = true;
+        }
+      }
+      // if the last selected filepath does not exist here, choose the first entry
+      if (found === false) {
+        this.setState({ filepath: String(currentFileItems[0].key) });
+      }
+    }
+    setTimeout(() => {
+      this.updateFileitems();
+    }, 100);
+  }
+
+  render(): React.ReactNode {
+    const inputType = this.state.inputType;
+
     return (
       <>
         <Form>
@@ -210,19 +215,10 @@ export default class JobSubmitForm extends React.Component<
                           <Form.Control
                             type="text"
                             placeholder={this.props.filebrowser.model.path}
-                            defaultValue={this.props.filebrowser.model.path}
                             onChange={e => {
-                              /*
-                              console.log('calling delayUserInput()');
-                              delayUserInput(
-                                e.target.value,
-                                this.updateFilepath,
-                                500
-                              );
-                              */
                               const timeout = setTimeout(() => {
                                 this.updateFilepath(e.target.value);
-                              });
+                              }, 250);
                               return () => {
                                 clearTimeout(timeout);
                               };
@@ -262,10 +258,12 @@ export default class JobSubmitForm extends React.Component<
                           <Form.Control
                             as="select"
                             id={'fileselect-dropdown'}
-                            onClick={this.handleFileSelect.bind(this)}
+                            placeholder={'Select a file'}
+                            value={this.state.filepath}
+                            onChange={this.handleFileSelect.bind(this)}
                             disabled={this.props.disabled}
                           >
-                            {fileItems}
+                            {this.state.fileitems}
                           </Form.Control>
                         </Form.Group>
                         <Button

@@ -54,5 +54,5 @@ jobs:
 
         jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK"
 
-        jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*OK"
+        jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*enabled"
         python -m jupyterlab.browser_check

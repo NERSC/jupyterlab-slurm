@@ -78,6 +78,7 @@ class UserFetchHandler(APIHandler):
             self._serverlog.exception(e)
             self.finish(json.dumps(e))
 
+
 # common utility methods for running slurm commands, and defaults to the run_command() for scancel and scontrol
 # sbatch and squeue need special handling of the command and override run_command()
 class SlurmCommandHandler(APIHandler):

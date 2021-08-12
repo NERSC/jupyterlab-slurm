@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Tab, Tabs } from 'react-bootstrap';
+import { Alert, Badge, Tab, Tabs } from 'react-bootstrap';
 import { FileBrowser } from '@jupyterlab/filebrowser';
 import { v4 as uuidv4 } from 'uuid';
 import { uniqueId } from 'lodash';
@@ -92,7 +92,7 @@ export default class SlurmManager extends React.Component<
       jobsPending: 0,
       jobErrors: [],
       queueCols: queueCols,
-      reloadQueue: true,
+      reloadQueue: false,
       autoReload: autoReload,
       autoReloadRate: autoReloadRate,
       theme: 'default'
@@ -112,7 +112,11 @@ export default class SlurmManager extends React.Component<
       </Alert>
     );
     this.setState(prevState => {
+      // add new alert to previous alerts
       return { alerts: this.state.alerts.concat([alert]) };
+
+      // reset alerts to be only 1 element
+      // return { alerts: [alert] };
     });
   }
 
@@ -138,14 +142,14 @@ export default class SlurmManager extends React.Component<
     const body = JSON.stringify({ jobID: jobID });
 
     try {
-      console.log(`Request for ${method} ${route}`);
+      //console.log(`Request for ${method} ${route}`);
       this.requestStatusTable.set(requestID, 'sent');
       requestAPI<any>(route, new URLSearchParams(), {
         body: body,
         method: method,
         headers: { 'Content-Type': 'application/json' }
       }).then(async result => {
-        console.log('makeJobRequest()', result);
+        //console.log('makeJobRequest()', result);
 
         if (result.returncode === 0) {
           this.addAlert(result.responseMessage, 'success');
@@ -169,7 +173,7 @@ export default class SlurmManager extends React.Component<
     action: JobAction,
     rows: Record<string, unknown>[]
   ): Promise<void> {
-    console.log(`processSelectedJobs(${action}, rows)`);
+    //console.log(`processSelectedJobs(${action}, rows)`);
     const { route, method } = (action => {
       switch (action) {
         case 'kill':
@@ -187,7 +191,6 @@ export default class SlurmManager extends React.Component<
         return { jobsPending: prevState.jobsPending + 1 };
       });
       await this.makeJobRequest(route, method, jobID).then(() => {
-        console.log(this.state.jobsPending);
         if (this.state.jobsPending > 0) {
           this.setState(prevState => {
             return { jobsPending: prevState.jobsPending - 1 };
@@ -220,7 +223,7 @@ export default class SlurmManager extends React.Component<
       contents = input;
     }
 
-    console.log('submitJob() ', serverRoot, fileBrowserPath);
+    //console.log('submitJob() ', serverRoot, fileBrowserPath);
     console.log('Submitting new batch job: ', inputType, contents);
 
     requestAPI<any>(
@@ -234,7 +237,7 @@ export default class SlurmManager extends React.Component<
     )
       .then(result => {
         let reload = true;
-        console.log('sbatch result', result);
+        //console.log('sbatch result', result);
         if (result['returncode'] !== 0) {
           this.addAlert(
             result['errorMessage'] === ''
@@ -271,14 +274,11 @@ export default class SlurmManager extends React.Component<
     prevProps: Readonly<types.Props>,
     prevState: Readonly<types.State>
   ): void {
-    console.log(
-      'SlurmManager.componentDidUpdate() ' +
-        'this.state.reloadQueue ' +
-        this.state.reloadQueue +
-        'this.state.jobsPending ' +
-        this.state.jobsPending
-    );
-    if (this.state.reloadQueue && this.state.jobsPending === 0) {
+    if (
+      this.state.reloadQueue &&
+      this.state.jobsPending === 0 &&
+      prevState.jobsPending === 0
+    ) {
       this.setState({ reloadQueue: false });
     }
   }
@@ -318,8 +318,21 @@ export default class SlurmManager extends React.Component<
               theme={getCurrentTheme()}
             />
           </Tab>
+          <Tab
+            className={'jp-SlurmWidget-JobNotifications'}
+            title={
+              <React.Fragment>
+                Job Notifications
+                <Badge className="ml-2" variant="info">
+                  {this.state.alerts.length}
+                </Badge>
+              </React.Fragment>
+            }
+            eventKey="jobHistory"
+          >
+            {alerts}
+          </Tab>
         </Tabs>
-        <div id="alertContainerTable">{alerts}</div>
       </div>
     );
   }

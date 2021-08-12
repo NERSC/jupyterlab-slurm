@@ -8,8 +8,6 @@ import { ICommandPalette, WidgetTracker } from '@jupyterlab/apputils';
 
 import { ILauncher } from '@jupyterlab/launcher';
 
-import { JSONExt } from '@lumino/coreutils';
-
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
@@ -53,19 +51,14 @@ const extension: JupyterFrontEndPlugin<void> = {
     console.log('JupyterFrontEndPlugin.activate()');
 
     // Declare a Slurm widget variable
-    let widget: SlurmWidget = null;
+    let widget: SlurmWidget;
 
     // Add an application command
     const commandID = 'slurm:open';
     const filebrowser = factory.defaultBrowser;
 
-    // Track and restore the widget state
-    const tracker = new WidgetTracker<SlurmWidget>({ namespace: 'slurm' });
-    restorer.restore(tracker, {
-      command: commandID,
-      args: () => JSONExt.emptyObject,
-      name: () => 'slurm'
-    });
+    console.log('After restore:');
+    console.log(widget);
 
     const parsedSettings: ISlurmUserSettings = {
       queueCols: [],
@@ -91,76 +84,81 @@ const extension: JupyterFrontEndPlugin<void> = {
 
       console.log('Loaded UserSettings: ' + parsedSettings);
     }
-    Promise.all([app.restored, settingRegistry.load(PLUGIN_ID)])
-      .then(([, settings]) => {
-        console.log(settings);
-        loadSetting(settings);
 
-        // add command, when there is no active widget show the open label
-        app.commands.addCommand(commandID, {
-          label: 'Slurm Queue Manager',
-          iconClass: SLURM_ICON_CLASS_LAUNCHER,
-          execute: () => {
-            if (widget === null) {
-              console.log(settingRegistry);
-              // Instantiate a new widget if one does not exist
-              widget = new SlurmWidget(filebrowser, parsedSettings);
-              widget.title.icon = SLURM_ICON_CLASS_TAB;
-            }
+    const settings = await settingRegistry.load(PLUGIN_ID);
+    console.log(settings);
+    loadSetting(settings);
 
-            if (!tracker.has(widget)) {
-              // Track the state of the widget for later restoration
-              tracker.add(widget);
-            }
+    // Track and restore the widget state
+    const tracker = new WidgetTracker<SlurmWidget>({ namespace: 'slurm' });
+    restorer.restore(tracker, {
+      command: commandID,
+      // args: () => JSONExt.emptyObject,
+      name: () => 'slurm'
+    });
 
-            if (!widget.isAttached) {
-              // Attach the widget to the main work area if it's not there
-              app.shell.add(widget);
-            }
-            widget.update();
-            // Activate the widget
-            app.shell.activateById(widget.id);
-          }
-        });
-
-        // Add the command to the palette.
-        palette.addItem({
-          command: commandID,
-          category: 'HPC Tools',
-          args: { isPalette: true }
-        });
-
-        // Add a launcher item if the launcher is available.
-        if (launcher) {
-          launcher.add({
-            command: commandID,
-            rank: 1,
-            category: 'HPC Tools'
-          });
+    // add command, when there is no active widget show the open label
+    app.commands.addCommand(commandID, {
+      label: 'Slurm Queue Manager',
+      iconClass: SLURM_ICON_CLASS_LAUNCHER,
+      execute: () => {
+        if (!widget) {
+          console.log(settingRegistry);
+          // Instantiate a new widget if one does not exist
+          widget = new SlurmWidget(filebrowser, parsedSettings);
+          widget.title.icon = SLURM_ICON_CLASS_TAB;
         }
 
-        requestAPI<any>('get_example')
-          .then(data => {
-            console.log('get_example', data);
-          })
-          .catch(reason => {
-            console.error(
-              `The jupyterlab_slurm server extension appears to have a problem starting.\n${reason}`
-            );
-          });
+        if (!tracker.has(widget)) {
+          // Track the state of the widget for later restoration
+          tracker.add(widget);
+          console.log('added widget to tracker');
+        }
 
-        requestAPI<any>('user')
-          .then(data => {
-            console.log('user', data['user']);
-          })
-          .catch(reason => {
-            console.error(
-              `The jupyterlab_slurm server extension appears to have trouble fetching user information.\n${reason}`
-            );
-          });
+        if (!widget.isAttached) {
+          // Attach the widget to the main work area if it's not there
+          app.shell.add(widget);
+        }
+        widget.update();
+        // Activate the widget
+        app.shell.activateById(widget.id);
+      }
+    });
+
+    // Add the command to the palette.
+    palette.addItem({
+      command: commandID,
+      category: 'HPC Tools',
+      args: { isPalette: true }
+    });
+
+    // Add a launcher item if the launcher is available.
+    if (launcher) {
+      launcher.add({
+        command: commandID,
+        rank: 1,
+        category: 'HPC Tools'
+      });
+    }
+
+    requestAPI<any>('get_example')
+      .then(data => {
+        console.log('get_example', data);
       })
       .catch(reason => {
-        console.error(reason);
+        console.error(
+          `The jupyterlab_slurm server extension appears to have a problem starting.\n${reason}`
+        );
+      });
+
+    requestAPI<any>('user')
+      .then(data => {
+        console.log('user', data['user']);
+      })
+      .catch(reason => {
+        console.error(
+          `The jupyterlab_slurm server extension appears to have trouble fetching user information.\n${reason}`
+        );
       });
   }
 };

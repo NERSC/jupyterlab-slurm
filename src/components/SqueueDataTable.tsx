@@ -1,13 +1,15 @@
-import React, { Component, ReactNode, useEffect } from 'react';
+import React, { Component, ReactNode } from 'react';
 import {
   Badge,
   Button,
+  ButtonGroup,
   ButtonToolbar,
   Col,
   Row,
   ToggleButton,
   InputGroup,
-  FormControl
+  FormControl,
+  Spinner
 } from 'react-bootstrap';
 import {
   BsArrowCounterclockwise,
@@ -88,7 +90,7 @@ export default class SqueueDataTable extends Component<
       clearSelected: false,
       columns: columns,
       displayColumns: columns.map(x => {
-        return { name: x, selector: x, sortable: true };
+        return { name: x, selector: x, sortable: true, maxWidth: '200px' };
       }),
       itemsPerPage: this.props.itemsPerPage, // make this prop dependent
       filterQuery: '',
@@ -115,8 +117,6 @@ export default class SqueueDataTable extends Component<
     selectedCount: number;
     selectedRows: Record<string, unknown>[];
   }): void {
-    console.log('onSelectedRows() : ', rowState);
-
     this.setState({
       selectedRows: rowState.selectedRows,
       clearSelected: false
@@ -148,7 +148,6 @@ export default class SqueueDataTable extends Component<
     }
 
     this.setState({ loading: true });
-    console.log('loading...');
 
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
@@ -181,12 +180,36 @@ export default class SqueueDataTable extends Component<
       a: Record<string, unknown>,
       b: Record<string, unknown>
     ): number {
+      // by default use the standard string comparison for field values
       let val_a = a[field];
       let val_b = b[field];
 
-      if (!isNaN(Number(a[field]))) {
+      // If the field value is a number, convert to number and use that for comparison
+      if (!isNaN(Number(a[field])) && !isNaN(Number(b[field]))) {
         val_a = Number(a[field]);
         val_b = Number(b[field]);
+      } else if (field === 'JOBID') {
+        // Requires a special sorting for job array strings where it can't be converted to a number
+        const jobIDSpecials = /[0-9][-_[\]]/g;
+        const parts_a = String(a[field])
+          .split(jobIDSpecials)
+          .map(x => Number(x));
+        const parts_b = String(b[field])
+          .split(jobIDSpecials)
+          .map(x => Number(x));
+        let tot_a = 0;
+        let tot_b = 0;
+        let i;
+
+        for (i = 0; i < parts_a.length; i++) {
+          tot_a += parts_a[i];
+        }
+        for (i = 0; i < parts_b.length; i++) {
+          tot_b += parts_b[i];
+        }
+
+        val_a = tot_a;
+        val_b = tot_b;
       }
 
       const greater = val_a > val_b;
@@ -224,7 +247,7 @@ export default class SqueueDataTable extends Component<
         return false;
       })
       .map((x: string[]) => {
-        const item: Record<string, unknown> = { id: Number(x[0]) };
+        const item: Record<string, unknown> = { id: x[0] };
         let i, col, colValue;
         for (i = 0, col = 0; col < this.state.columns.length; i++, col++) {
           colValue = this.state.columns[col];
@@ -233,7 +256,6 @@ export default class SqueueDataTable extends Component<
 
         return item;
       });
-
     this.setState({ displayRows: displayRows });
   }
 
@@ -242,7 +264,6 @@ export default class SqueueDataTable extends Component<
     const currentDT = new Date();
     const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
     if (delta >= this.state.reloadLimit) {
-      console.log('onReloadButtonClick() calling reload()');
       await this.getData();
     }
   }
@@ -254,31 +275,29 @@ export default class SqueueDataTable extends Component<
   }
 
   async componentWillMount(): Promise<void> {
-    console.log('componentWillMount()');
     await this.getData().then(async () => {
       await this.reload();
     });
   }
 
   async componentDidMount(): Promise<void> {
-    console.log(
-      'componentDidMount() this.props.reloadQueue ',
-      this.props.reloadQueue
-    );
-
-    // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
-    // we need to limit the frequency of squeue requests
-    if (this.props.reloadQueue) {
-      this.getData(this.state.reloadLimit);
-    }
-
+    // if (this.state.autoReload) {
+    //   useEffect(() => {
+    //     const interval = setInterval(async () => {
+    //       await this.getData(this.state.reloadRate);
+    //     }, this.state.reloadRate);
+    //     return () => clearInterval(interval);
+    //   }, []);
+    // }
     if (this.state.autoReload) {
-      useEffect(() => {
-        const interval = setInterval(async () => {
-          await this.getData(this.state.reloadRate);
-        }, this.state.reloadRate);
-        return () => clearInterval(interval);
-      }, []);
+      const reload = async () => {
+        this.setState({ loading: true });
+        await this.getData(this.state.reloadRate);
+        this.setState({ loading: false });
+
+        setTimeout(reload, this.state.reloadRate);
+      };
+      reload();
     }
   }
 
@@ -290,12 +309,21 @@ export default class SqueueDataTable extends Component<
     if (this.state.clearSelected) {
       this.setState({ clearSelected: false });
     }
+
+    // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
+    // we need to limit the frequency of squeue requests
+    if (this.props.reloadQueue) {
+      this.getData(this.state.reloadLimit);
+    }
+
+    // make sure a last attempt is made to reload when all job actions have completed
+    if (prevProps.reloadQueue && !this.props.reloadQueue) {
+      this.getData();
+    }
   }
 
-  handleFilter(filter: string): void {
-    console.log(filter);
+  async handleFilter(filter: string): Promise<void> {
     this.setState({ filterQuery: filter }, this.updateDisplayRows);
-    console.log(this.state.filterQuery);
   }
 
   render(): ReactNode {
@@ -310,28 +338,12 @@ export default class SqueueDataTable extends Component<
       displayedColumns: this.state.displayedColumns
     });
     */
+
     return (
       <>
-        <Row className={'justify-content-start jp-SlurmWidget-row'}>
+        <Row className={'mt-4 justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar>
-            <Col md>
-              <ToggleButton
-                type="checkbox"
-                className="jp-SlurmWidget-user-only-checkbox"
-                // to fix styling edit this
-                variant="outline-light"
-                onChange={this.toggleUserOnly.bind(this)}
-                checked={this.state.userOnly}
-                value="1"
-              >
-                Display my jobs only
-              </ToggleButton>
-            </Col>
-          </ButtonToolbar>
-        </Row>
-        <Row className={'justify-content-start jp-SlurmWidget-row'}>
-          <ButtonToolbar>
-            <Col md>
+            <ButtonGroup className={'ml-3 mr-2'}>
               <Button
                 className="jp-SlurmWidget-table-button"
                 variant="outline-secondary"
@@ -340,16 +352,14 @@ export default class SqueueDataTable extends Component<
                 <BsArrowRepeat />
                 Update Queue
               </Button>
-            </Col>
-            <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
                 disabled={this.state.selectedRows.length === 0}
-                variant={'outline-secondary'}
+                variant="outline-secondary"
                 onClick={this.clearSelectedRows.bind(this)}
               >
                 <BsArrowCounterclockwise />
-                Clear Selections
+                Clear Selected
                 {this.state.selectedRows.length > 0 && (
                   <Badge
                     variant="light"
@@ -360,8 +370,8 @@ export default class SqueueDataTable extends Component<
                   </Badge>
                 )}
               </Button>
-            </Col>
-            <Col md>
+            </ButtonGroup>
+            <ButtonGroup size="sm">
               <Button
                 className="jp-SlurmWidget-table-button"
                 disabled={this.state.selectedRows.length === 0}
@@ -382,8 +392,6 @@ export default class SqueueDataTable extends Component<
                   </Badge>
                 )}
               </Button>
-            </Col>
-            <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
                 disabled={this.state.selectedRows.length === 0}
@@ -404,8 +412,6 @@ export default class SqueueDataTable extends Component<
                   </Badge>
                 )}
               </Button>
-            </Col>
-            <Col md>
               <Button
                 className="jp-SlurmWidget-table-button"
                 disabled={this.state.selectedRows.length === 0}
@@ -426,20 +432,17 @@ export default class SqueueDataTable extends Component<
                   </Badge>
                 )}
               </Button>
-            </Col>
+            </ButtonGroup>
           </ButtonToolbar>
         </Row>
-        <Row
-          className={
-            'justify-content-start jp-SlurmWidget-row jp-SlurmWidget-table-filter-row'
-          }
-        >
+        <Row className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar>
             <Col lg>
               <InputGroup className="jp-SlurmWidget-table-filter-input-group">
                 <InputGroup.Prepend>
                   <InputGroup.Text className="jp-SlurmWidget-table-filter-label">
                     <BsFilter />
+                    Filter
                   </InputGroup.Text>
                 </InputGroup.Prepend>
                 <FormControl
@@ -451,11 +454,35 @@ export default class SqueueDataTable extends Component<
                 />
               </InputGroup>
             </Col>
+            <Col>
+              <ToggleButton
+                type="checkbox"
+                className="jp-SlurmWidget-user-only-checkbox"
+                variant="outline-light"
+                size="sm"
+                onChange={this.toggleUserOnly.bind(this)}
+                checked={this.state.userOnly}
+                value="1"
+              >
+                Display my jobs only
+              </ToggleButton>
+            </Col>
           </ButtonToolbar>
+          <Col>
+            Last updated: {this.state.lastSqueueFetch.toLocaleDateString()}{' '}
+            {this.state.lastSqueueFetch.toLocaleTimeString()}
+          </Col>
         </Row>
         {this.state.loading && (
           <Row className={'justify-content-center jp-SlurmWidget-row'}>
-            <p className={'jp-SlurmWidget-squeue-loading'}>Loading...</p>
+            <div
+              className={'justify-content-center jp-SlurmWidget-squeue-loading'}
+            >
+              <Spinner
+                animation="grow"
+                className={'jp-SlurmWidget-squeue-loader'}
+              />
+            </div>
           </Row>
         )}
         <Row
@@ -467,6 +494,7 @@ export default class SqueueDataTable extends Component<
             data={this.state.displayRows}
             columns={this.state.displayColumns}
             defaultSortField={this.props.availableColumns[0]}
+            defaultSortAsc={false}
             sortFunction={this.sortRows}
             striped
             highlightOnHover
@@ -475,9 +503,10 @@ export default class SqueueDataTable extends Component<
             clearSelectedRows={this.state.clearSelected}
             onSelectedRowsChange={this.onSelectedRows.bind(this)}
             noDataComponent={'No jobs currently queued.'}
-            paginationPerPage={this.props.itemsPerPage}
+            paginationPerPage={this.state.itemsPerPage}
             paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
             theme={this.props.theme}
+            noHeader={true}
             className={'jp-SlurmWidget-table'}
           />
         </Row>
