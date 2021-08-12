@@ -70,7 +70,7 @@ export default class JobSubmitForm extends React.Component<
    * and creates an array of <option> elements for each file.
    * If there are no files in the current directory, an empty entry is created.
    */
-    private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
+  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
     const fileListing = [];
     const iter = filebrowser.model.items();
     let i = iter.next();
@@ -121,7 +121,6 @@ export default class JobSubmitForm extends React.Component<
     }, 100);
   }
 
-
   /*
    * Switch between submitting a file and creating a script in a text box
    * */
@@ -170,7 +169,6 @@ export default class JobSubmitForm extends React.Component<
     const variant = 'success';
     this.props.addAlert('Job submitted', variant);
   }
-
 
   render(): React.ReactNode {
     const inputType = this.state.inputType;
