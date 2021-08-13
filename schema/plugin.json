@@ -1,0 +1,44 @@
+{
+  "title": "Slurm Queue Manager",
+  "description": "Slurm Queue Manager settings",
+  "properties": {
+    "userOnly": {
+      "type": "boolean",
+      "title": "My jobs only",
+      "description": "Show jobs only from this user",
+      "default": true
+    },
+    "autoReload": {
+      "type": "boolean",
+      "title": "Auto-refresh",
+      "description": "Automatically poll squeue periodically for updates",
+      "default": false
+    },
+    "autoReloadRate": {
+      "type": "number",
+      "title": "Auto-refresh rate",
+      "description": "Time to wait (in ms) in between auto refreshes of squeue",
+      "default": 60000
+    },
+    "queueCols": {
+      "type": "array",
+      "title": "squeue Column Header Labels",
+      "description":  "Column headers for the squeue table",
+      "default": ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"]
+    },
+    "itemsPerPage": {
+      "type": "number",
+      "title": "itemsPerPage",
+      "description": "Number of rows to display per page of squeue results",
+      "default": 10
+    },
+    "itemsPerPageOptions": {
+      "type": "array",
+      "title": "itemsPerPageOptions",
+      "description": "Selections for number of rows to display per page of squeue results",
+      "default": [10, 15, 20, 25, 30, 40, 50]
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}

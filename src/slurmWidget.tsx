@@ -1,29 +1,19 @@
 import React from 'react';
-
-import {
-  ReactWidget,
-} from '@jupyterlab/apputils';
-
-import {
-  PageConfig,
-} from '@jupyterlab/coreutils';
-
-import {
-  FileBrowser,
-} from '@jupyterlab/filebrowser';
-
-import {
-  UseSignal,
-} from '@jupyterlab/apputils';
-
-import {
-  Signal,
-} from '@lumino/signaling';
+import { ReactWidget, UseSignal } from '@jupyterlab/apputils';
+import { PageConfig } from '@jupyterlab/coreutils';
+import { FileBrowser } from '@jupyterlab/filebrowser';
+import { Signal } from '@lumino/signaling';
+import { uniqueId } from 'lodash';
 
 // Local
-import { makeRequest } from './utils';
+import { requestAPI } from './handler';
+import { ISlurmUserSettings } from './types';
 import SlurmManager from './components/SlurmManager';
-import { uniqueId } from 'lodash';
+
+type UserData = {
+  user: string;
+  exception: string;
+};
 
 export default class SlurmWidget extends ReactWidget {
   /**
@@ -34,6 +24,8 @@ export default class SlurmWidget extends ReactWidget {
    * JupyterLab's default file browser
    */
   private filebrowser: FileBrowser;
+
+  private _settings: ISlurmUserSettings;
   /**
    * The system username, retrieved from the server
    */
@@ -43,13 +35,14 @@ export default class SlurmWidget extends ReactWidget {
    */
   private userChanged = new Signal<this, string>(this);
 
-  constructor(filebrowser: FileBrowser) {
+  constructor(filebrowser: FileBrowser, settings: ISlurmUserSettings) {
     super();
     this.id = uniqueId('slurm-');
     this.addClass('jp-SlurmWidget');
     this.title.label = 'Slurm Queue Manager';
     this.title.closable = true;
     this.filebrowser = filebrowser;
+    this._settings = settings;
     this.serverRoot = PageConfig.getOption('serverRoot');
   }
 
@@ -62,39 +55,37 @@ export default class SlurmWidget extends ReactWidget {
     this.userChanged.emit(user);
   }
 
-  private async fetchUser() {
-    const user = await makeRequest({
-      route: 'user',
-      method: 'GET',
-      afterResponse: async (response) => {
-        if (response.status !== 200) {
-          throw Error(response.statusText);
-        }
-        else {
-          return response.text();
-        }
-      }
-    });
-    this.user = user;
+  private async fetchUser(): Promise<UserData> {
+    try {
+      requestAPI<any>('user')
+        .then(data => {
+          return { user: data.user };
+        })
+        .catch(reason => {
+          console.error('fetchUser error', reason);
+          throw Error(reason);
+        });
+    } catch (e) {
+      console.error(e);
+      const err = e.message;
+      return { user: '', exception: err };
+    }
   }
 
-  onAfterAttach() {
+  onAfterAttach(): void {
     this.fetchUser();
   }
-  
-  render() {
+
+  render(): any {
     return (
-      <UseSignal
-        signal={this.userChanged}
-        initialSender={this}
-        initialArgs={''}
-      >
-        {(_, user) => (
+      <UseSignal signal={this.userChanged}>
+        {(_: any, user: string) => (
           <SlurmManager
-            serverRoot={this.serverRoot}
             filebrowser={this.filebrowser}
-            user={user}>
-          </SlurmManager>
+            settings={this._settings}
+            serverRoot={this.serverRoot}
+            user={user}
+          />
         )}
       </UseSignal>
     );

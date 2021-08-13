@@ -1,0 +1,114 @@
+.jp-SlurmWidget {
+  /* make sure text looks Jupytery */
+  font-size: var(--jp-ui-font-size2);
+  font-family: var(--jp-ui-font-family);
+  overflow-y: auto;
+}
+
+.jp-SlurmWidget-main {
+  position: relative;
+  width: 100%;
+}
+
+.jp-SlurmWidget-row {
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0.5em;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+.jp-SlurmWidget-table-row {
+  /* fixed height for the table scroll */
+  height: 50vh;
+}
+
+.jp-SlurmWidget-table {
+  display: flex;
+  overflow: auto !important;
+  overflow-y: scroll !important;
+  max-height: 50vh;
+}
+
+/* Force the table elements to inherit the jupyter font size */
+.rdt_TableHeader,
+.jp-SlurmWidget-table .rdt_Table,
+.jp-SlurmWidget-table .rdt_TableHead,
+.jp-SlurmWidget-table .rdt_TableHeadRow,
+.jp-SlurmWidget-table .rdt_TableCol,
+.jp-SlurmWidget-table .rdt_TableBody,
+.jp-SlurmWidget-table .rdt_TableRow,
+.jp-SlurmWidget-table .rdt_TableCell,
+.rdt_Pagination {
+  font-size: inherit !important;
+  font-family: inherit !important;
+}
+
+.jp-SlurmWidget-NerscLaunchIcon {
+  background-image: url("nersc_icon.png");
+}
+
+.jp-SlurmWidget-NerscTabIcon {
+  background-image: url("nersc_icon_small.png");
+}
+
+.jp-SlurmWidget-table-button-badge {
+  margin-left: 5px;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.jp-SlurmWidget-table-button-toolbar {
+  width: 100%;
+}
+
+.jp-SlurmWidget-table-button {
+  min-width: 10rem;
+  font-family: inherit;
+}
+
+label .btn .jp-SlurmWidget-user-only-checkbox {
+  min-width: 12rem;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/*
+.jp-SlurmWidget-table-filter-row {
+  position: relative;
+  top: 2em;
+  z-index: 5000;*/   /* this is to keep the content in front of the table margin at the top */
+/*}*/
+
+.jp-SlurmWidget-table-filter-label {
+  color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.jp-SlurmWidget-table-filter-input {
+  border-color: var(--secondary);
+}
+
+.jp-SlurmWidget-squeue-loader {
+  color: #DF772E;
+}
+
+.jp-SlurmWidget-squeue-loading {
+  position: absolute;
+  top: 40vh;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 1;
+  /*background-color: var(--jp-border-color0);*/
+}
+
+.jp-SlurmWidget-JobNotifications {
+  overflow: auto;
+}
+
+.jp-SlurmWidget-user-only-checkbox input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+textarea.form-control {
+  max-height: 55vh;
+}
