@@ -36,8 +36,8 @@ def _load_jupyter_server_extension(server_app):
     web_app.settings.update(slurm_commands.get_paths())
 
     temporary_directory = web_app.settings['temporary_directory'] if 'temporary_directory' in web_app.settings else None
-    server_app.log.addHandler(logging.FileHandler('/tmp/jupyter_debug'))
-    server_app.log.setLevel(logging.DEBUG)
+    #server_app.log.addHandler(logging.FileHandler('/tmp/jupyter_debug'))
+    #server_app.log.setLevel(logging.DEBUG)
 
     # add get_example url
     setup_handlers(
