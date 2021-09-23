@@ -1,6 +1,6 @@
 .jp-SlurmWidget {
   /* make sure text looks Jupytery */
-  font-size: var(--jp-ui-font-size2);
+  font-size: var(--jp-ui-font-size1);
   font-family: var(--jp-ui-font-family);
   overflow-y: auto;
 }
@@ -8,6 +8,8 @@
 .jp-SlurmWidget-main {
   position: relative;
   width: 100%;
+  color: var(--jp-ui-font-color1);
+  background-color: var(--jp-layout-color0);
 }
 
 .jp-SlurmWidget-row {
@@ -61,12 +63,17 @@
   width: 100%;
 }
 
-.jp-SlurmWidget-table-button {
+.jp-SlurmWidget-table-button.btn {
   min-width: 10rem;
   font-family: inherit;
+  color: var(--jp-ui-font-color1);
 }
 
-label .btn .jp-SlurmWidget-user-only-checkbox {
+.jp-SlurmWidget-table-button.btn.disabled, .jp-SlurmWidget-table-button.btn:disabled {
+  color: var(--jp-ui-font-color2);
+}
+
+label.btn.jp-SlurmWidget-user-only-checkbox {
   min-width: 12rem;
   font-family: inherit;
   font-size: inherit;
@@ -79,15 +86,6 @@ label .btn .jp-SlurmWidget-user-only-checkbox {
   z-index: 5000;*/   /* this is to keep the content in front of the table margin at the top */
 /*}*/
 
-.jp-SlurmWidget-table-filter-label {
-  color: var(--secondary);
-  border-color: var(--secondary);
-}
-
-.jp-SlurmWidget-table-filter-input {
-  border-color: var(--secondary);
-}
-
 .jp-SlurmWidget-squeue-loader {
   color: #DF772E;
 }
@@ -98,7 +96,6 @@ label .btn .jp-SlurmWidget-user-only-checkbox {
   left: 50%;
   transform: translate(-50%, 0);
   z-index: 1;
-  /*background-color: var(--jp-border-color0);*/
 }
 
 .jp-SlurmWidget-JobNotifications {
@@ -111,4 +108,62 @@ label .btn .jp-SlurmWidget-user-only-checkbox {
 
 textarea.form-control {
   max-height: 55vh;
+}
+
+.nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--light);
+  background-color: var(--jp-layout-color2);
+}
+
+/* Dark Mode specific styling */
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-main a.nav-item {
+  color: var(--jp-ui-font-color2);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-main .accordion .card {
+  color: var(--jp-ui-font-color1);
+  background-color: var(--jp-layout-color1);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-main a.nav-item.active {
+  color: var(--jp-ui-font-color1);
+  background-color: var(--jp-layout-color2);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-table-filter-label.input-group-text {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--secondary);
+  background-color: var(--jp-layout-color1);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-main .form-control, .jp-SlurmWidget-main .form-control::placeholder {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--jp-input-border-color);
+  background-color: var(--jp-input-background);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-table-filter-input.form-control, .jp-SlurmWidget-table-filter-input.form-control:focus {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--secondary);
+  background-color: var(--jp-layout-color3);
+}
+
+[data-jp-theme-light="false"] .jp-SlurmWidget-main .form-control:focus, label.btn.jp-SlurmWidget-user-only-checkbox:not(.disabled), label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled) {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--jp-input-active-border-color);
+  background-color: var(--jp-input-active-background);
+}
+
+[data-jp-theme-light="false"] label.btn.jp-SlurmWidget-user-only-checkbox {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--jp-input-border-color);
+  background-color: var(--jp-input-background);
+}
+
+[data-jp-theme-light="false"] label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(.disabled).active, label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(.disabled):active {
+  color: var(--jp-ui-font-color1);
+  border-color: var(--jp-input-active-border-color);
+  background-color: var(--jp-input-active-background);
 }

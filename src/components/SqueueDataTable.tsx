@@ -343,7 +343,7 @@ export default class SqueueDataTable extends Component<
       <>
         <Row className={'mt-4 justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar>
-            <ButtonGroup className={'ml-3 mr-2'}>
+            <ButtonGroup size="sm" className={'ml-3 mr-2'}>
               <Button
                 className="jp-SlurmWidget-table-button"
                 variant="outline-secondary"
@@ -438,7 +438,10 @@ export default class SqueueDataTable extends Component<
         <Row className={'justify-content-start jp-SlurmWidget-row'}>
           <ButtonToolbar>
             <Col lg>
-              <InputGroup className="jp-SlurmWidget-table-filter-input-group">
+              <InputGroup
+                size="sm"
+                className="jp-SlurmWidget-table-filter-input-group"
+              >
                 <InputGroup.Prepend>
                   <InputGroup.Text className="jp-SlurmWidget-table-filter-label">
                     <BsFilter />
