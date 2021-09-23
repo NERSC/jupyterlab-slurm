@@ -18,7 +18,6 @@ namespace types {
     submitJob: (input: string, inputType: string) => void;
     addAlert: (message: string, variant: string) => void;
     disabled?: boolean;
-    theme: string;
     active: boolean;
   };
 

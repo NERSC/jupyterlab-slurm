@@ -36,7 +36,6 @@ namespace types {
     reloadQueue: boolean;
     autoReload: boolean;
     reloadRate: number;
-    theme: string;
     processJobAction: (
       action: JobAction,
       rows: Record<string, unknown>[]
@@ -58,6 +57,8 @@ namespace types {
     reloadLimit: number;
     userOnly: boolean;
     loading: boolean;
+    theme: string;
+    observer: MutationObserver;
   };
 }
 
@@ -83,6 +84,20 @@ export default class SqueueDataTable extends Component<
       ? props.defaultColumns
       : props.availableColumns;
 
+    const body = document.getElementsByTagName('body')[0];
+    const observer = new MutationObserver(mutationRecords => {
+      if (mutationRecords[0].oldValue === 'true') {
+        this.setState({ theme: 'dark' });
+      } else {
+        this.setState({ theme: 'light' });
+      }
+    });
+    observer.observe(body, {
+      attributes: true,
+      attributeFilter: ['data-jp-theme-light'],
+      attributeOldValue: true
+    });
+
     this.state = {
       rows: [],
       displayRows: [],
@@ -99,7 +114,9 @@ export default class SqueueDataTable extends Component<
       reloadRate: reloadRate,
       reloadLimit: 5000,
       userOnly: props.userOnly,
-      loading: false
+      loading: false,
+      theme: 'default',
+      observer: observer
     };
   }
 
@@ -274,13 +291,11 @@ export default class SqueueDataTable extends Component<
     });
   }
 
-  async componentWillMount(): Promise<void> {
+  async componentDidMount(): Promise<void> {
     await this.getData().then(async () => {
       await this.reload();
     });
-  }
 
-  async componentDidMount(): Promise<void> {
     // if (this.state.autoReload) {
     //   useEffect(() => {
     //     const interval = setInterval(async () => {
@@ -320,6 +335,10 @@ export default class SqueueDataTable extends Component<
     if (prevProps.reloadQueue && !this.props.reloadQueue) {
       this.getData();
     }
+  }
+
+  componentWillUnmount(): void {
+    this.state.observer.disconnect();
   }
 
   async handleFilter(filter: string): Promise<void> {
@@ -508,7 +527,7 @@ export default class SqueueDataTable extends Component<
             noDataComponent={'No jobs currently queued.'}
             paginationPerPage={this.state.itemsPerPage}
             paginationRowsPerPageOptions={this.props.itemsPerPageOptions}
-            theme={this.props.theme}
+            theme={this.state.theme}
             noHeader={true}
             className={'jp-SlurmWidget-table'}
           />
