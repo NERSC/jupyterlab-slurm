@@ -38,27 +38,6 @@ namespace types {
   };
 }
 
-function getCurrentTheme() {
-  const root = document.getElementsByTagName('body')[0];
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-  if (root.hasAttribute('data-jp-theme-light')) {
-    const light = root.getAttribute('data-jp-theme-light');
-
-    if (light === 'true') {
-      return 'default';
-    } else {
-      return 'dark';
-    }
-  } else {
-    if (mediaQuery.matches === true) {
-      return 'dark';
-    } else {
-      return 'default';
-    }
-  }
-}
-
 export default class SlurmManager extends React.Component<
   types.Props,
   types.State
@@ -306,7 +285,6 @@ export default class SlurmManager extends React.Component<
               autoReload={this.state.autoReload}
               itemsPerPage={this.props.settings.itemsPerPage}
               itemsPerPageOptions={this.props.settings.itemsPerPageOptions}
-              theme={getCurrentTheme()}
             />
           </Tab>
           <Tab title="Submit Jobs" eventKey="jobSubmit">
@@ -315,7 +293,6 @@ export default class SlurmManager extends React.Component<
               submitJob={this.submitJob.bind(this)}
               disabled={this.state.jobSubmitDisabled}
               addAlert={this.addAlert}
-              theme={getCurrentTheme()}
               active={this.state.activeTab === 'jobSubmit'}
             />
           </Tab>
