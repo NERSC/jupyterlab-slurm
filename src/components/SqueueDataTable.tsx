@@ -89,7 +89,7 @@ export default class SqueueDataTable extends Component<
       if (mutationRecords[0].oldValue === 'true') {
         this.setState({ theme: 'dark' });
       } else {
-        this.setState({ theme: 'light' });
+        this.setState({ theme: 'default' });
       }
     });
     observer.observe(body, {
