@@ -519,7 +519,7 @@ class SqueueHandler(SlurmCommandHandler):
 
 def setup_handlers(web_app, temporary_directory=None, log=None):
     if log:
-        log.info(web_app.settings)
+        log.debug(web_app.settings)
 
     host_pattern = ".*$"
 
