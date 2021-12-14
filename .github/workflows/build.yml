@@ -53,7 +53,7 @@ jobs:
         python -m pip install .
         RED=`tput -T xterm setaf 1`
         GREEN=`tput -T xterm setaf 2`
-        SERVER_EXT=`jupyter server extensionlist 2>&1`
+        SERVER_EXT=`jupyter serverextension list 2>&1`
         LAB_EXT=`jupyter labextension list 2>&1`
         echo -n "server extension install "
         grep -e "jupyterlab_slurm.*OK" <<< $SERVER_EXT && echo "${GREEN}PASS" || echo "${RED}FAIL"
