@@ -14,7 +14,7 @@ module.exports = {
     // project: 'tsconfig.json',
     sourceType: 'module'
   },
-  plugins: ['react', '@typescript-eslint', '@emotion'],
+  plugins: ['react', '@typescript-eslint'],
   rules: {
     '@typescript-eslint/naming-convention': [
       'error',
