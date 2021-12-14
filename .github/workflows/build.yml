@@ -53,8 +53,12 @@ jobs:
         python -m pip install .
         RED=`tput -T xterm setaf 1`
         GREEN=`tput -T xterm setaf 2`
-        echo -n "server extension install "; jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK" && \
-          echo "${GREEN}PASS" || echo "${RED}FAIL"
-        echo -n "lab extension install "; jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*enabled.*OK" && \
-          echo "${GREEN}PASS" || echo "${RED}FAIL"
+        SERVER_EXT=`jupyter server extensionlist 2>&1`
+        LAB_EXT=`jupyter labextension list 2>&1`
+        echo -n "server extension install "
+        grep -e "jupyterlab_slurm.*OK" <<< $SERVER_EXT && echo "${GREEN}PASS" || echo "${RED}FAIL"
+        echo "$SERVER_EXT"
+        echo -n "lab extension install "
+        grep -e "jupyterlab-slurm.*enabled.*OK" <<< $LAB_EXT && echo "${GREEN}PASS" || echo "${RED}FAIL"
+        echo "$LAB_EXT"
         python -m jupyterlab.browser_check
