@@ -51,8 +51,8 @@ jobs:
         jlpm
         jlpm run eslint:check
         python -m pip install .
-        RED=`tput setaf 1`
-        GREEN=`tput setaf 2`
+        RED=`tput -T xterm setaf 1`
+        GREEN=`tput -T xterm setaf 2`
         jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK" && echo "${GREEN}PASS" || echo "${RED}FAIL"
         jupyterlab-slurm % jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*enabled.*OK" && echo "${GREEN}PASS" || echo "${RED}FAIL"
         python -m jupyterlab.browser_check
