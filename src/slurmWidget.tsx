@@ -12,7 +12,7 @@ import SlurmManager from './components/SlurmManager';
 
 type UserData = {
   user: string;
-  exception: string;
+  exception?: string;
 };
 
 export default class SlurmWidget extends ReactWidget {
@@ -43,6 +43,7 @@ export default class SlurmWidget extends ReactWidget {
     this.title.closable = true;
     this.filebrowser = filebrowser;
     this._settings = settings;
+    this._user = '';
     this.serverRoot = PageConfig.getOption('serverRoot');
   }
 
@@ -56,20 +57,14 @@ export default class SlurmWidget extends ReactWidget {
   }
 
   private async fetchUser(): Promise<UserData> {
-    try {
-      requestAPI<any>('user')
-        .then(data => {
-          return { user: data.user };
-        })
-        .catch(reason => {
-          console.error('fetchUser error', reason);
-          throw Error(reason);
-        });
-    } catch (e) {
-      console.error(e);
-      const err = e.message;
-      return { user: '', exception: err };
-    }
+    return requestAPI<any>('user')
+      .then(data => {
+        return { user: data.user };
+      })
+      .catch(reason => {
+        console.error('fetchUser error', reason);
+        return { user: '', exception: reason }
+      });
   }
 
   onAfterAttach(): void {
@@ -79,12 +74,12 @@ export default class SlurmWidget extends ReactWidget {
   render(): any {
     return (
       <UseSignal signal={this.userChanged}>
-        {(_: any, user: string) => (
+        {(sender?: any, args?: string | undefined) => (
           <SlurmManager
             filebrowser={this.filebrowser}
             settings={this._settings}
             serverRoot={this.serverRoot}
-            user={user}
+            user={this.user}
           />
         )}
       </UseSignal>

@@ -19,11 +19,13 @@ import {
   BsFilter,
   BsTrashFill
 } from 'react-icons/bs';
-import DataTable, { IDataTableColumn } from 'react-data-table-component';
+import DataTable, { Selector, TableColumn as IDataTableColumn } from 'react-data-table-component';
 
 // Local
 import { requestAPI } from '../handler';
 import { JobAction } from '../types';
+
+type Primitive = string | number | boolean;
 
 namespace types {
   export type Props = {
@@ -105,7 +107,12 @@ export default class SqueueDataTable extends Component<
       clearSelected: false,
       columns: columns,
       displayColumns: columns.map(x => {
-        return { name: x, selector: x, sortable: true, maxWidth: '200px' };
+        return {
+          name: x,
+          selector: (record): Primitive => { return (record[x] as Primitive) },
+          sortable: true,
+          maxWidth: '200px'
+	};
       }),
       itemsPerPage: this.props.itemsPerPage, // make this prop dependent
       filterQuery: '',
@@ -156,12 +163,12 @@ export default class SqueueDataTable extends Component<
       const currentDT = new Date();
       const delta = Number(currentDT) - Number(this.state.lastSqueueFetch);
       if (delta < rateLimit) {
-        return;
+        return Promise.resolve([]);
       }
     }
 
     if (this.state.loading) {
-      return;
+      return Promise.resolve([]);
     }
 
     this.setState({ loading: true });
@@ -181,16 +188,17 @@ export default class SqueueDataTable extends Component<
             console.log('loading finished');
           }
         );
+	return data.data
       })
       .catch(error => {
         console.error('SqueueDataTable getData() error', error);
-        return null;
+        return [];
       });
   }
 
   private sortRows(
     rows: Record<string, unknown>[],
-    field: string,
+    selector: Selector<Record<string, unknown>>,
     direction: string
   ): Record<string, unknown>[] {
     function getSortValue(
@@ -198,20 +206,21 @@ export default class SqueueDataTable extends Component<
       b: Record<string, unknown>
     ): number {
       // by default use the standard string comparison for field values
-      let val_a = a[field];
-      let val_b = b[field];
+      
+      let val_a = selector(a);
+      let val_b = selector(b);
 
       // If the field value is a number, convert to number and use that for comparison
-      if (!isNaN(Number(a[field])) && !isNaN(Number(b[field]))) {
-        val_a = Number(a[field]);
-        val_b = Number(b[field]);
-      } else if (field === 'JOBID') {
+      if (!isNaN(Number(val_a)) && !isNaN(Number(val_b))) {
+        val_a = Number(val_a);
+        val_b = Number(val_b);
+      } else if (false) { // TODO: Fix sorting of JOBID (field === 'JOBID') {
         // Requires a special sorting for job array strings where it can't be converted to a number
         const jobIDSpecials = /[0-9][-_[\]]/g;
-        const parts_a = String(a[field])
+        const parts_a = String(val_a)
           .split(jobIDSpecials)
           .map(x => Number(x));
-        const parts_b = String(b[field])
+        const parts_b = String(val_b)
           .split(jobIDSpecials)
           .map(x => Number(x));
         let tot_a = 0;
@@ -381,7 +390,7 @@ export default class SqueueDataTable extends Component<
                 Clear Selected
                 {this.state.selectedRows.length > 0 && (
                   <Badge
-                    variant="light"
+                    bg="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
@@ -403,7 +412,7 @@ export default class SqueueDataTable extends Component<
                 Kill Job(s)
                 {this.state.selectedRows.length > 0 && (
                   <Badge
-                    variant="light"
+                    bg="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
@@ -423,7 +432,7 @@ export default class SqueueDataTable extends Component<
                 Hold Job(s)
                 {this.state.selectedRows.length > 0 && (
                   <Badge
-                    variant="light"
+                    bg="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
@@ -443,7 +452,7 @@ export default class SqueueDataTable extends Component<
                 Release Job(s)
                 {this.state.selectedRows.length > 0 && (
                   <Badge
-                    variant="light"
+                    bg="light"
                     pill={true}
                     className={'jp-SlurmWidget-table-button-badge'}
                   >
@@ -461,12 +470,10 @@ export default class SqueueDataTable extends Component<
                 size="sm"
                 className="jp-SlurmWidget-table-filter-input-group"
               >
-                <InputGroup.Prepend>
-                  <InputGroup.Text className="jp-SlurmWidget-table-filter-label">
-                    <BsFilter />
-                    Filter
-                  </InputGroup.Text>
-                </InputGroup.Prepend>
+                <InputGroup.Text className="jp-SlurmWidget-table-filter-label">
+                  <BsFilter />
+                  Filter
+                </InputGroup.Text>
                 <FormControl
                   className="jp-SlurmWidget-table-filter-input"
                   value={this.state.filterQuery}
@@ -478,6 +485,7 @@ export default class SqueueDataTable extends Component<
             </Col>
             <Col>
               <ToggleButton
+                id="user-only-checkbox"
                 type="checkbox"
                 className="jp-SlurmWidget-user-only-checkbox"
                 variant="outline-light"
@@ -515,7 +523,7 @@ export default class SqueueDataTable extends Component<
           <DataTable
             data={this.state.displayRows}
             columns={this.state.displayColumns}
-            defaultSortField={this.props.availableColumns[0]}
+            defaultSortFieldId={1}
             defaultSortAsc={false}
             sortFunction={this.sortRows}
             striped

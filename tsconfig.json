@@ -6,12 +6,6 @@
     "esModuleInterop": true,
     "incremental": true,
     "jsx": "react",
-    "lib": [
-      "ES6",
-      "ES2016",
-      "ES2017",
-      "DOM"
-    ],
     "module": "esnext",
     "moduleResolution": "node",
     "noEmitOnError": true,
@@ -22,15 +16,9 @@
     "outDir": "lib",
     "rootDir": "src",
     "strict": true,
-    "strictNullChecks": false,
-    "target": "es2017",
-    "types": [
-      "jest"
-    ]
+    "strictNullChecks": true,
+    "target": "ES2018"
   },
-  "files": [
-    "src/slurm-config/config.json"
-  ],
   "include": [
     "src/*.ts",
     "src/*.tsx",
