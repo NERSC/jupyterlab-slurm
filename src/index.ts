@@ -17,8 +17,6 @@ import { requestAPI } from './handler';
 import SlurmWidget from './slurmWidget';
 import { ISlurmUserSettings } from './types';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-
 /**
  * The class names for the Slurm extension icon, for launcher and
  * tab, respectively
@@ -48,7 +46,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     settingRegistry: ISettingRegistry,
     launcher: ILauncher | null
   ) => {
-    console.log('JupyterFrontEndPlugin.activate()');
+    console.debug('Slurm Extension is activated.');
 
     // Declare a Slurm widget variable
     let widget: SlurmWidget;
@@ -57,8 +55,8 @@ const extension: JupyterFrontEndPlugin<void> = {
     const commandID = 'slurm:open';
     const filebrowser = factory.defaultBrowser;
 
-    console.log('After restore:');
-    console.log(widget);
+    //console.debug('After restore:');
+    //console.debug(widget);
 
     const parsedSettings: ISlurmUserSettings = {
       queueCols: [],
@@ -82,11 +80,11 @@ const extension: JupyterFrontEndPlugin<void> = {
       parsedSettings.autoReloadRate = setting.get('autoReloadRate')
         .composite as number;
 
-      console.log('Loaded UserSettings: ' + parsedSettings);
+      //console.debug('Loaded UserSettings: ' + parsedSettings);
     }
 
     const settings = await settingRegistry.load(PLUGIN_ID);
-    console.log(settings);
+    //console.debug(settings);
     loadSetting(settings);
 
     // Track and restore the widget state
@@ -103,7 +101,7 @@ const extension: JupyterFrontEndPlugin<void> = {
       iconClass: SLURM_ICON_CLASS_LAUNCHER,
       execute: () => {
         if (!widget) {
-          console.log(settingRegistry);
+          //console.debug(settingRegistry);
           // Instantiate a new widget if one does not exist
           widget = new SlurmWidget(filebrowser, parsedSettings);
           widget.title.icon = SLURM_ICON_CLASS_TAB;
@@ -112,7 +110,7 @@ const extension: JupyterFrontEndPlugin<void> = {
         if (!tracker.has(widget)) {
           // Track the state of the widget for later restoration
           tracker.add(widget);
-          console.log('added widget to tracker');
+          //console.debug('added widget to tracker');
         }
 
         if (!widget.isAttached) {
@@ -143,7 +141,7 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     requestAPI<any>('get_example')
       .then(data => {
-        console.log('get_example', data);
+        console.debug('get_example', data);
       })
       .catch(reason => {
         console.error(
@@ -153,7 +151,7 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     requestAPI<any>('user')
       .then(data => {
-        console.log('user', data['user']);
+        console.debug('user', data['user']);
       })
       .catch(reason => {
         console.error(

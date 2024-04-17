@@ -1,6 +1,6 @@
 {
   "name": "jupyterlab-slurm",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "A JupyterLab extension to interface with the Slurm workload manager.",
   "keywords": [
     "jupyter",
@@ -56,34 +56,28 @@
     "watch:src": "tsc -w"
   },
   "dependencies": {
-    "@jupyterlab/application": "^3.0.10",
-    "@jupyterlab/apputils": "^3.0.6",
-    "@jupyterlab/coreutils": "^5.0.4",
-    "@jupyterlab/filebrowser": "^3.0.8",
-    "@jupyterlab/launcher": "^3.0.6",
-    "@jupyterlab/services": "^6.0.6",
-    "@jupyterlab/testutils": "^2.1.2",
-    "@lumino/widgets": "1.19.0",
-    "@types/bootstrap": "^4.3.0",
-    "@types/lodash": "^4.14.138",
-    "@types/node": "^11.13.7",
-    "@types/react": "^17.0.4",
-    "@types/styled-components": "^5.1.10",
-    "bootstrap": "^4.2.1",
+    "@jupyterlab/application": "^3.0.0",
+    "@jupyterlab/launcher": "^3.0.0",
+    "@jupyterlab/filebrowser": "^3.0.0",
+    "@jupyterlab/ui-components": "^3.0.0",
+    "@jupyterlab/coreutils": "^5.0.0",
+    "@jupyterlab/services": "^6.0.0",
     "lodash": "^4.17.15",
-    "popper.js": "^1.15.0",
-    "react": "^17.0.1",
-    "react-bootstrap": "^1.0.1",
+    "react-popper": "^1.3.11",
     "react-data-table-component": "^6.11.7",
-    "react-dom": "^17.0.1",
     "react-icons": "^4.2.0",
     "react-spinners": "^0.11.0",
     "styled-components": "^5.3.0",
-    "uuid": "^8.1.0"
+    "uuid": "^8.1.0",
+    "bootstrap": "^4.6.2",
+    "react-bootstrap": "^1.0.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
     "@jupyterlab/builder": "^3.0.0",
-    "@types/jest": "^26.0.3",
+    "@types/lodash": "^4.14.138",
+    "@types/styled-components": "^5.1.10",
     "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^4.28.1",
     "@typescript-eslint/parser": "^4.28.1",
@@ -94,12 +88,10 @@
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.24.0",
     "eslint-plugin-react-hooks": "^4.2.0",
-    "jest": "^26.1.0",
     "mkdirp": "^1.0.3",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.1.1",
     "rimraf": "^3.0.2",
-    "ts-jest": "^26.1.1",
     "typescript": "~4.1.3",
     "yarn-deduplicate": "^1.1.1"
   },
@@ -119,6 +111,7 @@
     "outputDir": "jupyterlab_slurm/labextension"
   },
   "resolutions": {
-    "@lumino/widgets": "~1.19.0"
+    "@jupyterlab/rendermime-interfaces": "^3.0.0 <= 3.6.3",
+    "@types/react": "^17.0.4"
   }
 }

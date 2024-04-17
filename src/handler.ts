@@ -31,7 +31,7 @@ export async function requestAPI<T>(
 
   let response: Response;
   try {
-    //console.log('requestAPI new request', requestUrl, init, settings);
+    //console.debug('requestAPI new request', requestUrl, init, settings);
     response = await ServerConnection.makeRequest(requestUrl, init, settings);
   } catch (error) {
     console.error(
@@ -54,7 +54,7 @@ export async function requestAPI<T>(
 
   if (data.length > 0) {
     try {
-      console.log('response data', requestUrl, urlParams, init, data);
+      console.debug('response data', requestUrl, urlParams, init, data);
       data = JSON.parse(data);
     } catch (error) {
       console.error(

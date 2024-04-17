@@ -23,7 +23,7 @@ namespace types {
 
   export type State = {
     filebrowser: FileBrowser;
-    fileitems: JSX.Element[];
+    fileitems: React.JSX.Element[];
     inputType: string;
     inputPathSelectType: string;
     filepath: string;
@@ -56,7 +56,7 @@ export default class JobSubmitForm extends React.Component<
    * component was clicked on and is now visible). If changed
    * to true, it calls the updateFileitems() function
    */
-  componentDidUpdate(prevProps: types.Props, prevState: types.State): void {
+  componentDidUpdate(prevProps: types.Props): void {
     if (prevProps.active !== this.props.active) {
       if (this.props.active) {
         this.updateFileitems();
@@ -69,7 +69,7 @@ export default class JobSubmitForm extends React.Component<
    * and creates an array of <option> elements for each file.
    * If there are no files in the current directory, an empty entry is created.
    */
-  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
+  private getFileItems(filebrowser: FileBrowser): React.JSX.Element[] {
     const fileListing = [];
     const iter = filebrowser.model.items();
     let i = iter.next();

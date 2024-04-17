@@ -168,7 +168,7 @@ export default class SqueueDataTable extends Component<
 
     return await requestAPI<any>('squeue', squeueParams)
       .then(data => {
-        console.log('SqueueDataTable getData() squeue', squeueParams, data);
+        console.debug('SqueueDataTable getData() squeue', squeueParams, data);
 
         this.setState(
           {
@@ -178,7 +178,7 @@ export default class SqueueDataTable extends Component<
           },
           () => {
             this.updateDisplayRows();
-            console.log('loading finished');
+            console.debug('loading finished');
           }
         );
       })
@@ -347,7 +347,7 @@ export default class SqueueDataTable extends Component<
 
   render(): ReactNode {
     /*
-    console.log({
+    console.debug({
       rows: this.state.rows,
       columns: columns,
       data: data,

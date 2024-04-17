@@ -66,9 +66,14 @@ export default class SlurmWidget extends ReactWidget {
           throw Error(reason);
         });
     } catch (e) {
-      console.error(e);
-      const err = e.message;
-      return { user: '', exception: err };
+      console.exception(e);
+      try {
+        const err = e.message;
+        return { user: '', exception: err };
+      } catch (em) {
+        console.exception(em);
+        return { user: '', exception: 'No error message found!' };
+      }
     }
   }
 
