@@ -8,7 +8,7 @@ import { ICommandPalette, WidgetTracker } from '@jupyterlab/apputils';
 
 import { ILauncher } from '@jupyterlab/launcher';
 
-import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
+import { IDefaultFileBrowser } from '@jupyterlab/filebrowser';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
@@ -36,7 +36,7 @@ const extension: JupyterFrontEndPlugin<void> = {
   requires: [
     ICommandPalette,
     ILayoutRestorer,
-    IFileBrowserFactory,
+    IDefaultFileBrowser,
     ISettingRegistry
   ],
   optional: [ILauncher],
@@ -44,7 +44,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     app: JupyterFrontEnd,
     palette: ICommandPalette,
     restorer: ILayoutRestorer,
-    factory: IFileBrowserFactory,
+    filebrowser: IDefaultFileBrowser,
     settingRegistry: ISettingRegistry,
     launcher: ILauncher | null
   ) => {
@@ -55,10 +55,8 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     // Add an application command
     const commandID = 'slurm:open';
-    const filebrowser = factory.defaultBrowser;
 
     console.log('After restore:');
-    console.log(widget);
 
     const parsedSettings: ISlurmUserSettings = {
       queueCols: [],
@@ -106,7 +104,7 @@ const extension: JupyterFrontEndPlugin<void> = {
           console.log(settingRegistry);
           // Instantiate a new widget if one does not exist
           widget = new SlurmWidget(filebrowser, parsedSettings);
-          widget.title.icon = SLURM_ICON_CLASS_TAB;
+          widget.title.iconClass = SLURM_ICON_CLASS_TAB;
         }
 
         if (!tracker.has(widget)) {

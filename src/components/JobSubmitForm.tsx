@@ -71,13 +71,10 @@ export default class JobSubmitForm extends React.Component<
    */
   private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
     const fileListing = [];
-    const iter = filebrowser.model.items();
-    let i = iter.next();
-    while (i) {
+    for (const i of filebrowser.model.items()) {
       if (i.type === 'file') {
         fileListing.push(i.path);
       }
-      i = iter.next();
     }
 
     let fileItems;
@@ -185,10 +182,10 @@ export default class JobSubmitForm extends React.Component<
               value={inputType}
               onChange={this.handleInputType.bind(this)}
             >
-              <ToggleButton value="path" variant="outline-secondary">
+              <ToggleButton id="path-toggle" value="path" variant="outline-secondary">
                 Submit a File
               </ToggleButton>
-              <ToggleButton value="contents" variant="outline-secondary">
+              <ToggleButton id="contents-toggle" value="contents" variant="outline-secondary">
                 Submit Text
               </ToggleButton>
             </ToggleButtonGroup>
@@ -198,7 +195,7 @@ export default class JobSubmitForm extends React.Component<
               {inputType === 'path' && (
                 <Accordion defaultActiveKey={'1'}>
                   <Card>
-                    <Accordion.Toggle
+                    <Accordion.Item
                       as={Card.Header}
                       eventKey={'0'}
                       onClick={() => {
@@ -212,7 +209,7 @@ export default class JobSubmitForm extends React.Component<
                         <BsCaretRightFill />
                       )}
                       Type in the path to your slurm script
-                    </Accordion.Toggle>
+                    </Accordion.Item>
                     <Accordion.Collapse eventKey={'0'}>
                       <Card.Body>
                         <Form.Group>
@@ -241,7 +238,7 @@ export default class JobSubmitForm extends React.Component<
                     </Accordion.Collapse>
                   </Card>
                   <Card>
-                    <Accordion.Toggle
+                    <Accordion.Item
                       as={Card.Header}
                       eventKey={'1'}
                       onClick={() => {
@@ -255,7 +252,7 @@ export default class JobSubmitForm extends React.Component<
                         <BsCaretRightFill />
                       )}
                       Choose a slurm script from your current directory
-                    </Accordion.Toggle>
+                    </Accordion.Item>
                     <Accordion.Collapse eventKey={'1'}>
                       <Card.Body>
                         <Form.Group>

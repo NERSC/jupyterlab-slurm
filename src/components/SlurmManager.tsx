@@ -271,7 +271,9 @@ export default class SlurmManager extends React.Component<
           id="slurm-tabs"
           activeKey={this.state.activeTab}
           onSelect={k => {
-            this.setState({ activeTab: k });
+            if (k !== null) {
+              this.setState({ activeTab: k });
+            }
           }}
         >
           <Tab title="Slurm Queue" eventKey="jobQueue">
@@ -301,7 +303,7 @@ export default class SlurmManager extends React.Component<
             title={
               <React.Fragment>
                 Job Notifications
-                <Badge className="ml-2" variant="info">
+                <Badge className="ml-2" bg="info">
                   {this.state.alerts.length}
                 </Badge>
               </React.Fragment>

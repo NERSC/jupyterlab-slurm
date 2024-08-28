@@ -1,10 +1,28 @@
+const jestJupyterLab = require('@jupyterlab/testutils/lib/jest-config');
+
+const esModules = [
+  '@codemirror',
+  '@jupyter/ydoc',
+  '@jupyterlab/',
+  'lib0',
+  'nanoid',
+  'vscode-ws-jsonrpc',
+  'y-protocols',
+  'y-websocket',
+  'yjs'
+].join('|');
+
+const baseConfig = jestJupyterLab(__dirname);
+
 module.exports = {
-    preset: 'ts-jest/presets/js-with-babel',
-    moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-    transformIgnorePatterns: ['/node_modules/(?!(@jupyterlab/.*)/)'],
-    globals: {
-        'ts-jest': {
-            tsConfig: 'tsconfig.json'
-        }
-    },
+  ...baseConfig,
+  automock: false,
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/.ipynb_checkpoints/*'
+  ],
+  coverageReporters: ['lcov', 'text'],
+  testRegex: 'src/.*/.*.spec.ts[x]?$',
+  transformIgnorePatterns: [`/node_modules/(?!${esModules}).+`]
 };

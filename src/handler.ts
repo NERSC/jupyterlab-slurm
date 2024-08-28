@@ -41,6 +41,7 @@ export async function requestAPI<T>(
       settings,
       error
     );
+    throw error
   }
 
   let data = null;
