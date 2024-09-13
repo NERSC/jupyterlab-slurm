@@ -9,6 +9,8 @@ import {
   ToggleButton,
   ToggleButtonGroup
 } from 'react-bootstrap';
+import { AccordionEventKey } from 'react-bootstrap/AccordionContext';
+import { useAccordionButton } from 'react-bootstrap/AccordionButton';
 import { BsCaretDownFill, BsCaretRightFill } from 'react-icons/bs';
 import { FileBrowser } from '@jupyterlab/filebrowser';
 
@@ -23,13 +25,22 @@ namespace types {
 
   export type State = {
     filebrowser: FileBrowser;
-    fileitems: JSX.Element[];
+    fileitems: React.ReactElement[];
     inputType: string;
     inputPathSelectType: string;
     filepath: string;
     inlineScript: string;
     inputTimeout: number;
   };
+}
+
+interface ICustomToggleProps {
+  children: React.ReactNode;
+  eventKey: string;
+}
+function CustomToggle({ children, eventKey }: ICustomToggleProps) {
+  const decoratedOnClick = useAccordionButton(eventKey);
+  return <div onClick={decoratedOnClick}>{children}</div>;
 }
 
 export default class JobSubmitForm extends React.Component<
@@ -49,6 +60,7 @@ export default class JobSubmitForm extends React.Component<
     };
 
     this.updateFilepath = this.updateFilepath.bind(this);
+    this.handleFileToggle = this.handleFileToggle.bind(this);
   }
 
   /*
@@ -69,22 +81,22 @@ export default class JobSubmitForm extends React.Component<
    * and creates an array of <option> elements for each file.
    * If there are no files in the current directory, an empty entry is created.
    */
-  private getFileItems(filebrowser: FileBrowser): JSX.Element[] {
-    const fileListing = [];
+  private getFileItems(filebrowser: FileBrowser): React.ReactElement[] {
+    const fileListing: string[] = [];
     for (const i of filebrowser.model.items()) {
       if (i.type === 'file') {
         fileListing.push(i.path);
       }
     }
 
-    let fileItems;
+    let fileItems: React.ReactElement[];
 
     if (fileListing.length > 0) {
       fileItems = fileListing.map(x => {
         return <option key={x}>{x}</option>;
       });
     } else {
-      fileItems = [<option key={''}>{''}</option>];
+      fileItems = [];
     }
 
     return fileItems;
@@ -166,8 +178,18 @@ export default class JobSubmitForm extends React.Component<
     this.props.addAlert('Job submitted', variant);
   }
 
+  handleFileToggle(eventKey: AccordionEventKey): void {
+    if (eventKey === '0') {
+      this.setState({ inputPathSelectType: 'textfield' });
+    } else if (eventKey === '1') {
+      this.setState({ inputPathSelectType: 'dropdown' });
+    } else {
+      this.setState({ inputPathSelectType: '' });
+    }
+  }
+
   render(): React.ReactNode {
-    const inputType = this.state.inputType;
+    const { inputType, filepath, fileitems } = this.state;
 
     return (
       <>
@@ -182,10 +204,18 @@ export default class JobSubmitForm extends React.Component<
               value={inputType}
               onChange={this.handleInputType.bind(this)}
             >
-              <ToggleButton id="path-toggle" value="path" variant="outline-secondary">
+              <ToggleButton
+                id="path-toggle"
+                value="path"
+                variant="outline-secondary"
+              >
                 Submit a File
               </ToggleButton>
-              <ToggleButton id="contents-toggle" value="contents" variant="outline-secondary">
+              <ToggleButton
+                id="contents-toggle"
+                value="contents"
+                variant="outline-secondary"
+              >
                 Submit Text
               </ToggleButton>
             </ToggleButtonGroup>
@@ -193,29 +223,28 @@ export default class JobSubmitForm extends React.Component<
           <Row className={'justify-content-center  jp-SlurmWidget-row'}>
             <Col sm={12}>
               {inputType === 'path' && (
-                <Accordion defaultActiveKey={'1'}>
+                <Accordion
+                  defaultActiveKey={'1'}
+                  onSelect={this.handleFileToggle}
+                >
                   <Card>
-                    <Accordion.Item
-                      as={Card.Header}
-                      eventKey={'0'}
-                      onClick={() => {
-                        this.setState({ inputPathSelectType: 'textfield' });
-                      }}
-                    >
-                      {this.state.inputPathSelectType === 'textfield' && (
-                        <BsCaretDownFill />
-                      )}
-                      {this.state.inputPathSelectType === 'dropdown' && (
-                        <BsCaretRightFill />
-                      )}
-                      Type in the path to your slurm script
-                    </Accordion.Item>
+                    <Card.Header>
+                      <CustomToggle eventKey={'0'}>
+                        {this.state.inputPathSelectType === 'textfield' && (
+                          <BsCaretDownFill />
+                        )}
+                        {this.state.inputPathSelectType !== 'textfield' && (
+                          <BsCaretRightFill />
+                        )}
+                        Type in the path to your slurm script
+                      </CustomToggle>
+                    </Card.Header>
                     <Accordion.Collapse eventKey={'0'}>
                       <Card.Body>
                         <Form.Group>
                           <Form.Control
                             type="text"
-                            placeholder={this.props.filebrowser.model.path}
+                            placeholder={'/full/path/to/script'}
                             onChange={e => {
                               const timeout = setTimeout(() => {
                                 this.updateFilepath(e.target.value);
@@ -238,21 +267,17 @@ export default class JobSubmitForm extends React.Component<
                     </Accordion.Collapse>
                   </Card>
                   <Card>
-                    <Accordion.Item
-                      as={Card.Header}
-                      eventKey={'1'}
-                      onClick={() => {
-                        this.setState({ inputPathSelectType: 'dropdown' });
-                      }}
-                    >
-                      {this.state.inputPathSelectType === 'dropdown' && (
-                        <BsCaretDownFill />
-                      )}
-                      {this.state.inputPathSelectType === 'textfield' && (
-                        <BsCaretRightFill />
-                      )}
-                      Choose a slurm script from your current directory
-                    </Accordion.Item>
+                    <Card.Header>
+                      <CustomToggle eventKey={'1'}>
+                        {this.state.inputPathSelectType === 'dropdown' && (
+                          <BsCaretDownFill />
+                        )}
+                        {this.state.inputPathSelectType !== 'dropdown' && (
+                          <BsCaretRightFill />
+                        )}
+                        Choose a slurm script from your current directory
+                      </CustomToggle>
+                    </Card.Header>
                     <Accordion.Collapse eventKey={'1'}>
                       <Card.Body>
                         <Form.Group>
@@ -260,11 +285,11 @@ export default class JobSubmitForm extends React.Component<
                             as="select"
                             id={'fileselect-dropdown'}
                             placeholder={'Select a file'}
-                            value={this.state.filepath}
+                            value={filepath}
                             onChange={this.handleFileSelect.bind(this)}
                             disabled={this.props.disabled}
                           >
-                            {this.state.fileitems}
+                            {fileitems}
                           </Form.Control>
                         </Form.Group>
                         <Button
@@ -279,7 +304,7 @@ export default class JobSubmitForm extends React.Component<
                   </Card>
                 </Accordion>
               )}
-              {inputType !== 'path' && (
+              {this.state.inputType !== 'path' && (
                 <Form.Group>
                   <Form.Label>Enter your Slurm script here</Form.Label>
                   <Form.Control
