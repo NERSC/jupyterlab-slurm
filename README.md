@@ -7,8 +7,7 @@ providing simple and intuitive controls for viewing and managing jobs on the que
 
 ## Prerequisites
 
-* JupyterLab >= 3.0
-* Node.js 14+
+* JupyterLab >= 4.0.0
 * Slurm
 
 
@@ -34,7 +33,7 @@ of the palette and the launcher.
 
 ### Development install
 
-As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io/en/stable/developer/extension_dev.html#extension-authoring) for a development install of the labextension you can run the following in this directory:
+As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io/en/stable/extension/extension_dev.html#extension-authoring) for a development install of the labextension you can run the following in this directory:
 
 ### Setup a local slurm cluster
 
