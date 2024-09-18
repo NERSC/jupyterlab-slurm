@@ -182,10 +182,18 @@ export default class JobSubmitForm extends React.Component<
               value={inputType}
               onChange={this.handleInputType.bind(this)}
             >
-              <ToggleButton id="path-toggle" value="path" variant="outline-secondary">
+              <ToggleButton
+                id="path-toggle"
+                value="path"
+                variant="outline-secondary"
+              >
                 Submit a File
               </ToggleButton>
-              <ToggleButton id="contents-toggle" value="contents" variant="outline-secondary">
+              <ToggleButton
+                id="contents-toggle"
+                value="contents"
+                variant="outline-secondary"
+              >
                 Submit Text
               </ToggleButton>
             </ToggleButtonGroup>
