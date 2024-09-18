@@ -47,11 +47,11 @@
 }
 
 .jp-SlurmWidget-NerscLaunchIcon {
-  background-image: url("nersc_icon.png");
+  background-image: url('nersc_icon.png');
 }
 
 .jp-SlurmWidget-NerscTabIcon {
-  background-image: url("nersc_icon_small.png");
+  background-image: url('nersc_icon_small.png');
 }
 
 .jp-SlurmWidget-table-button-badge {
@@ -69,7 +69,8 @@
   color: var(--jp-ui-font-color1);
 }
 
-.jp-SlurmWidget-table-button.btn.disabled, .jp-SlurmWidget-table-button.btn:disabled {
+.jp-SlurmWidget-table-button.btn.disabled,
+.jp-SlurmWidget-table-button.btn:disabled {
   color: var(--jp-ui-font-color2);
 }
 
@@ -83,11 +84,11 @@ label.btn.jp-SlurmWidget-user-only-checkbox {
 .jp-SlurmWidget-table-filter-row {
   position: relative;
   top: 2em;
-  z-index: 5000;*/   /* this is to keep the content in front of the table margin at the top */
+  z-index: 5000;*/ /* this is to keep the content in front of the table margin at the top */
 /*}*/
 
 .jp-SlurmWidget-squeue-loader {
-  color: #DF772E;
+  color: #df772e;
 }
 
 .jp-SlurmWidget-squeue-loading {
@@ -102,7 +103,7 @@ label.btn.jp-SlurmWidget-user-only-checkbox {
   overflow: auto;
 }
 
-.jp-SlurmWidget-user-only-checkbox input[type="checkbox"] {
+.jp-SlurmWidget-user-only-checkbox input[type='checkbox'] {
   margin-right: 0.5em;
 }
 
@@ -110,7 +111,8 @@ textarea.form-control {
   max-height: 55vh;
 }
 
-.nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+.nav-tabs .nav-item.show .nav-link,
+.nav-tabs .nav-link.active {
   color: var(--jp-ui-font-color1);
   border-color: var(--light);
   background-color: var(--jp-layout-color2);
@@ -118,51 +120,62 @@ textarea.form-control {
 
 /* Dark Mode specific styling */
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-main a.nav-item {
+[data-jp-theme-light='false'] .jp-SlurmWidget-main a.nav-item {
   color: var(--jp-ui-font-color2);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-main .accordion .card {
+[data-jp-theme-light='false'] .jp-SlurmWidget-main .accordion .card {
   color: var(--jp-ui-font-color1);
   background-color: var(--jp-layout-color1);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-main a.nav-item.active {
+[data-jp-theme-light='false'] .jp-SlurmWidget-main a.nav-item.active {
   color: var(--jp-ui-font-color1);
   background-color: var(--jp-layout-color2);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-table-filter-label.input-group-text {
+[data-jp-theme-light='false']
+  .jp-SlurmWidget-table-filter-label.input-group-text {
   color: var(--jp-ui-font-color1);
   border-color: var(--secondary);
   background-color: var(--jp-layout-color1);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-main .form-control, .jp-SlurmWidget-main .form-control::placeholder {
+[data-jp-theme-light='false'] .jp-SlurmWidget-main .form-control,
+.jp-SlurmWidget-main .form-control::placeholder {
   color: var(--jp-ui-font-color1);
   border-color: var(--jp-input-border-color);
   background-color: var(--jp-input-background);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-table-filter-input.form-control, .jp-SlurmWidget-table-filter-input.form-control:focus {
+[data-jp-theme-light='false'] .jp-SlurmWidget-table-filter-input.form-control,
+.jp-SlurmWidget-table-filter-input.form-control:focus {
   color: var(--jp-ui-font-color1);
   border-color: var(--secondary);
   background-color: var(--jp-layout-color3);
 }
 
-[data-jp-theme-light="false"] .jp-SlurmWidget-main .form-control:focus, label.btn.jp-SlurmWidget-user-only-checkbox:not(.disabled), label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled) {
+[data-jp-theme-light='false'] .jp-SlurmWidget-main .form-control:focus,
+label.btn.jp-SlurmWidget-user-only-checkbox:not(.disabled),
+label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled) {
   color: var(--jp-ui-font-color1);
   border-color: var(--jp-input-active-border-color);
   background-color: var(--jp-input-active-background);
 }
 
-[data-jp-theme-light="false"] label.btn.jp-SlurmWidget-user-only-checkbox {
+[data-jp-theme-light='false'] label.btn.jp-SlurmWidget-user-only-checkbox {
   color: var(--jp-ui-font-color1);
   border-color: var(--jp-input-border-color);
   background-color: var(--jp-input-background);
 }
 
-[data-jp-theme-light="false"] label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(.disabled).active, label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(.disabled):active {
+[data-jp-theme-light='false']
+  label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(
+    .disabled
+  ).active,
+label.btn.jp-SlurmWidget-user-only-checkbox:not(:disabled):not(
+    .disabled
+  ):active {
   color: var(--jp-ui-font-color1);
   border-color: var(--jp-input-active-border-color);
   background-color: var(--jp-input-active-background);

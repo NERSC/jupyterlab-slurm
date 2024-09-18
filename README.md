@@ -1,15 +1,14 @@
 # Slurm JupyterLab Extension
 
-A JupyterLab extension that interfaces with the Slurm Workload Manager, 
+A JupyterLab extension that interfaces with the Slurm Workload Manager,
 providing simple and intuitive controls for viewing and managing jobs on the queue.
 
 ![Slurm Extension](./docs/images/slurm.png)
 
 ## Prerequisites
 
-* JupyterLab >= 4.0.0
-* Slurm
-
+- JupyterLab >= 4.0.0
+- Slurm
 
 ## Installation
 
@@ -27,9 +26,8 @@ jupyter serverextension enable --py --sys-prefix jupyterlab_slurm
 ```
 
 After launching JupyterLab, the extension can be found in the command palette under
-the name ```Slurm Queue Manager```, and is listed under the ```HPC TOOLS``` section
+the name `Slurm Queue Manager`, and is listed under the `HPC TOOLS` section
 of the palette and the launcher.
-
 
 ### Development install
 
@@ -76,6 +74,7 @@ jlpm run build
 ```
 
 ### Restart the jupyterlab docker container
+
 ```bash
 docker compose restart jupyterlab
 
