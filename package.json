@@ -1,6 +1,6 @@
 {
   "name": "jupyterlab-slurm",
-  "version": "4.0.0.a",
+  "version": "4.0.0a",
   "description": "A JupyterLab extension to interface with the Slurm workload manager.",
   "keywords": [
     "jupyter",
