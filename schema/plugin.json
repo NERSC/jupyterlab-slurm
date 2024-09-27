@@ -23,17 +23,8 @@
     "queueCols": {
       "type": "array",
       "title": "squeue Column Header Labels",
-      "description": "Column headers for the squeue table",
-      "default": [
-        "JOBID",
-        "PARTITION",
-        "NAME",
-        "USER",
-        "ST",
-        "TIME",
-        "NODES",
-        "NODELIST(REASON)"
-      ]
+      "description":  "Column headers for the squeue table",
+      "default": ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"]
     },
     "itemsPerPage": {
       "type": "number",

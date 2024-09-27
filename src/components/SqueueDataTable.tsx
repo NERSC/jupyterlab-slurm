@@ -19,15 +19,13 @@ import {
   BsFilter,
   BsTrashFill
 } from 'react-icons/bs';
-import DataTable, {
-  Selector,
-  TableColumn,
-  TableColumn as IDataTableColumn
-} from 'react-data-table-component';
+import DataTable, { Selector, TableColumn as IDataTableColumn } from 'react-data-table-component';
 
 // Local
 import { requestAPI } from '../handler';
 import { JobAction } from '../types';
+
+type Primitive = string | number | boolean;
 
 namespace types {
   export type Props = {
@@ -109,20 +107,12 @@ export default class SqueueDataTable extends Component<
       clearSelected: false,
       columns: columns,
       displayColumns: columns.map(x => {
-        const column: TableColumn<Record<string, unknown>> = {
+        return {
           name: x,
-          selector: (record: Record<string, unknown>): any => {
-            return record[x];
-          },
+          selector: (record): Primitive => { return (record[x] as Primitive) },
           sortable: true,
           maxWidth: '200px'
-        };
-
-        if (x === 'JOBID') {
-          column.sortFunction = this.sortJobID;
-        }
-
-        return column;
+	};
       }),
       itemsPerPage: this.props.itemsPerPage, // make this prop dependent
       filterQuery: '',
@@ -198,44 +188,12 @@ export default class SqueueDataTable extends Component<
             console.log('loading finished');
           }
         );
-        return data.data;
+	return data.data
       })
       .catch(error => {
         console.error('SqueueDataTable getData() error', error);
         return [];
       });
-  }
-
-  private sortJobID(
-    rowA: Record<string, unknown>,
-    rowB: Record<string, unknown>
-  ): 0 | 1 | -1 {
-    // Requires a special sorting for job array strings where it can't be converted to a number
-    const jobIDSpecials = /[0-9][-_[\]]/g;
-    const parts_a = String(rowA.JOBID)
-      .split(jobIDSpecials)
-      .map(x => Number(x));
-    const parts_b = String(rowB.JOBID)
-      .split(jobIDSpecials)
-      .map(x => Number(x));
-    let tot_a = 0;
-    let tot_b = 0;
-    let i;
-
-    for (i = 0; i < parts_a.length; i++) {
-      tot_a += parts_a[i];
-    }
-    for (i = 0; i < parts_b.length; i++) {
-      tot_b += parts_b[i];
-    }
-
-    if (tot_a > tot_b) {
-      return 1;
-    } else if (tot_b > tot_a) {
-      return -1;
-    }
-
-    return 0;
   }
 
   private sortRows(
@@ -248,7 +206,7 @@ export default class SqueueDataTable extends Component<
       b: Record<string, unknown>
     ): number {
       // by default use the standard string comparison for field values
-
+      
       let val_a = selector(a);
       let val_b = selector(b);
 
@@ -256,6 +214,28 @@ export default class SqueueDataTable extends Component<
       if (!isNaN(Number(val_a)) && !isNaN(Number(val_b))) {
         val_a = Number(val_a);
         val_b = Number(val_b);
+      } else if (false) { // TODO: Fix sorting of JOBID (field === 'JOBID') {
+        // Requires a special sorting for job array strings where it can't be converted to a number
+        const jobIDSpecials = /[0-9][-_[\]]/g;
+        const parts_a = String(val_a)
+          .split(jobIDSpecials)
+          .map(x => Number(x));
+        const parts_b = String(val_b)
+          .split(jobIDSpecials)
+          .map(x => Number(x));
+        let tot_a = 0;
+        let tot_b = 0;
+        let i;
+
+        for (i = 0; i < parts_a.length; i++) {
+          tot_a += parts_a[i];
+        }
+        for (i = 0; i < parts_b.length; i++) {
+          tot_b += parts_b[i];
+        }
+
+        val_a = tot_a;
+        val_b = tot_b;
       }
 
       const greater = val_a > val_b;
@@ -341,7 +321,7 @@ export default class SqueueDataTable extends Component<
 
         setTimeout(reload, this.state.reloadRate);
       };
-      await reload();
+      reload();
     }
   }
 
@@ -357,12 +337,12 @@ export default class SqueueDataTable extends Component<
     // after a user submits a series of job actions (submit, cancel, hold, release), reload the squeue table view
     // we need to limit the frequency of squeue requests
     if (this.props.reloadQueue) {
-      await this.getData(this.state.reloadLimit);
+      this.getData(this.state.reloadLimit);
     }
 
     // make sure a last attempt is made to reload when all job actions have completed
     if (prevProps.reloadQueue && !this.props.reloadQueue) {
-      await this.getData();
+      this.getData();
     }
   }
 
@@ -498,7 +478,7 @@ export default class SqueueDataTable extends Component<
                   className="jp-SlurmWidget-table-filter-input"
                   value={this.state.filterQuery}
                   onChange={e => {
-                    return this.handleFilter(e.target.value);
+                    this.handleFilter(e.target.value);
                   }}
                 />
               </InputGroup>

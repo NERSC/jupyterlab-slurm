@@ -48,7 +48,7 @@ const extension: JupyterFrontEndPlugin<void> = {
     settingRegistry: ISettingRegistry,
     launcher: ILauncher | null
   ) => {
-    console.log('JupyterLab extension jupyterlab-slurm is activated!');
+    console.log('JupyterFrontEndPlugin.activate()');
 
     // Declare a Slurm widget variable
     let widget: SlurmWidget;
