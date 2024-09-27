@@ -2,7 +2,16 @@
   "userOnly": true,
   "autoReload": false,
   "autoReloadRate": 60000,
-  "queueCols": ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"],
+  "queueCols": [
+    "JOBID",
+    "PARTITION",
+    "NAME",
+    "USER",
+    "ST",
+    "TIME",
+    "NODES",
+    "NODELIST(REASON)"
+  ],
   "cutoff": 16,
   "wordbreak": true,
   "escapeHtml": true

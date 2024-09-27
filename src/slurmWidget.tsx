@@ -63,7 +63,7 @@ export default class SlurmWidget extends ReactWidget {
       })
       .catch(reason => {
         console.error('fetchUser error', reason);
-        return { user: '', exception: reason }
+        return { user: '', exception: reason };
       });
   }
 
