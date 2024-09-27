@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v4.3.5
+_src_path: https://github.com/jupyterlab/extension-template
+author_email: mhenderson@lbl.gov
+author_name: Matt Henderson
+has_binder: false
+has_settings: true
+kind: server
+labextension_name: jupyterlab-slurm
+project_short_description: A JupyterLab extension to interface with the Slurm workload
+    manager.
+python_name: jupyterlab_slurm
+repository: https://github.com/NERSC/jupyterlab-slurm
+test: true
+
