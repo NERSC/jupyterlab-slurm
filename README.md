@@ -10,6 +10,19 @@ providing simple and intuitive controls for viewing and managing jobs on the que
 - JupyterLab >= 4.0.0
 - Slurm
 
+## Architecture
+
+This extension consists of two main parts:
+
+- **Backend (Python)**: A Jupyter Server extension that provides a REST API to interface with Slurm commands (`squeue`, `sbatch`, `scancel`, `scontrol`, `sacct`).
+  - Handlers are located in `jupyterlab_slurm/handlers.py`.
+  - It uses a base class `SlurmCommandHandler` to execute shell commands and handle errors.
+  - Job details use a specialized `JobDetailsHandler` that normalizes data from both `scontrol` and `sacct`.
+- **Frontend (TypeScript/React)**: A JupyterLab extension that provides the UI.
+  - Built with React, MUI (Material UI), and `ag-grid-react` for high-performance table rendering.
+  - Main components: `SlurmWidget` (top-level), `SqueueDataTable` (live queue), `SlurmJobHistory` (completed jobs), and `JobDetailsPanel` (detailed inspection).
+  - State management handles polling, selection snapshots, and navigation between job details.
+
 ## Installation
 
 This extension includes both a client-side JupyterLab extension and a server-side

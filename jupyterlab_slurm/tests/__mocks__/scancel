@@ -1,0 +1,4 @@
+#!/usr/bin/env python3
+from slurm_commands import SlurmCommandMock
+m = SlurmCommandMock()
+m.scancel()

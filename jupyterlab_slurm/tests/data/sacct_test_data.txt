@@ -1,0 +1,12 @@
+#COLUMNS:JobID,JobName,User,Partition,Account,AllocCPUS,State,ExitCode,Start,End,Elapsed,QOS,WorkDir,StdOut,StdErr,SubmitLine,NNodes
+5025|long_job|user006|regular|myaccount|4|COMPLETED|0:0|2026-01-15T10:00:00|2026-01-15T11:02:03|01:02:03|normal|/home/user006/jobs|/home/user006/jobs/slurm-5025.out|/home/user006/jobs/slurm-5025.err|sbatch job.sh|1
+5025.batch|batch|user006|regular|myaccount|4|COMPLETED|0:0|2026-01-15T10:00:00|2026-01-15T11:02:03|01:02:03|normal||||1
+5026|viz_task|user007|gpu|vizaccount|8|FAILED|1:0|2026-01-15T12:00:00|2026-01-15T12:12:34|00:12:34|normal|/home/user007/viz|/home/user007/viz/out.log|/home/user007/viz/err.log|sbatch --gres=gpu:1 viz.sh|1
+5026.batch|batch|user007|gpu|vizaccount|8|FAILED|1:0|2026-01-15T12:00:00|2026-01-15T12:12:34|00:12:34|normal||||1
+5027|quick|user008|debug|debugacct|1|CANCELLED|0:0|2026-01-15T14:00:00|2026-01-15T14:00:10|00:00:10|debug|/scratch/user008|slurm-%j.out|slurm-%j.err|sbatch quick.sh|1
+5028|nightly|user005|batch|batchacct|16|TIMEOUT|0:0|2026-01-14T00:00:00|2026-01-15T02:03:04|1-02:03:04|normal|/home/user005/nightly|nightly.out|nightly.err|sbatch -N4 nightly.sh|4
+5029|analyze|user010|regular|myaccount|2|COMPLETED|0:0|2026-01-15T08:00:00|2026-01-15T10:00:00|02:00:00|normal|/home/user010/analysis|analyze.out|analyze.err|sbatch analyze.sh|1
+6030|very_long_history_job_name|user015|regular|longacct|32|FAILED|1:0|2026-01-12T00:00:00|2026-01-15T12:45:59|3-12:45:59|premium|/scratch/user015/long|long.out|long.err|sbatch -N16 long.sh|16
+6031|array_training|user025|gpu|gpuacct|16|COMPLETED|0:0|2026-01-15T00:00:00|2026-01-15T12:34:56|12:34:56|normal|/home/user025/train|train.out|train.err|sbatch --array=1-10 train.sh|4
+6032|data_pipeline|user031|batch|pipeacct|4|CANCELLED|0:0|2026-01-15T15:00:00|2026-01-15T15:10:05|00:10:05|normal|/scratch/user031/pipe|pipe.out|pipe.err|sbatch pipe.sh|2
+6033|io_benchmark|user022|debug|benchacct|1|TIMEOUT|0:0|2026-01-14T00:00:00|2026-01-15T00:00:00|1-00:00:00|debug|/scratch/user022/bench|bench.out|bench.err|sbatch bench.sh|1

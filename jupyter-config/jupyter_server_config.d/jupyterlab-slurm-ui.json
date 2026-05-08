@@ -1,0 +1,43 @@
+{
+  "SlurmCommandPaths": {
+    "squeue_path": "squeue",
+    "scancel_path": "scancel",
+    "scontrol_path": "scontrol",
+    "sbatch_path": "sbatch",
+    "sacct_path": "sacct"
+  },
+  "SlurmAccounting": {
+    "sacct_fields": "JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode"
+  },
+  "SlurmUI": {
+    "queue_column_labels": {
+      "JOBID": "Job ID",
+      "PARTITION": "QOS",
+      "NAME": "Job Name",
+      "USER": "User",
+      "ST": "Job Status",
+      "TIME": "Elapsed",
+      "NODES": "Nodes",
+      "NODELIST(REASON)": "Node/Reason"
+    },
+    "history_column_labels": {
+      "JobID": "Job ID",
+      "JobName": "Job Name",
+      "Partition": "QOS",
+      "Account": "Account",
+      "AllocCPUS": "CPUs",
+      "State": "State",
+      "ExitCode": "Exit Code"
+    },
+    "queue_column_sizing": {
+      "ST": {"width": 56, "minWidth": 48},
+      "NODES": {"width": 80, "minWidth": 72},
+      "USER": {"width": 104, "minWidth": 96},
+      "PARTITION": {"width": 120},
+      "TIME": {"width": 120},
+      "JOBID": {"width": 150},
+      "NAME": {"flex": 2},
+      "NODELIST(REASON)": {"flex": 2}
+    }
+  }
+}
