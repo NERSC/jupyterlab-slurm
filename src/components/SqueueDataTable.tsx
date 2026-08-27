@@ -102,14 +102,20 @@ export default function SqueueDataTable(props: ISlurmWidgetProps) {
   }, [successOpen, successMessage, setSuccessOpen]);
 
   // Live "now" ticker so the countdown to the next refresh stays current.
+  // Resynced to Date.now() whenever nextAvailableSqueueFetch changes (e.g.
+  // after each fetch), so the very next tick isn't stale by up to 1s left
+  // over from the previous interval's schedule (which previously caused the
+  // countdown to briefly display one second too many, e.g. 11s instead of
+  // 10s for a 10s refresh rate).
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!autoReload) {
       return;
     }
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [autoReload]);
+  }, [autoReload, nextAvailableSqueueFetch]);
 
   const hasFetched =
     lastSqueueFetch.getTime() > new Date('1970-01-01').getTime();

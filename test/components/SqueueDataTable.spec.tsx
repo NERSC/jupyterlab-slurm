@@ -132,6 +132,42 @@ describe('SqueueDataTable', () => {
     expect(screen.getByText(/Refreshing…/)).toBeInTheDocument();
   });
 
+  test('the "next refresh in" countdown starts at exactly the refresh rate, not one second too many', () => {
+    // Regression test: the "now" ticker used to only tick on its own
+    // independent 1s interval, so if a new nextAvailableSqueueFetch landed
+    // shortly *before* the ticker's next scheduled tick, "now" could be up
+    // to ~1s stale, causing the countdown to briefly display 11s instead of
+    // 10s for a 10s refresh rate. Simulate that by mounting, advancing time
+    // by 900ms (before the ticker's first 1000ms tick fires), then
+    // delivering a fresh nextAvailableSqueueFetch exactly 10s out.
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const reloadRateMs = 10000;
+
+    mockUseSlurmQueue.mockReturnValue(
+      baseQueueState({ autoReload: true, nextAvailableSqueueFetch: null })
+    );
+    const { rerender } = render(
+      <SqueueDataTable {...baseProps({ autoReload: true, autoReloadRate: 10 })} />
+    );
+
+    jest.advanceTimersByTime(900);
+    mockUseSlurmQueue.mockReturnValue(
+      baseQueueState({
+        autoReload: true,
+        nextAvailableSqueueFetch: new Date(Date.now() + reloadRateMs)
+      })
+    );
+    rerender(
+      <SqueueDataTable {...baseProps({ autoReload: true, autoReloadRate: 10 })} />
+    );
+
+    const expectedSeconds = Math.ceil(reloadRateMs / 1000);
+    const countdown = screen.getByText(/Next refresh in \d+s/);
+    const actualSeconds = Number(countdown.textContent?.match(/(\d+)s/)?.[1]);
+    expect(actualSeconds).toBe(expectedSeconds);
+    jest.useRealTimers();
+  });
+
   test('the toolbar Refresh button calls reload()', () => {
     const reload = jest.fn();
     mockUseSlurmQueue.mockReturnValue(baseQueueState({ reload }));
