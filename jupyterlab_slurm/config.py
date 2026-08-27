@@ -5,31 +5,29 @@ from traitlets.config import Configurable
 class SlurmCommandPaths(Configurable):
     squeue_path = Unicode(
         default_value="squeue",
-        help=""
+        help="Path to the squeue command (resolved from PATH if not overridden)"
     ).tag(config=True)
 
     scancel_path = Unicode(
         default_value="scancel",
-        help=""
+        help="Path to the scancel command (resolved from PATH if not overridden)"
     ).tag(config=True)
 
     scontrol_path = Unicode(
         default_value="scontrol",
-        help=""
+        help="Path to the scontrol command (resolved from PATH if not overridden)"
     ).tag(config=True)
 
     sbatch_path = Unicode(
         default_value="sbatch",
-        help=""
+        help="Path to the sbatch command (resolved from PATH if not overridden)"
     ).tag(config=True)
 
     # Optional accounting command path (added for job history)
     sacct_path = Unicode(
         default_value="sacct",
-        help=""
+        help="Path to the sacct command (resolved from PATH if not overridden)"
     ).tag(config=True)
-
-    # add spath as trait
 
     def get_paths(self):
         return {
@@ -50,12 +48,29 @@ class SlurmAccounting(Configurable):
     ).tag(config=True)
 
     # Comma-separated list of fields to request from sacct
-    # Admins can adjust this to match their site configuration. Keep 8 fields by default
-    # so the UI/tests have a stable column count.
+    # Admins can adjust this to match their site configuration. Submit time is
+    # included by default so users can distinguish jobs that share a name/id.
     sacct_fields = Unicode(
-        default_value="JobID,Partition,JobName,User,State,Elapsed,NNodes,ExitCode",
+        default_value="JobID,Partition,JobName,User,State,Submit,Elapsed,NNodes,ExitCode",
         help="Comma-separated list of fields to request from sacct"
     ).tag(config=True)
+
+    # Number of days of history to query from sacct (via -S now-<N>days).
+    # Admins can widen or narrow this window to match their site's accounting retention.
+    sacct_time_window_days = Integer(
+        default_value=30,
+        help="Number of days of job history to request from sacct"
+    ).tag(config=True)
+
+    def get_config(self):
+        """Serialize all admin-configurable traits to a plain dict for web_app.settings."""
+        return {name: getattr(self, name) for name in self.trait_names(config=True)}
+
+
+# NOTE: `SlurmTesting` (the opt-in cluster compatibility harness config) now
+# lives in `test_suite.py`, alongside `SlurmTestSuiteHandler`, so that both
+# can be omitted entirely from a production build. See test_suite.py and
+# production_checklist.md for details.
 
 
 class SlurmUI(Configurable):
@@ -171,3 +186,7 @@ class SlurmUI(Configurable):
         default_value=False,
         help="If True, allow user-scope config to set site hooks (NOT recommended in production)",
     ).tag(config=True)
+
+    def get_config(self):
+        """Serialize all admin-configurable traits to a plain dict for web_app.settings."""
+        return {name: getattr(self, name) for name in self.trait_names(config=True)}

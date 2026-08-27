@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0.3.2"]
+requires = ["hatchling>=1.5.0", "jupyterlab>=4.5.7,<5", "hatch-nodejs-version>=0.3.2"]
 build-backend = "hatchling.build"
 
 [project]
@@ -35,6 +35,12 @@ test = [
     "pytest-cov",
     "pytest-jupyter[server]>=0.6.0"
 ]
+docs = [
+    "sphinx",
+    "myst-parser",
+    "sphinx-rtd-theme",
+    "sphinxcontrib-mermaid"
+]
 
 [tool.hatch.version]
 source = "nodejs"
@@ -44,7 +50,22 @@ fields = ["description", "authors", "urls"]
 
 [tool.hatch.build.targets.sdist]
 artifacts = ["jupyterlab_slurm/labextension"]
-exclude = [".github", "binder"]
+exclude = [
+    ".github",
+    "binder",
+    ".idea",
+    "remote_logs",
+    "job_submission_ui",
+    "coverage",
+    ".stylelintcache",
+    ".eslintcache",
+    "*.log",
+]
+# NOTE: the opt-in compatibility test-suite harness (jupyterlab_slurm/test_suite.py)
+# is intentionally NOT excluded here by default, so local/dev sdist and wheel
+# builds keep the feature available (guarded by SlurmTesting.enabled, which
+# defaults to False). To produce a production build that omits the harness
+# module entirely, run `python scripts/strip_test_suite.py` before `python -m build`.
 
 [tool.hatch.build.targets.wheel.shared-data]
 "jupyterlab_slurm/labextension" = "share/jupyter/labextensions/jupyterlab-slurm"
@@ -78,7 +99,7 @@ version_cmd = "hatch version"
 
 [tool.jupyter-releaser.hooks]
 before-build-npm = [
-    "python -m pip install 'jupyterlab>=4.0.0,<5'",
+    "python -m pip install 'jupyterlab>=4.5.7,<5'",
     "jlpm",
     "jlpm build:prod"
 ]

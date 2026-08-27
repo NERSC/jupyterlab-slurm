@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import html
 import json
-import logging
 import os
 import re
 import shlex
@@ -14,7 +13,21 @@ from jupyter_server.utils import url_path_join
 import tornado
 import tornado.web
 
-logger = logging.Logger(__file__)
+try:
+    from ._version import __version__
+except Exception:  # pragma: no cover - fallback for uninstalled/dev use
+    __version__ = "dev"
+
+from ._common import logger, make_envelope, SLURM_COMMAND_TIMEOUT_SECONDS
+
+# The compatibility test-suite harness lives in its own optional module so
+# that it can be omitted entirely from a production build/deployment (see
+# `test_suite.py` and `production_checklist.md`). If it isn't present, the
+# `/test-suite` route is simply never registered below.
+try:
+    from .test_suite import SlurmTestSuiteHandler
+except ImportError:  # pragma: no cover - expected in a stripped-down prod build
+    SlurmTestSuiteHandler = None
 
 jobIDMatcher = re.compile(r"^[0-9]+(_[0-9]+)?$")
 
@@ -41,24 +54,75 @@ class InvalidCommand(Exception):
         self.message = message
 
 
-# Here mainly as a sanity check that the extension is installed and running
-class ExampleHandler(APIHandler):
+class TooManySlurmJobIDs(Exception):
+    def __init__(self, count, limit):
+        self.count = count
+        self.limit = limit
+        self.message = "Requested {} job IDs, exceeding the limit of {}".format(count, limit)
+
+
+class InvalidSlurmPath(Exception):
+    def __init__(self, field, value):
+        self.field = field
+        self.message = "Invalid {}: must be a plain string with no NUL bytes".format(field)
+
+
+# Maximum number of job IDs accepted in a single request body/query, to
+# bound the number of Slurm subprocesses a single request can spawn.
+MAX_JOB_IDS_PER_REQUEST = 200
+
+# Global cap on concurrently running Slurm subprocesses across all handlers,
+# so unbounded/overlapping polling or bursts of requests cannot fork an
+# unbounded number of `squeue`/`sacct`/`scontrol`/etc. processes.
+MAX_CONCURRENT_SLURM_PROCESSES = 8
+_slurm_process_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SLURM_PROCESSES)
+
+
+def http_status_for_failure(exit_code: int, error_message: str = None) -> int:
+    """Map a handler-level failure to an appropriate HTTP status code.
+
+    Genuine Slurm command failures (e.g. `scancel` on a job that already
+    finished) are still valid responses to a valid request and stay at 200
+    with `success: false` in the envelope. This helper is only used for the
+    handler-level failure classes called out by the production checklist:
+    malformed requests, unavailable commands, and internal errors.
+    """
+    if exit_code == 127:
+        # Executable could not be resolved on PATH / configured path.
+        return 503
+    return 500
+
+
+# Health-check endpoint: confirms the server extension is installed, running,
+# and reports its version so the frontend can verify a matched deployment.
+class HealthCheckHandler(APIHandler):
     def initialize(self, log=logger):
         super().initialize()
         self._serverlog = log
-        self._serverlog.info("ExampleHandler.initialize()")
+        self._serverlog.info("HealthCheckHandler.initialize()")
 
     @tornado.web.authenticated
     def get(self):
         try:
-            self._serverlog.info("ExampleHandler.get()")
-            self.finish(json.dumps({
-                "data": "This is the /jupyterlab_slurm/get_example endpoint!"
-                }))
+            self._serverlog.debug("HealthCheckHandler.get()")
+            envelope = make_envelope(
+                True,
+                data={"name": "jupyterlab_slurm", "version": __version__},
+                message="ok",
+            )
+            # Keep the legacy top-level `status`/`name`/`version` fields for one
+            # release in case anything outside the extension polls this
+            # endpoint directly (also mirrored under `data`).
+            envelope["status"] = "ok"
+            envelope["name"] = "jupyterlab_slurm"
+            envelope["version"] = __version__
+            self.finish(json.dumps(envelope))
         except Exception as e:
-            self.finish(json.dumps({
-                "message": "ExampleHandler error", "exception": str(e)
-                }))
+            self._serverlog.exception(e)
+            self.set_status(500)
+            envelope = make_envelope(False, error=str(e), exit_code=1)
+            envelope["status"] = "error"
+            self.finish(json.dumps(envelope))
 
 
 # A simple request handler for retrieving the username
@@ -71,14 +135,26 @@ class UserFetchHandler(APIHandler):
     @tornado.web.authenticated
     def get(self):
         try:
-            username = os.environ.get('USER')
+            # Prefer the authenticated Jupyter identity (works correctly under
+            # multi-user deployments, e.g. JupyterHub, where the OS process
+            # `USER` env var may be shared, unset, or belong to a service
+            # account rather than the actual signed-in user). Fall back to the
+            # process `USER` only for single-user/local deployments where no
+            # Jupyter identity is configured.
+            username = None
+            current_user = getattr(self, "current_user", None)
+            if current_user is not None:
+                username = getattr(current_user, "username", None) or getattr(current_user, "name", None)
+                if username is None and isinstance(current_user, str):
+                    username = current_user
+            if not username:
+                username = os.environ.get('USER')
             self._serverlog.info("UserFetchHandler.get() {}".format(username))
-            self.finish(json.dumps({
-                "user": username
-                }))
+            self.finish(json.dumps(make_envelope(True, data={"user": username})))
         except Exception as e:
             self._serverlog.exception(e)
-            self.finish(json.dumps(e))
+            self.set_status(500)
+            self.finish(json.dumps(make_envelope(False, error=str(e), exit_code=1)))
 
 
 # common utility methods for running slurm commands, and defaults to the run_command() for scancel and scontrol
@@ -102,64 +178,41 @@ class SlurmCommandHandler(APIHandler):
             body = json.loads(self.request.body or b"{}")
             if "job_ids" not in body:
                 raise MissingSlurmJobID("")
-            jobIDs = body["job_ids"]
+            job_ids = body["job_ids"]
         else:
-            # Accept both body arguments and query parameters for flexibility (e.g., DELETE with query params)
-            # First, attempt to parse a JSON body even if Content-Type wasn't set correctly
-            jobIDs = []
-            try:
-                if self.request.body:
-                    body_text = self.request.body.decode() if isinstance(self.request.body, (bytes, bytearray)) else str(self.request.body)
-                    text = body_text.strip()
-                    if (text.startswith('{') and text.endswith('}')) or (text.startswith('[') and text.endswith(']')):
-                        maybe_json = json.loads(text)
-                        if isinstance(maybe_json, dict) and 'job_ids' in maybe_json:
-                            jobIDs = [str(x) for x in maybe_json.get('job_ids', [])]
-                        elif isinstance(maybe_json, list):
-                            jobIDs = [str(x) for x in maybe_json]
-            except Exception:
-                # Fall back to arguments parsing
-                jobIDs = []
+            # Query parameter(s), e.g. ?job_ids=123&job_ids=456
+            job_ids = self.get_arguments('job_ids')
 
-            if not jobIDs:
-                jobIDs = self.get_arguments('job_ids')
-                # Normalize possible encodings like JSON-encoded list or comma-separated string
-                if len(jobIDs) == 1:
-                    raw = jobIDs[0]
-                    if isinstance(raw, bytes):
-                        raw = raw.decode()
-                    raw_str = str(raw).strip()
-                    # JSON list encoded into a single arg
-                    if raw_str.startswith('[') and raw_str.endswith(']'):
-                        # Try JSON first, then fall back to Python literal lists like ['123']
-                        parsed = None
-                        try:
-                            parsed = json.loads(raw_str)
-                        except Exception:
-                            try:
-                                import ast
-                                parsed = ast.literal_eval(raw_str)
-                            except Exception:
-                                parsed = None
-                        if isinstance(parsed, list):
-                            jobIDs = [str(x) for x in parsed]
-                    # Comma-separated list
-                    elif ',' in raw_str and ' ' not in raw_str:
-                        jobIDs = [s for s in raw_str.split(',') if s]
+        if len(job_ids) > MAX_JOB_IDS_PER_REQUEST:
+            raise TooManySlurmJobIDs(len(job_ids), MAX_JOB_IDS_PER_REQUEST)
 
-        for jobID in jobIDs:
-            if not jobIDMatcher.search(jobID):
-                raise InvalidSlurmJobID(jobID, "jobID {} is invalid".format(jobID))
+        for job_id in job_ids:
+            if not jobIDMatcher.search(job_id):
+                raise InvalidSlurmJobID(job_id, "job_id {} is invalid".format(job_id))
 
-        return jobIDs
+        return job_ids
 
-    async def _run_command(self, command: str = None, stdin=None, cwd=None):
+    async def _run_command(self, command=None, stdin=None, cwd=None):
         """Run a Slurm command safely, resolving executable via PATH if needed.
         Returns dict: {stdout, stderr, returncode} and never raises on failure.
+
+        `command` may be either a pre-built argv list (preferred boundary for
+        any value that can contain user-controlled/free-form content, such as
+        a submitted script path) or a plain string of already-validated,
+        space-free tokens (legacy call sites), which is split with `shlex`
+        only for backwards compatibility. Prefer passing a list so arbitrary
+        user input is never re-tokenized.
         """
-        self._serverlog.info('SlurmCommandHandler._run_command(): {} {} {}'.format(command, stdin, cwd))
-        commands = shlex.split(command)
-        self._serverlog.info('SlurmCommandHandler._run_command(): {}'.format(commands))
+        # Log at debug level only: the full argv/cwd can contain filesystem
+        # paths (job script/output locations, usernames embedded in home
+        # directories), which shouldn't appear in production-default (INFO)
+        # logs per the redaction policy in production_checklist.md section 4.
+        self._serverlog.debug('SlurmCommandHandler._run_command(): %s %s %s', command, stdin, cwd)
+        if isinstance(command, (list, tuple)):
+            commands = list(command)
+        else:
+            commands = shlex.split(command)
+        self._serverlog.debug('SlurmCommandHandler._run_command(): %s', commands)
 
         # Resolve executable via PATH when not absolute
         exe = commands[0]
@@ -171,28 +224,47 @@ class SlurmCommandHandler(APIHandler):
                 if which:
                     resolved = which
             # Log resolution
-            self._serverlog.info('SlurmCommandHandler._run_command(): resolved exe {} -> {}'.format(exe, resolved))
-            # If still not found, return a clear error
+            self._serverlog.debug('SlurmCommandHandler._run_command(): resolved exe %s -> %s', exe, resolved)
+            # If still not found, return a clear error. Do not include the raw
+            # PATH environment value in the response body: PATH is an
+            # environment value, not something that should be returned to the
+            # client (production_checklist.md section 4). Log it at debug
+            # level instead, for operator troubleshooting only.
             if not os.path.isabs(resolved) or not os.path.exists(resolved):
+                self._serverlog.debug(
+                    'SlurmCommandHandler._run_command(): executable not found: %s. PATH=%s',
+                    exe, os.environ.get('PATH', ''))
                 return {
                     "stdout": "",
-                    "stderr": f"Executable not found: {exe}. PATH={os.environ.get('PATH','')}",
+                    "stderr": "Executable not found: {}".format(exe),
                     "returncode": 127
                 }
             commands[0] = resolved
         except Exception as e:
             # Best effort; try to run with original exe
-            self._serverlog.warning(f"Command resolution failed for {exe}: {e}")
+            self._serverlog.warning('Command resolution failed for %s: %s', exe, e)
 
-        # Execute with timeout
-        proc = await asyncio.create_subprocess_exec(
-            *commands,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            stdin=stdin,
-            cwd=cwd
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60.0)
+        # Execute with timeout. Bound the number of concurrently running Slurm
+        # subprocesses so overlapping polling/requests cannot fork an unbounded
+        # number of processes.
+        async with _slurm_process_semaphore:
+            proc = await asyncio.create_subprocess_exec(
+                *commands,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                stdin=stdin,
+                cwd=cwd
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=SLURM_COMMAND_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                return {
+                    "stdout": "",
+                    "stderr": "command timed out after {}s".format(SLURM_COMMAND_TIMEOUT_SECONDS),
+                    "returncode": -1
+                }
         return {
             "stdout": stdout.decode(errors='replace').strip(),
             "stderr": stderr.decode(errors='replace').strip(),
@@ -200,17 +272,20 @@ class SlurmCommandHandler(APIHandler):
         }
 
     async def run_command(self, args: list = None):
-        responseMessage = ""
-        errorMessage = "{} did not run!".format(self._slurm_command)
+        response_message = ""
+        error_message = "{} did not run!".format(self._slurm_command)
         returncode = -1
+        http_status = 200
+        requested_ids = []
         try:
-            jobIDs = " ".join(self.get_jobids())
-            self._serverlog.info(jobIDs)
+            requested_ids = self.get_jobids()
+            job_ids = " ".join(requested_ids)
+            self._serverlog.info(job_ids)
 
             if args is None:
                 args = []
 
-            out = await self._run_command("{} {} {}".format(self._slurm_command, " ".join(args), jobIDs))
+            out = await self._run_command("{} {} {}".format(self._slurm_command, " ".join(args), job_ids))
 
             returncode = out["returncode"]
             cmd_stdout = ""
@@ -222,47 +297,60 @@ class SlurmCommandHandler(APIHandler):
                 cmd_stderr = out["stderr"]
 
             if returncode != 0:
-                responseMessage = "Failure: {} {} {}".format(self._slurm_command, jobIDs, cmd_stdout)
-                errorMessage = cmd_stderr
+                response_message = "Failure: {} {} {}".format(self._slurm_command, job_ids, cmd_stdout)
+                error_message = cmd_stderr
+                if returncode == 127:
+                    http_status = 503
             else:
-                responseMessage = "Success: {} {}".format(self._slurm_command, jobIDs)
-                errorMessage = ""
+                response_message = "Success: {} {}".format(self._slurm_command, job_ids)
+                error_message = ""
         except KeyError as ke:
             self._serverlog.exception(ke)
             try:
-                jobIDs is not None
+                job_ids is not None
             except NameError:
-                jobIDs = []
+                job_ids = []
 
-            responseMessage = "Failure: {} {}".format(self._slurm_command, jobIDs)
-            errorMessage = "Missing key before running command: {}".format(str(ke))
+            response_message = "Failure: {} {}".format(self._slurm_command, job_ids)
+            error_message = "Missing key before running command: {}".format(str(ke))
             returncode = -1
+            http_status = 400
         except MissingSlurmJobID as emj:
             self._serverlog.exception(emj)
-            responseMessage = "Failure: {} missing jobID".format(self._slurm_command)
-            errorMessage = emj.message
+            response_message = "Failure: {} missing job_id".format(self._slurm_command)
+            error_message = emj.message
             returncode = -1
+            http_status = 400
         except InvalidSlurmJobID as eij:
             self._serverlog.exception(eij)
-            responseMessage = "Failure: {} invalid jobID {}".format(self._slurm_command, eij.jobid)
-            errorMessage = eij.message
+            response_message = "Failure: {} invalid job_id {}".format(self._slurm_command, eij.jobid)
+            error_message = eij.message
             returncode = -1
+            http_status = 400
+        except TooManySlurmJobIDs as etm:
+            self._serverlog.exception(etm)
+            response_message = "Failure: {} too many job_ids".format(self._slurm_command)
+            error_message = etm.message
+            returncode = -1
+            http_status = 400
+        except json.JSONDecodeError as je:
+            self._serverlog.exception(je)
+            response_message = "Failure: {} malformed request body".format(self._slurm_command)
+            error_message = "Malformed JSON body: {}".format(str(je))
+            returncode = -1
+            http_status = 400
         except Exception as e:
             self._serverlog.exception(e)
             try:
-                jobIDs is not None
+                job_ids is not None
             except NameError:
-                jobIDs = []
+                job_ids = []
 
-            responseMessage = "Failure: {} {}".format(self._slurm_command, jobIDs)
-            errorMessage = "Unhandled Exception: {}".format(str(e))
+            response_message = "Failure: {} {}".format(self._slurm_command, job_ids)
+            error_message = "Unhandled Exception: {}".format(str(e))
             returncode = -1
+            http_status = 500
         finally:
-            requested_ids = []
-            try:
-                requested_ids = self.get_jobids()
-            except Exception:
-                requested_ids = []
             success = (returncode == 0)
             data = {
                 "requestedIds": requested_ids,
@@ -270,10 +358,11 @@ class SlurmCommandHandler(APIHandler):
             }
             return {
                 "success": success,
-                "responseMessage": responseMessage,
-                "errorMessage": None if success else errorMessage,
+                "responseMessage": response_message,
+                "errorMessage": None if success else error_message,
                 "exitCode": returncode,
-                "data": data
+                "data": data,
+                "_httpStatus": 200 if success else http_status
                 }
 
 
@@ -287,18 +376,24 @@ class SlurmCommandHandler(APIHandler):
 class ScancelHandler(SlurmCommandHandler):
     def initialize(self, scancel: str = "scancel", log=logger):
         super().initialize(scancel, log)
-        self._serverlog.info("ScancelHandler.initialize(): {} {}".format(self._slurm_command, self._serverlog))
+        self._serverlog.debug("ScancelHandler.initialize(): %s", self._slurm_command)
 
     # Add `-H "Authorization: token <token>"` to the curl command for any DELETE request
     @tornado.web.authenticated
     async def delete(self):
-        self._serverlog.info('ScancelHandler.delete() - request: {}, command: {}'.format(
-            self.request, self._slurm_command))
+        # Never log the raw `self.request` object: it carries request headers
+        # (auth cookies, XSRF tokens) that must not be written to logs.
+        self._serverlog.debug('ScancelHandler.delete() - method: %s, command: %s',
+            self.request.method, self._slurm_command)
         try:
             out = await self.run_command()
+            http_status = out.pop("_httpStatus", 200)
+            self.set_status(http_status)
             await self.finish(json.dumps(out))
             return
         except Exception as e:
+            self._serverlog.exception(e)
+            self.set_status(500)
             error_resp = {
                 "success": False,
                 "responseMessage": "Failure {}".format(self._slurm_command),
@@ -314,14 +409,17 @@ class ScancelHandler(SlurmCommandHandler):
 class ScontrolHandler(SlurmCommandHandler):
     def initialize(self, scontrol: str = "scontrol", log=logger):
         super().initialize(scontrol, log)
-        self._serverlog.info("ScontrolHandler.initialize()")
+        self._serverlog.debug("ScontrolHandler.initialize()")
 
     # Add `-H "Authorization: token <token>"` to the curl command for any PATCH request
     @tornado.web.authenticated
     async def patch(self, action):
-        self._serverlog.info("ScontrolHandler.patch(): {} {}".format(self._slurm_command, action))
+        self._serverlog.debug("ScontrolHandler.patch(): %s %s", self._slurm_command, action)
         try:
-            # Prefer maximally portable hold/release via update JobId=<id> Hold=on/off
+            # Use the native `scontrol hold|release <jobid>` subcommands. The
+            # `update JobId=<id> Hold=on/off` form is rejected on some sites
+            # (e.g. NERSC/Perlmutter) with "Update of this parameter is not
+            # supported: Hold=on".
             if action in ("hold", "release"):
                 requested = []
                 changed = []
@@ -335,18 +433,17 @@ class ScontrolHandler(SlurmCommandHandler):
                 if not requested:
                     resp = {
                         "success": False,
-                        "responseMessage": f"Failure {self._slurm_command} {action} missing jobIDs",
+                        "responseMessage": f"Failure {self._slurm_command} {action} missing job_ids",
                         "errorMessage": "No job IDs provided",
                         "exitCode": -1,
                         "data": {"requestedIds": [], "changedIds": []}
                     }
+                    self.set_status(400)
                     await self.finish(json.dumps(resp))
                     return
 
-                hold_val = "on" if action == "hold" else "off"
                 for jid in requested:
-                    cmd = f"{self._slurm_command} update JobId={shlex.quote(jid)} Hold={hold_val}"
-                    out = await self._run_command(cmd)
+                    out = await self._run_command([self._slurm_command, action, jid])
                     exit_codes.append(out.get("returncode", -1))
                     if out.get("returncode", -1) == 0:
                         changed.append(jid)
@@ -368,9 +465,13 @@ class ScontrolHandler(SlurmCommandHandler):
 
             # Default behavior for other scontrol actions
             out = await self.run_command([action])
+            http_status = out.pop("_httpStatus", 200)
+            self.set_status(http_status)
             await self.finish(json.dumps(out))
             return
         except Exception as e:
+            self._serverlog.exception(e)
+            self.set_status(500)
             error_resp = {
                 "success": False,
                 "responseMessage": "Failure {} {}".format(self._slurm_command, action),
@@ -389,17 +490,19 @@ class SbatchHandler(SlurmCommandHandler):
         self._serverlog.debug("SbatchHandler.initialize()")
 
     async def run_command(self, script_path: str = None, output_path: str = None):
-        responseMessage = ""
-        errorMessage = "{} has not run yet!".format(self._slurm_command)
+        response_message = ""
+        error_message = "{} has not run yet!".format(self._slurm_command)
         returncode = -1
         try:
             try:
-                self._serverlog.info("SbatchHandler.post() - sbatch call - {} {} {}".format(
-                    self._slurm_command, script_path, output_path))
+                self._serverlog.debug("SbatchHandler.post() - sbatch call - %s %s %s",
+                    self._slurm_command, script_path, output_path)
                 if not output_path:
                     output_path = os.getcwd()
-                out = await self._run_command("{} {}".format(
-                    self._slurm_command, script_path), cwd=output_path)
+                # Pass the script path as its own argv element (never build a
+                # string command out of it) so it can never be re-tokenized
+                # by shlex, e.g. a path containing whitespace.
+                out = await self._run_command([self._slurm_command, script_path], cwd=output_path)
                 out["errorMessage"] = ""
             except Exception as e:
                 out = {
@@ -426,20 +529,20 @@ class SbatchHandler(SlurmCommandHandler):
                 cmd_stderr = out["stderr"]
 
             if returncode != 0:
-                responseMessage = "Failure: {} {}".format(self._slurm_command, cmd_stdout)
-                errorMessage = cmd_stderr
+                response_message = "Failure: {} {}".format(self._slurm_command, cmd_stdout)
+                error_message = cmd_stderr
             else:
-                responseMessage = "Success: {}".format(self._slurm_command)
-                errorMessage = ""
+                response_message = "Success: {}".format(self._slurm_command)
+                error_message = ""
         except KeyError as ke:
             self._serverlog.exception(ke)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Missing key before running command: {}".format(str(ke))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Missing key before running command: {}".format(str(ke))
             returncode = -1
         except Exception as e:
             self._serverlog.exception(e)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Unhandled Exception: {}".format(str(e))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Unhandled Exception: {}".format(str(e))
             returncode = -1
         finally:
             success = (returncode == 0)
@@ -457,8 +560,8 @@ class SbatchHandler(SlurmCommandHandler):
                 data = {"jobId": job_id, "submissionMessage": cmd_stdout.strip()}
             return {
                 "success": success,
-                "responseMessage": responseMessage,
-                "errorMessage": None if success else errorMessage,
+                "responseMessage": response_message,
+                "errorMessage": None if success else error_message,
                 "exitCode": returncode,
                 "data": data
                 }
@@ -480,17 +583,54 @@ class SbatchHandler(SlurmCommandHandler):
             self._serverlog.exception(e)
 
         try:
-            self._serverlog.info('SbatchHandler.post() - sbatch request: {} {}, inputPath: {}, outputPath: {}'.format(
-                self.request, self.request.body, inputPath, outputPath))
+            # Never log `self.request` or `self.request.body` directly:
+            # the request carries auth headers/cookies, and the body may be
+            # arbitrary request content; only the already-validated path
+            # fields are safe/useful to record, and only at debug level.
+            self._serverlog.debug('SbatchHandler.post() - inputPath: %s, outputPath: %s', inputPath, outputPath)
 
             if not inputPath:
                 raise tornado.web.MissingArgumentError('inputPath')
 
+            # Boundary validation: inputPath/outputPath must be plain strings
+            # with no embedded NUL bytes before being handed to argv-based
+            # execution (they are already passed as their own argv elements,
+            # never shell-interpreted, but a non-string or NUL-containing
+            # value indicates a malformed/malicious request and must be
+            # rejected outright rather than reaching the subprocess call).
+            for name, value in (('inputPath', inputPath), ('outputPath', outputPath)):
+                if value is not None:
+                    if not isinstance(value, str) or '\x00' in value:
+                        raise InvalidSlurmPath(name, value)
+
             out = await self.run_command(inputPath, outputPath)
             await self.finish(json.dumps(out))
             return
+        except tornado.web.MissingArgumentError as e:
+            self._serverlog.exception(e)
+            self.set_status(400)
+            error_resp = {
+                "success": False,
+                "responseMessage": "Failure: {}".format(self._slurm_command),
+                "errorMessage": "Malformed request: {}".format(str(e)),
+                "exitCode": -1,
+                "data": {}
+            }
+            await self.finish(json.dumps(error_resp))
+        except InvalidSlurmPath as e:
+            self._serverlog.exception(e)
+            self.set_status(400)
+            error_resp = {
+                "success": False,
+                "responseMessage": "Failure: {}".format(self._slurm_command),
+                "errorMessage": e.message,
+                "exitCode": -1,
+                "data": {}
+            }
+            await self.finish(json.dumps(error_resp))
         except Exception as e:
             self._serverlog.exception(e)
+            self.set_status(500)
             error_resp = {
                 "success": False,
                 "responseMessage": "Failure: {}".format(self._slurm_command),
@@ -519,13 +659,13 @@ class SqueueHandler(SlurmCommandHandler):
         return exec_command
 
     async def run_command(self, args: list = None):
-        responseMessage = ""
-        errorMessage = "{} did not run!".format(self._slurm_command)
+        response_message = ""
+        error_message = "{} did not run!".format(self._slurm_command)
         returncode = -1
         rows = []
         try:
             exec_command = self.get_command()
-            self._serverlog.info("SqueueHandler.run_command(): {}".format(exec_command))
+            self._serverlog.debug("SqueueHandler.run_command(): %s", exec_command)
             out = await self._run_command(exec_command)
 
             returncode = out.get("returncode", -1)
@@ -533,11 +673,11 @@ class SqueueHandler(SlurmCommandHandler):
             cmd_stderr = out.get("stderr", "").strip() if out.get("stderr") else ""
 
             if returncode != 0:
-                responseMessage = "Failure: {} {}".format(exec_command, cmd_stdout)
-                errorMessage = cmd_stderr
+                response_message = "Failure: {} {}".format(exec_command, cmd_stdout)
+                error_message = cmd_stderr
             else:
-                responseMessage = "Success: {}".format(exec_command)
-                errorMessage = None
+                response_message = "Success: {}".format(exec_command)
+                error_message = None
 
             data_lines = cmd_stdout.splitlines() if cmd_stdout else []
             for row in data_lines:
@@ -551,14 +691,14 @@ class SqueueHandler(SlurmCommandHandler):
                     rows.append([(html.escape(entry)).strip() for entry in values])
         except KeyError as ke:
             self._serverlog.exception(ke)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Missing key before running command: {}".format(str(ke))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Missing key before running command: {}".format(str(ke))
             returncode = -1
             rows = []
         except Exception as e:
             self._serverlog.exception(e)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Unhandled Exception: {}".format(str(e))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Unhandled Exception: {}".format(str(e))
             returncode = -1
             rows = []
         finally:
@@ -578,15 +718,15 @@ class SqueueHandler(SlurmCommandHandler):
             }
             return {
                 "success": success,
-                "responseMessage": responseMessage,
-                "errorMessage": None if success else errorMessage,
+                "responseMessage": response_message,
+                "errorMessage": None if success else error_message,
                 "exitCode": returncode,
                 "data": data
             }
 
     @tornado.web.authenticated
     async def get(self):
-        self._serverlog.info("SqueueHandler.get() {}".format(self._slurm_command))
+        self._serverlog.debug("SqueueHandler.get() %s", self._slurm_command)
         out = {
             "returncode": -1,
             "stderr": "Command did not run!",
@@ -596,8 +736,11 @@ class SqueueHandler(SlurmCommandHandler):
         try:
             out = await self.run_command()
             data_dict = out
+            if not data_dict.get("success", False):
+                self.set_status(500 if out.get("exitCode") not in (127,) else 503)
         except Exception as e:
             self._serverlog.exception("Unhandled Exception: {}".format(e))
+            self.set_status(500)
             data_dict = {
                 "success": False,
                 "responseMessage": "Failure: {}".format(self._slurm_command),
@@ -615,8 +758,9 @@ class SacctHandler(SlurmCommandHandler):
         self._serverlog.debug("SacctHandler.initialize()")
 
     def _get_fields(self):
-        # Default fields align with 8 columns similar to Squeue
-        default_fields = "JobID,Partition,JobName,User,State,Elapsed,NNodes,ExitCode"
+        # Default fields include Submit time so users can distinguish jobs with
+        # the same name/id in the history view.
+        default_fields = "JobID,Partition,JobName,User,State,Submit,Elapsed,NNodes,ExitCode"
         try:
             acc = self.settings.get('SlurmAccounting')
             if acc is not None:
@@ -652,14 +796,14 @@ class SacctHandler(SlurmCommandHandler):
         return base
 
     async def run_command(self, args: list = None, user: str = None):
-        responseMessage = ""
-        errorMessage = f"{self._slurm_command} did not run!"
+        response_message = ""
+        error_message = f"{self._slurm_command} did not run!"
         returncode = -1
         rows = []
         columns = self._get_fields().split(',')
         try:
             exec_command = self.get_command(user=user)
-            self._serverlog.info("SacctHandler.run_command(): {}".format(exec_command))
+            self._serverlog.debug("SacctHandler.run_command(): %s", exec_command)
             out = await self._run_command(exec_command)
 
             returncode = out.get("returncode", -1)
@@ -667,11 +811,11 @@ class SacctHandler(SlurmCommandHandler):
             cmd_stderr = out.get("stderr", "").strip() if out.get("stderr") else ""
 
             if returncode != 0:
-                responseMessage = "Failure: {} {}".format(exec_command, cmd_stdout)
-                errorMessage = cmd_stderr
+                response_message = "Failure: {} {}".format(exec_command, cmd_stdout)
+                error_message = cmd_stderr
             else:
-                responseMessage = "Success: {}".format(exec_command)
-                errorMessage = None
+                response_message = "Success: {}".format(exec_command)
+                error_message = None
 
             data_lines = cmd_stdout.splitlines() if cmd_stdout else []
             for line in data_lines:
@@ -696,14 +840,14 @@ class SacctHandler(SlurmCommandHandler):
                     pass
         except KeyError as ke:
             self._serverlog.exception(ke)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Missing key before running command: {}".format(str(ke))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Missing key before running command: {}".format(str(ke))
             returncode = -1
             rows = []
         except Exception as e:
             self._serverlog.exception(e)
-            responseMessage = "Failure: {}".format(self._slurm_command)
-            errorMessage = "Unhandled Exception: {}".format(str(e))
+            response_message = "Failure: {}".format(self._slurm_command)
+            error_message = "Unhandled Exception: {}".format(str(e))
             returncode = -1
             rows = []
         finally:
@@ -714,15 +858,15 @@ class SacctHandler(SlurmCommandHandler):
             }
             return {
                 "success": success,
-                "responseMessage": responseMessage,
-                "errorMessage": None if success else errorMessage,
+                "responseMessage": response_message,
+                "errorMessage": None if success else error_message,
                 "exitCode": returncode,
                 "data": data
             }
 
     @tornado.web.authenticated
     async def get(self):
-        self._serverlog.info("SacctHandler.get() {}".format(self._slurm_command))
+        self._serverlog.debug("SacctHandler.get() %s", self._slurm_command)
         try:
             # Optional user filter via query parameter
             user = None
@@ -731,9 +875,12 @@ class SacctHandler(SlurmCommandHandler):
             except Exception:
                 user = None
             out = await self.run_command(user=user)
+            if not out.get("success", False):
+                self.set_status(503 if out.get("exitCode") == 127 else 500)
             await self.finish(json.dumps(out))
         except Exception as e:
             self._serverlog.exception("Unhandled Exception: {}".format(e))
+            self.set_status(500)
             await self.finish(json.dumps({
                 "success": False,
                 "responseMessage": "Failure: {}".format(self._slurm_command),
@@ -811,28 +958,22 @@ class UiConfigHandler(APIHandler):
                 except Exception:
                     pass
 
-            payload = {
-                "success": True,
-                "data": {
-                    "queue_column_labels": labels,
-                    "queue_column_sizing": sizing,
-                    "history_column_labels": history_labels,
-                    "details_field_groups": details_field_groups,
-                    "details_labels": details_labels,
-                    "details_sources": details_sources,
-                    "details_hidden": details_hidden,
-                    "squeue_reload_limit_ms": reload_limit_ms,
-                    "dev_diagnostics": dev_diag,
-                }
-            }
+            payload = make_envelope(True, data={
+                "queue_column_labels": labels,
+                "queue_column_sizing": sizing,
+                "history_column_labels": history_labels,
+                "details_field_groups": details_field_groups,
+                "details_labels": details_labels,
+                "details_sources": details_sources,
+                "details_hidden": details_hidden,
+                "squeue_reload_limit_ms": reload_limit_ms,
+                "dev_diagnostics": dev_diag,
+            })
             await self.finish(json.dumps(payload))
         except Exception as e:
             self._serverlog.exception("Unhandled Exception in UiConfigHandler: {}".format(e))
-            await self.finish(json.dumps({
-                "success": False,
-                "errorMessage": str(e),
-                "data": {}
-            }))
+            self.set_status(500)
+            await self.finish(json.dumps(make_envelope(False, error=str(e), exit_code=1)))
 
 
 class JobDetailsHandler(APIHandler):
@@ -881,21 +1022,89 @@ class JobDetailsHandler(APIHandler):
         return path
 
     def expand_and_verify_path(self, path: str, jid: str, jname: str, user: str, workdir: str) -> str:
-        """Expand Slurm placeholders and verify file exists. Return None if not found."""
+        """Expand Slurm placeholders and verify file exists. Return None if not found.
+
+        Path policy (documented for `production_checklist.md` §4):
+          - Absolute paths (including those resolved from `~`) are trusted as
+            configured by Slurm/the admin's `details_queries` policy or the
+            job's own recorded `StdOut`/`StdErr`/`WorkDir` values; they are not
+            user-request-controlled, so no traversal restriction applies.
+          - Relative paths are joined against the job's own `WorkDir` (as
+            reported by Slurm for that job) and then normalized; the result
+            must still resolve inside that `WorkDir` so a relative value
+            containing `..` cannot escape the job's working directory
+            (path-traversal protection).
+          - Symlinks are followed (`os.path.isfile`/`os.stat` naturally
+            dereference them) since Slurm output files are commonly symlinked
+            on shared filesystems (e.g. `latest.log` -> `job_123.log`); we do
+            not restrict symlink targets beyond the relative-path containment
+            check above, since Slurm's own filesystem/ownership controls are
+            the authoritative enforcement point for a shared cluster mount.
+          - Ownership/ACL enforcement is intentionally left to the underlying
+            filesystem and Slurm's own permissions; the server process reads
+            with its own privileges and `os.path.isfile`/`os.stat` will simply
+            fail (treated as "not found") if access is denied.
+        """
         if not path:
             return None
         expanded = self.expand_slurm_path(path, jid, jname, user)
         if not expanded:
             return None
-        # If path is relative, join with workdir
+        # If path is relative, join with workdir and enforce containment so a
+        # value like "../../etc/passwd" cannot escape the job's working
+        # directory. Absolute paths (or ~-prefixed) are trusted as-is.
         if not expanded.startswith('/') and not expanded.startswith('~'):
             if workdir:
-                expanded = os.path.join(workdir, expanded)
+                joined = os.path.normpath(os.path.join(workdir, expanded))
+                real_workdir = os.path.realpath(workdir)
+                real_joined = os.path.realpath(joined)
+                if os.path.commonpath([real_workdir, real_joined]) != real_workdir:
+                    self._serverlog.warning(
+                        "expand_and_verify_path(): rejected path escaping workdir: {} (workdir={})".format(
+                            path, workdir))
+                    return None
+                expanded = joined
         # Expand ~ to home directory
         expanded = os.path.expanduser(expanded)
-        # Check if file exists
+        # Check if file exists (symlinks are followed; ownership/permission
+        # enforcement is delegated to the filesystem itself)
         if os.path.isfile(expanded):
             return expanded
+        return None
+
+    @staticmethod
+    def _get_file_info(path):
+        """Return dict with exists flag and size in bytes for a file path, or None/0 if missing."""
+        if not path:
+            return {"exists": False, "size": 0}
+        try:
+            st = os.stat(path)
+            return {"exists": True, "size": st.st_size}
+        except OSError:
+            return {"exists": False, "size": 0}
+
+    @staticmethod
+    def _extract_script_path(command):
+        """Extract the script path from a command string like 'sbatch /path/to/script.sh'."""
+        if not command:
+            return None
+        # Strip leading sbatch/srun/salloc and their flags to get the script path
+        parts = shlex.split(command)
+        if not parts:
+            return None
+        # Skip the submitter command (sbatch, srun, etc.) and any flags
+        i = 0
+        if parts[0] in ('sbatch', 'srun', 'salloc') or parts[0].endswith('/sbatch') or parts[0].endswith('/srun') or parts[0].endswith('/salloc'):
+            i = 1
+        # Skip flags (start with -)
+        while i < len(parts) and parts[i].startswith('-'):
+            # Some flags take a value argument (e.g. -p partition, --qos=xxx)
+            if '=' not in parts[i] and i + 1 < len(parts) and not parts[i + 1].startswith('-') and not parts[i + 1].startswith('/'):
+                i += 2
+            else:
+                i += 1
+        if i < len(parts):
+            return parts[i]
         return None
 
     def initialize(self, log=logger, scontrol: str = "scontrol", sacct: str = "sacct"):
@@ -916,13 +1125,20 @@ class JobDetailsHandler(APIHandler):
     # Hook and policy utilities
     # ------------------------
     def _is_admin_policy_present(self) -> bool:
+        """
+        Whether `web_app.settings['SlurmUI']` reflects admin-controlled policy.
+
+        `SlurmUI` is populated exactly once, at server-extension load time, from
+        Traitlets config (e.g. `jupyter_server_config.py` / `*.d` JSON files) —
+        see `_load_jupyter_server_extension()` in `__init__.py`. `UiConfigHandler`
+        (the only route that exposes it) is GET-only, so no user-facing endpoint
+        can ever mutate `web_app.settings['SlurmUI']`; a populated dict here is
+        therefore, by construction, admin/server-scope policy, never
+        user-scope/request-scope data.
+        """
         try:
             ui_cfg = self.settings.get('SlurmUI')
-            if not ui_cfg:
-                return False
-            # If this dict came from validated admin file loader, it may carry a marker
-            # Fallback: consider any dict present as admin for now.
-            return True
+            return bool(ui_cfg)
         except Exception:
             return False
 
@@ -931,6 +1147,10 @@ class JobDetailsHandler(APIHandler):
             return
         self._hooks_loaded = True
         ui_cfg = self.settings.get('SlurmUI') or {}
+        # `JLSLURM_DEV` only relaxes admin-only checks when no admin policy has
+        # actually been loaded (i.e. a bare local/dev server with no
+        # `SlurmUI` config at all); once an admin has configured `SlurmUI`
+        # (even in a dev deployment), that config is authoritative.
         dev_env = bool(os.environ.get('JLSLURM_DEV')) and not self._is_admin_policy_present()
         allow_user_hooks = ui_cfg.get('allow_user_hooks', False) or dev_env
         dev_mode = ui_cfg.get('dev_mode', False) or dev_env
@@ -942,9 +1162,14 @@ class JobDetailsHandler(APIHandler):
             mod, _, attr = path.partition(':')
             if not attr:
                 return None
-            # allow-list check unless dev_mode
-            if allowlist and not dev_mode:
-                if not any(mod == p or mod.startswith(p + '.') for p in allowlist):
+            # Fail-closed allow-list check: outside dev_mode, a hook is only
+            # loaded if its module prefix is explicitly present in the
+            # allowlist. An *empty* allowlist must reject every hook in
+            # production rather than silently permitting any configured
+            # import (the previous `if allowlist and not dev_mode:` guard
+            # was bypassed entirely whenever the allowlist was empty).
+            if not dev_mode:
+                if not allowlist or not any(mod == p or mod.startswith(p + '.') for p in allowlist):
                     self._serverlog.warning(f"Rejected hook import not in allowlist: {path}")
                     return None
             try:
@@ -977,6 +1202,56 @@ class JobDetailsHandler(APIHandler):
             self._serverlog.warning(f"Failed to parse SLURM_UI_DEV_* env overrides: {e}")
         return {'details_queries': None, 'details_field_map': None, 'details_field_aliases': None}
 
+    @staticmethod
+    def _parse_gpu_from_tres(tres_str: str):
+        """Parse GPU count/type/mem/util from a Slurm TRES string, e.g.
+        "cpu=128,mem=229902M,node=1,billing=128,gres/gpu:a100=4,gres/gpu=4".
+        Modern Slurm (real Perlmutter output, both `scontrol show job`'s
+        AllocTRES/ReqTRES and `sacct`'s AllocTRES/ReqTRES) reports GPUs this
+        way; the untyped `gres/gpu=N` key is always present, with an
+        additional typed `gres/gpu:<type>=N` key when a specific GPU
+        architecture was requested/allocated.
+        Returns a dict with keys: gpus, gpu_type, gpu_mem, gpu_util (each
+        None if not present).
+        """
+        result = {"gpus": None, "gpu_type": None, "gpu_mem": None, "gpu_util": None}
+        if not tres_str or tres_str == "(null)":
+            return result
+        for part in tres_str.split(','):
+            part = part.strip()
+            if part.startswith('gres/gpumem'):
+                m = re.search(r'=(\d+)', part)
+                if m:
+                    result["gpu_mem"] = m.group(1)
+            elif part.startswith('gres/gpuutil'):
+                m = re.search(r'=(\d+)', part)
+                if m:
+                    result["gpu_util"] = m.group(1)
+            elif part.startswith('gres/gpu'):
+                mtype = re.match(r'gres/gpu:([^=]+)=(\d+)', part)
+                if mtype:
+                    result["gpu_type"] = mtype.group(1)
+                    result["gpus"] = mtype.group(2)
+                else:
+                    m = re.match(r'gres/gpu=(\d+)', part)
+                    if m and result["gpus"] is None:
+                        result["gpus"] = m.group(1)
+        return result
+
+    @staticmethod
+    def _parse_gpu_from_tres_per_node(tres_per_node: str):
+        """Parse GPU count from a `TresPerNode`/`TresPerTask`-style string,
+        e.g. "gres/gpu:4" (real Perlmutter `scontrol show job` format for a
+        pending/requested job that has no typed GRES). Returns the count as
+        a string, or None.
+        """
+        if not tres_per_node:
+            return None
+        m = re.search(r'gres/gpu:(\d+)', tres_per_node)
+        if m:
+            return m.group(1)
+        return None
+
     def _build_sacct_argv(self, qprofile: dict, job_id: str):
         args = list(qprofile.get('args') or [])
         fmt = qprofile.get('format') or []
@@ -995,7 +1270,16 @@ class JobDetailsHandler(APIHandler):
         start = time.time()
         async def _exec(cmdv, envv):
             proc = await asyncio.create_subprocess_exec(*cmdv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=envv or None)
-            out_b, err_b = await proc.communicate()
+            try:
+                out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=SLURM_COMMAND_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                return -1, "", "command timed out after {}s".format(SLURM_COMMAND_TIMEOUT_SECONDS)
+            except asyncio.CancelledError:
+                proc.kill()
+                await proc.communicate()
+                raise
             return proc.returncode, out_b.decode(errors='replace'), err_b.decode(errors='replace')
 
         self._load_site_hooks()
@@ -1039,12 +1323,13 @@ class JobDetailsHandler(APIHandler):
         try:
             job_id = (job_id or "").strip()
             if not job_id:
-                await self.finish(json.dumps({
-                    "success": False,
-                    "exitCode": 1,
-                    "errorMessage": "Missing job_id",
-                    "data": {}
-                }))
+                self.set_status(400)
+                await self.finish(json.dumps(make_envelope(False, error="Missing job_id", exit_code=1)))
+                return
+            if not jobIDMatcher.search(job_id):
+                self.set_status(400)
+                await self.finish(json.dumps(make_envelope(
+                    False, error="Invalid job_id: {}".format(job_id), exit_code=1)))
                 return
 
             # Load policy and possible dev overrides for this process
@@ -1083,6 +1368,10 @@ class JobDetailsHandler(APIHandler):
                 "Nodelist": None,
                 "CPUs": None,
                 "GPUs": None,
+                "GPUType": None,
+                "GPUMemVariant": None,
+                "GPUMem": None,
+                "GPUUtil": None,
                 "Mem": None,
                 "GRES": None,
                 "TimeLimit": None,
@@ -1099,13 +1388,20 @@ class JobDetailsHandler(APIHandler):
 
             def parse_scontrol(text: str):
                 # Parse scontrol Key=Value output, handling values that contain spaces.
-                # Each pair is delimited by ' Key=' boundaries or end-of-line.
+                # Each pair is delimited by ' Key=' boundaries or end-of-line. Keys can
+                # themselves contain a colon (e.g. real scontrol output like
+                # "Partition=gpu AllocNode:Sid=slurmctld:1362" -- verified against a
+                # real Docker Slurm cluster run), so the key pattern must allow
+                # `[\w:]+`, not just `\w+`, or a compound key like `AllocNode:Sid`
+                # would fail to match as a boundary and bleed into the previous
+                # value (e.g. `Partition` would incorrectly include everything up
+                # to the next real boundary).
                 kv = {}
                 for line in text.splitlines():
                     stripped = line.strip()
                     if not stripped:
                         continue
-                    for m in re.finditer(r'(\w+)=(.*?)(?=\s+\w+=|$)', stripped):
+                    for m in re.finditer(r'([\w:]+)=(.*?)(?=\s+[\w:]+=|$)', stripped):
                         kv[m.group(1)] = m.group(2).strip()
                 return kv
 
@@ -1121,21 +1417,48 @@ class JobDetailsHandler(APIHandler):
             if rc == 0 and out:
                 kv = parse_scontrol(out)
 
-                # Parse GPUs from GRES
-                gpus = None
+                # Parse GPUs. Real `scontrol show job` output (verified
+                # against actual Perlmutter data) does NOT have a `Gres=`
+                # key -- that only appears in `scontrol show node` output.
+                # A job instead reports its GPU allocation/request via
+                # `AllocTRES`/`ReqTRES` (e.g. "gres/gpu:a100=4,gres/gpu=4")
+                # once running, or `TresPerNode`/`TresPerTask`
+                # (e.g. "gres/gpu:4", untyped) while still pending. Fall
+                # back to the legacy `Gres=` key for older Slurm sites that
+                # might still emit it there.
+                tres_gpu = self._parse_gpu_from_tres(kv.get('AllocTRES') or kv.get('ReqTRES') or '')
+                gpus = tres_gpu["gpus"]
+                gpu_type = tres_gpu["gpu_type"]
+                if gpus is None:
+                    gpus = self._parse_gpu_from_tres_per_node(kv.get('TresPerNode') or kv.get('TresPerTask') or '')
                 gres = kv.get('Gres')
-                if gres:
-                    # Gres examples: gpu:4, gpu:kepler:2, gpu:1(S:0)
+                if gpus is None and gres:
+                    # Gres examples: gpu:4, gpu:kepler:2, gpu:1(S:0),
+                    # gpu:a100:4(S:0-3) (real Perlmutter node format).
                     for part in gres.split(','):
                         if part.startswith('gpu'):
-                            m = re.search(r'gpu:.*?(\d+)', part)
+                            # Strip trailing socket-affinity info, e.g. "(S:0-3)".
+                            clean = re.sub(r'\(.*\)$', '', part)
+                            segs = clean.split(':')
+                            if len(segs) >= 3:
+                                # gpu:<type>:<count>
+                                gpu_type = segs[1]
+                                gpus = segs[2]
+                                break
+                            m = re.search(r'gpu:(\d+)', clean)
                             if m:
                                 gpus = m.group(1)
                                 break
-                            m = re.search(r'gpu:(\d+)', part)
-                            if m:
-                                gpus = m.group(1)
-                                break
+
+                # GPU memory variant (e.g. hbm40g/hbm80g) is exposed via node
+                # Features/constraints on Perlmutter, not a distinct GRES type
+                # (e.g. Features=gpu&a100&hbm80g).
+                gpu_mem_variant = None
+                features = kv.get('Features') or kv.get('ActiveFeatures')
+                if features:
+                    m = re.search(r'hbm(\d+g)', features, re.IGNORECASE)
+                    if m:
+                        gpu_mem_variant = m.group(1)
                 
                 # Compute Elapsed
                 elapsed = None
@@ -1185,6 +1508,10 @@ class JobDetailsHandler(APIHandler):
                     "NodeList": kv.get('NodeList'),
                     "CPUs": kv.get('NumCPUs') or kv.get('NumCPUsRaw'),
                     "GPUs": gpus,
+                    "GPUType": gpu_type,
+                    "GPUMemVariant": gpu_mem_variant,
+                    "GPUMem": tres_gpu["gpu_mem"],
+                    "GPUUtil": tres_gpu["gpu_util"],
                     "Mem": kv.get('MinMemoryNode') or kv.get('MinMemoryCPU'),
                     "GRES": kv.get('Gres'),
                     "TimeLimit": kv.get('TimeLimit'),
@@ -1207,14 +1534,34 @@ class JobDetailsHandler(APIHandler):
                     alloc = {"command": "sacct", "args": ["--parsable2","-n"],
                              "format": [
                                  "JobID","JobName","User","Partition","Account","AllocCPUS","State","ExitCode",
-                                 "Start","End","Elapsed","QOS","NodeList","NNodes","NTasks","ReqMem","MaxRSS",
-                                 "TotalCPU","UserCPU","SystemCPU","AveDiskRead","AveDiskWrite",
-                                 "WorkDir","StdOut","StdErr","SubmitLine"
+                                 "Start","End","Elapsed","Submit","Timelimit","QOS","NodeList","NNodes","NTasks",
+                                 "ReqMem","MaxRSS","TotalCPU","UserCPU","SystemCPU","AveDiskRead","AveDiskWrite",
+                                 "WorkDir","StdOut","StdErr","SubmitLine",
+                                 "DerivedExitCode","AllocTRES","ReqTRES"
                              ],
                              "time_window_days": 30}
                 # Use shlex.split to handle paths with spaces (e.g., "python /path/to/sacct")
-                argv = shlex.split(self._sacct) + self._build_sacct_argv(alloc, job_id)
+                sacct_prefix = shlex.split(self._sacct)
+                # Sanitize the job id for sacct: drop an array throttle suffix
+                # (e.g. "123_[1-4%2]") which Slurm's job-array parser rejects.
+                query_job_id = re.sub(r'%\d+', '', job_id)
+                argv = sacct_prefix + self._build_sacct_argv(alloc, query_job_id)
                 rc, out, err = await self._run_with_hooks('sacct', argv, os.environ.copy(), context)
+                # An array element / range job id (e.g. "123_4" or "123_[1-4]")
+                # can be rejected by some Slurm versions with a fatal
+                # "Bad job array element specified" error (non-zero exit, no
+                # output). In that case, retry against the base array job id,
+                # which returns every element; the row-pick below still selects
+                # the requested element by its JobID.
+                if (rc != 0 or not out.strip()) and '_' in query_job_id:
+                    base_job_id = query_job_id.split('_', 1)[0]
+                    if base_job_id and base_job_id != query_job_id:
+                        self._serverlog.info(
+                            "sacct job-details failed for '%s' (rc=%s); retrying with base array id '%s'",
+                            query_job_id, rc, base_job_id
+                        )
+                        argv = sacct_prefix + self._build_sacct_argv(alloc, base_job_id)
+                        rc, out, err = await self._run_with_hooks('sacct', argv, os.environ.copy(), context)
                 if rc == 0 and out.strip():
                     lines = [l for l in out.splitlines() if l.strip()]
                     # derive columns from alloc.format
@@ -1247,6 +1594,30 @@ class JobDetailsHandler(APIHandler):
                     juser = get_field('User')
                     workdir = get_field('WorkDir')
 
+                    # Parse GPUs from AllocTRES/ReqTRES. Modern Slurm removed
+                    # AllocGRES/ReqGRES (sacct fatals with "AllocGRES has been
+                    # removed, please use AllocTRES"), so GPU counts now come
+                    # from the TRES string, e.g. "cpu=2,mem=256M,node=1,gres/gpu=4"
+                    # or "gres/gpu:a100=2".
+                    sacct_tres = get_field('AllocTRES') or get_field('ReqTRES')
+                    sacct_tres_gpu = self._parse_gpu_from_tres(sacct_tres)
+                    sacct_gpus = sacct_tres_gpu["gpus"]
+                    sacct_gpu_type = sacct_tres_gpu["gpu_type"]
+                    sacct_gpu_mem = sacct_tres_gpu["gpu_mem"]
+                    sacct_gpu_util = sacct_tres_gpu["gpu_util"]
+                    # Present only the GRES portion of TRES (e.g. "gres/gpu=1"),
+                    # not the full cpu/mem/node TRES string, for the details view.
+                    gres_tokens = [p for p in (sacct_tres or '').split(',') if p.startswith('gres/')]
+                    sacct_gres = ','.join(gres_tokens) if gres_tokens else None
+
+                    # Pull resource-usage fields from .batch step row when available,
+                    # since the main job row typically has these empty.
+                    batch_row = next((r for r in parsed_rows if '.batch' in (r.get('JobID') or '')), None)
+                    if batch_row:
+                        batch_get = self.get_field_factory(batch_row, aliases, field_map)
+                    else:
+                        batch_get = get_field
+
                     fields.update({
                         "JobName": jname,
                         "User": juser,
@@ -1255,20 +1626,30 @@ class JobDetailsHandler(APIHandler):
                         "CPUs": get_field('CPUs') or get_field('AllocCPUS'),
                         "State": get_field('State'),
                         "ExitCode": get_field('ExitCode'),
+                        "DerivedExitCode": get_field('DerivedExitCode'),
+                        "SubmitTime": get_field('Submit'),
                         "StartTime": get_field('Start'),
                         "EndTime": get_field('End'),
                         "Elapsed": get_field('Elapsed'),
+                        "TimeLimit": get_field('Timelimit'),
                         "QOS": get_field('QOS'),
                         "NodeList": get_field('NodeList'),
+                        "Nodelist": get_field('NodeList'),
                         "Nodes": get_field('NNodes'),
                         "Tasks": get_field('NTasks'),
                         "ReqMem": get_field('ReqMem'),
-                        "MaxRSS": get_field('MaxRSS'),
-                        "TotalCPU": get_field('TotalCPU'),
-                        "UserCPU": get_field('UserCPU'),
-                        "SystemCPU": get_field('SystemCPU'),
-                        "AveDiskRead": get_field('AveDiskRead'),
-                        "AveDiskWrite": get_field('AveDiskWrite'),
+                        "Mem": get_field('ReqMem'),
+                        "GRES": sacct_gres,
+                        "GPUs": sacct_gpus,
+                        "GPUType": sacct_gpu_type,
+                        "GPUMem": sacct_gpu_mem,
+                        "GPUUtil": sacct_gpu_util,
+                        "MaxRSS": batch_get('MaxRSS'),
+                        "TotalCPU": batch_get('TotalCPU'),
+                        "UserCPU": batch_get('UserCPU'),
+                        "SystemCPU": batch_get('SystemCPU'),
+                        "AveDiskRead": batch_get('AveDiskRead'),
+                        "AveDiskWrite": batch_get('AveDiskWrite'),
                         "WorkDir": workdir,
                         "Stdout": self.expand_and_verify_path(raw_stdout, job_id, jname, juser, workdir),
                         "Stderr": self.expand_and_verify_path(raw_stderr, job_id, jname, juser, workdir),
@@ -1286,13 +1667,24 @@ class JobDetailsHandler(APIHandler):
                     except Exception:
                         steps = []
                 else:
-                    await self.finish(json.dumps({
-                        "success": False,
-                        "exitCode": rc if rc is not None else 1,
-                        "errorMessage": err.strip() or "Job not found",
-                        "data": {}
-                    }))
+                    self.set_status(404)
+                    await self.finish(json.dumps(make_envelope(
+                        False,
+                        error=err.strip() or "Job not found",
+                        exit_code=rc if rc is not None else 1,
+                    )))
                     return
+
+            # Enrich Stdout/Stderr with file existence and size info
+            for fkey in ('Stdout', 'Stderr'):
+                fpath = fields.get(fkey)
+                info = self._get_file_info(fpath)
+                fields[fkey + 'Exists'] = info['exists']
+                fields[fkey + 'Size'] = info['size']
+
+            # Extract script path from Command for editor actions
+            cmd = fields.get('Command')
+            fields['CommandScript'] = self._extract_script_path(cmd)
 
             # post_process hook (as final normalization opportunity)
             self._load_site_hooks()
@@ -1302,25 +1694,50 @@ class JobDetailsHandler(APIHandler):
                 except Exception as e:
                     self._serverlog.warning(f"post_process hook failed: {e}")
 
-            payload = {
-                "success": True,
-                "exitCode": 0,
-                "data": {
-                    "source": source,
-                    "fields": fields,
-                    # Optional: present only when sacct returned multiple rows (steps)
-                    **({"steps": steps} if source == 'sacct' and 'steps' in locals() and steps else {})
-                }
-            }
+            payload = make_envelope(True, exit_code=0, data={
+                "source": source,
+                "fields": fields,
+                # Optional: present only when sacct returned multiple rows (steps)
+                **({"steps": steps} if source == 'sacct' and 'steps' in locals() and steps else {})
+            })
             await self.finish(json.dumps(payload))
         except Exception as e:
             self._serverlog.exception("Unhandled Exception in JobDetailsHandler: {}".format(e))
-            await self.finish(json.dumps({
-                "success": False,
-                "exitCode": 1,
-                "errorMessage": str(e),
-                "data": {}
-            }))
+            self.set_status(500)
+            await self.finish(json.dumps(make_envelope(False, error=str(e), exit_code=1)))
+
+
+def _validate_slurm_command_path(name, path, log=None):
+    """Warn at server startup if a configured Slurm command path does not
+    look trustworthy: an absolute path that doesn't exist or isn't
+    executable, or a bare command name that can't be resolved on `PATH` at
+    all. This is advisory rather than fatal (many valid deployments
+    intentionally rely on `PATH` resolution, and `sacct_path` may
+    legitimately be an "interpreter script" form like
+    "/usr/bin/python3 /path/to/wrapper.py"), but it surfaces obvious
+    misconfiguration at startup instead of failing silently on every
+    request.
+    """
+    log = log or logger
+    if not path:
+        return
+    try:
+        first_token = shlex.split(path)[0]
+    except Exception:
+        first_token = path
+    if not first_token:
+        return
+    if os.path.isabs(first_token):
+        if not os.path.exists(first_token):
+            log.warning("Configured %s command path does not exist: %s", name, first_token)
+        elif not os.path.isfile(first_token) or not os.access(first_token, os.X_OK):
+            log.warning("Configured %s command path is not an executable file: %s", name, first_token)
+    else:
+        if not shutil.which(first_token):
+            log.warning(
+                "Configured %s command '%s' could not be resolved on PATH; "
+                "requests to this endpoint will fail with HTTP 503",
+                name, first_token)
 
 
 def setup_handlers(web_app, temporary_directory=None, log=None):
@@ -1366,10 +1783,17 @@ def setup_handlers(web_app, temporary_directory=None, log=None):
     # Optional accounting path (sacct); if not configured, fallback to PATH
     sacct_path = obtain_path("sacct")
 
+    for _name, _path in (
+        ("squeue", squeue_path), ("scancel", scancel_path),
+        ("scontrol", scontrol_path), ("sbatch", sbatch_path),
+        ("sacct", sacct_path),
+    ):
+        _validate_slurm_command_path(_name, _path, log)
+
     base_url = web_app.settings['base_url']
 
     handlers = [
-        (url_path_join(base_url, "jupyterlab_slurm", "get_example"), ExampleHandler, dict(log=log)),
+        (url_path_join(base_url, "jupyterlab_slurm", "status"), HealthCheckHandler, dict(log=log)),
         (url_path_join(base_url, "jupyterlab_slurm", "user"), UserFetchHandler, dict(log=log)),
         (url_path_join(base_url, "jupyterlab_slurm", "ui-config"), UiConfigHandler, dict(log=log)),
         (url_path_join(base_url, 'jupyterlab_slurm', 'squeue'), SqueueHandler, dict(squeue=squeue_path, log=log)),
@@ -1385,6 +1809,16 @@ def setup_handlers(web_app, temporary_directory=None, log=None):
         (url_path_join(base_url, 'jupyterlab_slurm', 'job', '(?P<job_id>.*)'), JobDetailsHandler,
          dict(scontrol=scontrol_path, sacct=sacct_path, log=log))
      ]
+
+    # The test-suite harness route is only appended when its (optional) module
+    # is present *and* an admin has explicitly enabled it via SlurmTesting.enabled.
+    # See test_suite.py for why this module can be omitted from a production build.
+    if SlurmTestSuiteHandler is not None:
+        from .test_suite import register_handler as _register_test_suite_handler
+        _register_test_suite_handler(
+            handlers, base_url, url_path_join, squeue_path, sacct_path,
+            scontrol_path, sbatch_path, scancel_path, log, web_app,
+        )
 
     if log:
         log.debug("Slurm command paths: \nsqueue: {}\nscancel: {}\nscontrol: {}\nsbatch: {}\nsacct: {}\n".format(

@@ -2,10 +2,12 @@ import json
 import os
 import re
 import sys
+import asyncio
 from typing import Any, Dict
 
 from traitlets.config import Config
 import pytest
+from tornado.httpclient import HTTPClientError
 
 from .__mocks__.slurm import SlurmControllerMock
 from ..config import SlurmCommandPaths
@@ -55,15 +57,97 @@ async def run_command(commands: str) -> Dict[str, Any]:
         'returncode': process.returncode
         }
 
-async def test_get_example(jp_fetch):
-    response = await jp_fetch("jupyterlab_slurm", "get_example")
+async def test_status_health_check(jp_fetch):
+    response = await jp_fetch("jupyterlab_slurm", "status")
 
     assert response.code == 200
     payload = json.loads(response.body)
-    expected_payload = {
-        "data": "This is the /jupyterlab_slurm/get_example endpoint!"
-    }
-    assert payload == expected_payload
+    assert payload["status"] == "ok"
+    assert payload["name"] == "jupyterlab_slurm"
+    # Version is reported so the frontend can verify a matched deployment.
+    assert "version" in payload and isinstance(payload["version"], str)
+
+
+async def test_test_suite_is_disabled_by_default(jp_fetch):
+    """The compatibility harness must not be routable in a default deployment."""
+    with pytest.raises(HTTPClientError) as exc_info:
+        await jp_fetch(
+            "jupyterlab_slurm",
+            "test-suite",
+            method="POST",
+            body="{}",
+        )
+    assert exc_info.value.code == 404
+
+
+@pytest.fixture
+def enabled_testing(jp_server_config, tmp_path):
+    testing = Config()
+    testing["enabled"] = True
+    testing["allow_mutations"] = False
+    testing["test_directory"] = str(tmp_path)
+    testing["max_runtime_seconds"] = 60
+    jp_server_config["SlurmTesting"] = testing
+    return jp_server_config
+
+
+async def test_test_suite_run_lifecycle_read_only(enabled_testing, jp_fetch):
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "test-suite",
+        method="POST",
+        body="{}",
+    )
+    assert response.code == 202
+    run_id = json.loads(response.body)["data"]["runId"]
+
+    # The read-only mode should complete without submitting a Slurm job.
+    for _ in range(20):
+        response = await jp_fetch("jupyterlab_slurm", f"test-suite/{run_id}")
+        payload = json.loads(response.body)
+        if payload["data"]["status"] in {"completed", "error"}:
+            break
+        await asyncio.sleep(0.05)
+    assert payload["data"]["status"] == "completed"
+    names = {item["name"] for item in payload["data"]["results"]}
+    assert {"squeue", "sacct", "scontrol", "submit-and-account"} <= names
+
+@pytest.fixture
+def admin_ui_config(jp_server_config):
+    """Simulate an HPC admin defining SlurmUI/SlurmAccounting via server config."""
+    ui_config = Config()
+    ui_config['queue_column_labels'] = {'JOBID': 'Job ID', 'PARTITION': 'QOS'}
+    ui_config['history_column_labels'] = {'JobID': 'Job ID'}
+    ui_config['squeue_reload_limit_ms'] = 12000
+    jp_server_config['SlurmUI'] = ui_config
+
+    acc_config = Config()
+    acc_config['sacct_fields'] = \
+        'JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode,Submit'
+    acc_config['sacct_time_window_days'] = 14
+    jp_server_config['SlurmAccounting'] = acc_config
+    return jp_server_config
+
+async def test_admin_ui_config_propagates(admin_ui_config, jp_fetch):
+    # Admin-defined SlurmUI settings should flow through to the /ui-config endpoint.
+    response = await jp_fetch("jupyterlab_slurm", "ui-config")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    data = payload['data']
+    assert data['queue_column_labels'] == {'JOBID': 'Job ID', 'PARTITION': 'QOS'}
+    assert data['history_column_labels'] == {'JobID': 'Job ID'}
+    assert data['squeue_reload_limit_ms'] == 12000
+
+async def test_admin_sacct_fields_propagate(admin_ui_config, jp_fetch):
+    # Admin-defined SlurmAccounting.sacct_fields should drive the history columns.
+    response = await jp_fetch("jupyterlab_slurm", "sacct")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['data']['columns'] == [
+        'JobID', 'JobName', 'Partition', 'Account',
+        'AllocCPUS', 'State', 'ExitCode', 'Submit'
+    ]
 
 async def test_squeue(jp_fetch):
     response = await jp_fetch("jupyterlab_slurm", "squeue")
@@ -94,7 +178,7 @@ async def test_scancel(jp_fetch):
         "jupyterlab_slurm",
         "scancel",
         method='DELETE',
-        params={'job_ids': [job_id]}
+        params=[('job_ids', job_id)]
     )
     assert response.code == 200
     result = json.loads(response.body)
@@ -123,33 +207,41 @@ async def test_scontrol(jp_fetch):
         "jupyterlab_slurm",
         "scontrol/hold",
         method='PATCH',
+        headers={'Content-Type': 'application/json'},
         body=json.dumps({'job_ids': [job_id]})
     )
     assert response.code == 200
-    # Verify state is 'H'
+    # Verify the job is now held. NERSC/standard Slurm represents a user hold as
+    # a PENDING job (ST=PD) with Reason=(JobHeldUser) -- there is no distinct
+    # 'H' squeue state code.
     response = await jp_fetch("jupyterlab_slurm", "squeue")
     assert response.code == 200
     payload = json.loads(response.body)
     rows = payload['data']['rows']
     held_row = next((row for row in rows if row[0] == job_id), None)
-    assert held_row is not None and held_row[4] == 'H'
+    assert held_row is not None
+    assert held_row[4] == 'PD'
+    assert held_row[7] == '(JobHeldUser)'
 
     # Release the job
     response = await jp_fetch(
         "jupyterlab_slurm",
         "scontrol/release",
         method='PATCH',
+        headers={'Content-Type': 'application/json'},
         body=json.dumps({'job_ids': [job_id]})
     )
     assert response.code == 200
 
-    # Verify state changed from 'H' back to a schedulable state (not 'H')
+    # After release the hold reason is cleared (no longer JobHeldUser); the job
+    # returns to the normal pending queue.
     response = await jp_fetch("jupyterlab_slurm", "squeue")
     assert response.code == 200
     payload = json.loads(response.body)
     rows = payload['data']['rows']
     released_row = next((row for row in rows if row[0] == job_id), None)
-    assert released_row is not None and released_row[4] != 'H'
+    assert released_row is not None
+    assert released_row[7] != '(JobHeldUser)'
 
 async def test_sbatch(jp_fetch, mock_server_config, tmp_path):
     # confirm that the job is not there before running sbatch
@@ -194,11 +286,20 @@ async def test_sacct(jp_fetch):
     assert isinstance(rows, list)
     assert isinstance(cols, list)
     assert cols == [
-        'JobID', 'Partition', 'JobName', 'User', 'State', 'Elapsed', 'NNodes', 'ExitCode'
+        'JobID', 'Partition', 'JobName', 'User', 'State', 'Submit', 'Elapsed', 'NNodes', 'ExitCode'
     ]
+    # Submit time is a default column so users can distinguish jobs sharing a
+    # name/id; verify it is populated for allocation rows.
+    submit_idx = cols.index('Submit')
     # ensure at least one history row present and matches column count
     assert len(rows) > 0
     assert all(len(r) == len(cols) for r in rows)
+    # The history query uses `sacct -X`, so only allocation rows must be
+    # returned -- no job-step rows such as "5025.batch" / "5025.extern".
+    job_id_idx = cols.index('JobID')
+    assert all('.' not in r[job_id_idx] for r in rows)
+    # Every allocation row should carry a Submit timestamp.
+    assert all(len(r[submit_idx]) > 0 for r in rows)
 
 async def test_sacct_user_filter(jp_fetch):
     # Request history for a specific user known to be present in the mock data
@@ -267,11 +368,58 @@ async def test_job_details_sacct_fallback(jp_fetch):
     assert "5025.batch" in step_ids
 
 
+async def test_job_details_sacct_gpu_from_tres(jp_fetch):
+    """Job Details via the sacct fallback must derive the GPU count from the
+    modern AllocTRES/ReqTRES fields. Older code requested AllocGRES/ReqGRES,
+    which modern Slurm removed (sacct fatals: "AllocGRES has been removed,
+    please use AllocTRES"), breaking Job Details entirely."""
+    job_id = "5026"  # GPU job in the fixture: AllocTRES=...,gres/gpu=1,...
+    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload["success"] is True
+    assert payload["exitCode"] == 0
+    data = payload["data"]
+    assert data.get("source") == "sacct"
+    fields = data.get("fields", {})
+    assert fields.get("JobID") == job_id
+    # GPU count parsed from the TRES string (gres/gpu=1)
+    assert fields.get("GPUs") == "1"
+    # GPU type parsed from the typed TRES key (gres/gpu:a100=1)
+    assert fields.get("GPUType") == "a100"
+    # GPU memory/utilization TRES keys (gres/gpumem, gres/gpuutil)
+    assert fields.get("GPUMem") == "40000"
+    assert fields.get("GPUUtil") == "87"
+
+
+async def test_job_details_array_element_sacct_fallback(jp_fetch):
+    """An array-element job id that Slurm's sacct rejects ("Bad job array
+    element specified") must still resolve by retrying against the base array
+    job id, then selecting the requested element from the results."""
+    job_id = "7040_2"
+    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload["success"] is True
+    assert payload["exitCode"] == 0
+    data = payload["data"]
+    assert data.get("source") == "sacct"
+    fields = data.get("fields", {})
+    # The requested element row (not the sibling 7040_1) should be picked.
+    assert fields.get("JobID") == job_id
+    assert fields.get("State") == "FAILED"
+    assert fields.get("ExitCode") == "7:0"
+    # The .batch step row for the element should be surfaced as a step.
+    steps = data.get("steps", [])
+    step_ids = [s.get("JobID") for s in steps]
+    assert "7040_2.batch" in step_ids
+
+
 async def test_job_details_not_found(jp_fetch):
     """Test the /job/<id> endpoint returns error for non-existent job."""
     job_id = "99999"  # Non-existent job
-    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}")
-    assert response.code == 200  # HTTP 200 but success=False
+    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}", raise_error=False)
+    assert response.code == 404  # Not found is now surfaced as HTTP 404
     payload = json.loads(response.body)
     assert payload["success"] is False
     assert "errorMessage" in payload or payload.get("exitCode") != 0
@@ -395,14 +543,69 @@ async def test_job_details_active_job_via_scontrol(jp_fetch):
     assert fields.get("WorkDir") is not None
     assert fields.get("Stdout") is not None
     assert fields.get("Stderr") is not None
-    # We didn't set GRES in the simple mock string, so we'll skip that check or adjust it
-    # assert fields.get("GRES") == "gpu:4"
-    # These fields are now populated
-    assert fields.get("GPUs") == "4"
+    # A CPU-partition job (like Perlmutter's `shared`/`regular`) has no GPU
+    # allocation: the mock now models resources via modern TRES strings and
+    # only emits a GPU for GPU partitions.
+    assert fields.get("GPUs") is None
+    # NumCPUs is 2 per node (2 nodes -> 4), Mem comes from MinMemoryNode.
+    assert fields.get("CPUs") == "4"
+    assert fields.get("Mem") == "256M"
     assert fields.get("Elapsed") is not None
-    assert fields.get("Stdout") is not None
-    assert fields.get("Stderr") is not None
-    assert fields.get("WorkDir") is not None
+
+
+async def test_job_details_gpu_job_via_scontrol(jp_fetch):
+    """A running GPU-partition job should surface a GPU count. Verified
+    against real Perlmutter `scontrol show job` output: the job has NO
+    `Gres=` key at all (only `scontrol show node` has that); GPU info comes
+    from the typed `AllocTRES` (e.g. "gres/gpu:a100=4,gres/gpu=4") once the
+    job is running."""
+    # Inject a running GPU job into the shared squeue mock data.
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'squeue_test_data.txt')
+    with open(data_path, 'a') as f:
+        # jobid partition jobname user state elapsed nodes reason/nodelist
+        f.write("            5025_9 gpu       gpu_job       testuser R        0:30      1 node009\n")
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_9")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload["success"] is True
+    data = payload["data"]
+    assert data.get("source") == "scontrol"
+    fields = data.get("fields", {})
+    assert fields.get("State") == "RUNNING"
+    assert fields.get("Partition") == "gpu"
+    assert fields.get("GPUs") == "4"
+    # GPU type comes from the typed AllocTRES key (gres/gpu:a100=4), and the
+    # memory variant (40GB vs 80GB) comes from node Features/constraints
+    # (Features=gpu&a100&hbm80g), matching real Perlmutter node output.
+    assert fields.get("GPUType") == "a100"
+    assert fields.get("GPUMemVariant") == "80g"
+
+
+async def test_job_details_gpu_job_pending_via_scontrol(jp_fetch):
+    """A PENDING GPU-partition job should still surface a GPU count, sourced
+    from the untyped `TresPerNode`/`ReqTRES` (since `AllocTRES` is `(null)`
+    before the job starts). Verified against a real Perlmutter pending GPU
+    job, which reports `TresPerNode=gres/gpu:4` and
+    `ReqTRES=...,gres/gpu=1024` with no GPU type information available yet."""
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'squeue_test_data.txt')
+    with open(data_path, 'a') as f:
+        # jobid partition jobname user state elapsed nodes reason/nodelist
+        f.write("            5025_10 gpu       gpu_job_pend  testuser PD       0:00      2 (Resources)\n")
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_10")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload["success"] is True
+    data = payload["data"]
+    assert data.get("source") == "scontrol"
+    fields = data.get("fields", {})
+    assert fields.get("State") == "PENDING"
+    assert fields.get("Partition") == "gpu"
+    # No typed AllocTRES yet (job hasn't started); GPU count must come from
+    # TresPerNode/ReqTRES instead.
+    assert fields.get("GPUs") == "4"
+
 
 async def test_job_details_placeholder_expansion(jp_fetch, tmp_path):
     """Test Slurm placeholder expansion in log paths."""
@@ -539,3 +742,1056 @@ def test_elapsed_calculation_logic():
     assert calculate_elapsed("2024-03-21 10:00:00", None) == "01:00:00"
     # Test Unknown
     assert calculate_elapsed("Unknown", None) is None
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage: error/edge paths across the command handlers
+# ---------------------------------------------------------------------------
+
+def _make_job_details_handler():
+    """Build a JobDetailsHandler instance without a running server, for unit
+    testing its pure helper methods."""
+    from ..handlers import JobDetailsHandler
+    from unittest.mock import MagicMock
+    app = MagicMock()
+    app.ui_methods = {}
+    app.settings = {"base_url": "/", "csp_report_uri": "/csp"}
+    request = MagicMock()
+    request.connection = MagicMock()
+    return JobDetailsHandler(app, request)
+
+
+async def test_run_with_hooks_bounded_by_timeout(monkeypatch):
+    """The site-hook execution path (`JobDetailsHandler._run_with_hooks`) must
+    be bounded by a timeout like every other Slurm invocation, so a
+    hung/unresponsive command cannot block a request or leak a process
+    indefinitely."""
+    from .. import handlers as handlers_module
+
+    handler = _make_job_details_handler()
+    handler._hooks_loaded = True
+    handler._hooks = {
+        'pre_build': None, 'pre_exec': None, 'around_exec': None,
+        'post_process': None, 'audit': None,
+    }
+
+    class _NeverEndingProc:
+        returncode = None
+
+        async def communicate(self):
+            await asyncio.sleep(10)
+            return b"", b""
+
+        def kill(self):
+            self.returncode = -9
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        return _NeverEndingProc()
+
+    monkeypatch.setattr(handlers_module.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(handlers_module, "SLURM_COMMAND_TIMEOUT_SECONDS", 0.05)
+
+    rc, out, err = await handler._run_with_hooks("sacct", ["sacct", "-j", "1"], {}, {})
+    assert rc == -1
+    assert out == ""
+    assert "timed out" in err
+
+
+async def test_user_endpoint(jp_fetch):
+    """The /user endpoint returns the current username, wrapped in the
+    unified response envelope."""
+    response = await jp_fetch("jupyterlab_slurm", "user")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    assert payload['exitCode'] == 0
+    assert payload['errorMessage'] is None
+    assert "user" in payload['data']
+
+
+async def test_scancel_invalid_job_id(jp_fetch):
+    """A non-numeric job id must be rejected (InvalidSlurmJobID) and surface as
+    a failed response rather than shelling out."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        params={'job_ids': ['not-a-job-id']},
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request (invalid job id)
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['exitCode'] != 0
+
+
+async def test_scancel_multiple_jobs(jp_fetch):
+    """scancel should remove every requested job id from the queue."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    assert len(rows) >= 2
+    ids = [rows[0][0], rows[1][0]]
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        params=[('job_ids', jid) for jid in ids]
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    new_rows = json.loads(response.body)['data']['rows']
+    remaining = {r[0] for r in new_rows}
+    assert all(jid not in remaining for jid in ids)
+
+
+async def test_scontrol_hold_missing_job_ids(jp_fetch):
+    """Holding with an empty job list must fail with a clear message rather than
+    silently succeeding."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/hold",
+        method='PATCH',
+        body=json.dumps({'job_ids': []}),
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request (missing job ids)
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['errorMessage'] == "No job IDs provided"
+    assert result['data']['changedIds'] == []
+
+
+async def test_scontrol_hold_multiple_jobs(jp_fetch):
+    """Holding several jobs at once should mark them all held and report each in
+    changedIds."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    ids = [rows[0][0], rows[2][0]]
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/hold",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': ids})
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    assert set(result['data']['changedIds']) == set(ids)
+
+    # Verify both jobs now report the held state in squeue: ST=PD with
+    # Reason=(JobHeldUser) (NERSC/standard Slurm has no 'H' state code).
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    held = {r[0]: (r[4], r[7]) for r in rows}
+    for jid in ids:
+        assert held.get(jid) == ('PD', '(JobHeldUser)')
+
+
+async def test_sbatch_missing_input_path(jp_fetch):
+    """Submitting without an inputPath must fail gracefully with an error
+    envelope (not a 500)."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({}),
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request (missing inputPath)
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['exitCode'] != 0
+
+
+async def test_sbatch_via_handler_extracts_job_id(jp_fetch):
+    """A successful sbatch through the handler should add a job to the queue and
+    surface the parsed job id in the response data."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    original = len(json.loads(response.body)['data']['rows'])
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({'inputPath': '/tmp/some_job.sh'})
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    assert result['exitCode'] == 0
+    # The mock prints "Submitted batch job <id>"; the handler parses the id.
+    assert result['data'].get('jobId') is not None
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    post = len(json.loads(response.body)['data']['rows'])
+    assert post == original + 1
+
+
+async def test_sbatch_gpu_job_end_to_end(jp_fetch, tmp_path):
+    """Submitting a script with `#SBATCH --partition=gpu` (or `--gres=gpu`)
+    should flow through the mock cluster like a real GPU job: it shows up in
+    squeue under the GPU partition, and its job details expose a GPU count,
+    exercising the same local mock cluster used for CPU jobs."""
+    script = tmp_path / "gpu_job.sh"
+    script.write_text(
+        "#!/bin/bash\n"
+        "#SBATCH --partition=gpu\n"
+        "#SBATCH --job-name=gpu_e2e\n"
+        "#SBATCH --nodes=1\n"
+        "#SBATCH --gres=gpu:4\n"
+        "echo hello\n"
+    )
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({'inputPath': str(script)})
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    job_id = result['data'].get('jobId')
+    assert job_id is not None
+
+    # The job should now be visible in the queue under the GPU partition.
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    row = next((r for r in rows if job_id in r), None)
+    assert row is not None
+    assert "gpu" in row
+
+    # Job details should surface GPU info for this submitted job.
+    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    fields = payload['data'].get('fields', {})
+    assert fields.get('Partition') == 'gpu'
+    assert fields.get('GPUs') == '4'
+
+
+async def test_job_details_pending_job_via_scontrol(jp_fetch):
+    """A pending job in the queue resolves via scontrol with a PENDING state and
+    a Reason populated (from the reason/nodelist column)."""
+    job_id = "5025_3"  # PENDING with reason "(Priority)" in the test data
+    response = await jp_fetch("jupyterlab_slurm", f"job/{job_id}")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    data = payload['data']
+    assert data.get('source') == 'scontrol'
+    fields = data.get('fields', {})
+    assert fields.get('JobID') == job_id
+    assert fields.get('State') == 'PENDING'
+    assert fields.get('Reason') is not None
+    # StdoutExists/StderrExists enrichment keys are always present
+    assert 'StdoutExists' in fields
+    assert 'StderrExists' in fields
+
+
+def test_get_file_info(tmp_path):
+    """_get_file_info reports existence and size for real paths, and safely
+    handles missing paths and None."""
+    handler = _make_job_details_handler()
+
+    f = tmp_path / "out.log"
+    f.write_text("hello world")  # 11 bytes
+    info = handler._get_file_info(str(f))
+    assert info['exists'] is True
+    assert info['size'] == 11
+
+    missing = handler._get_file_info(str(tmp_path / "nope.log"))
+    assert missing == {"exists": False, "size": 0}
+
+    assert handler._get_file_info(None) == {"exists": False, "size": 0}
+
+
+def test_extract_script_path():
+    """_extract_script_path strips the submitter command and its flags to find
+    the script path."""
+    handler = _make_job_details_handler()
+
+    assert handler._extract_script_path("sbatch /home/u/run.sh") == "/home/u/run.sh"
+    assert handler._extract_script_path(
+        "sbatch -N1 --qos=regular /home/u/run.sh") == "/home/u/run.sh"
+    assert handler._extract_script_path(
+        "/usr/bin/sbatch -p debug /scratch/job.sh") == "/scratch/job.sh"
+    assert handler._extract_script_path("") is None
+    assert handler._extract_script_path(None) is None
+
+
+def test_get_field_factory():
+    """get_field_factory resolves fields via the field_map (raw->normalized),
+    aliases, direct names, and returns None when absent."""
+    handler = _make_job_details_handler()
+
+    pick = {'JobIDRaw': '123', 'JobState': 'RUNNING', 'Foo': 'bar'}
+    field_map = {'JobIDRaw': 'JobID'}
+    aliases = {'State': ['JobState']}
+    get_field = handler.get_field_factory(pick, aliases, field_map)
+
+    # Resolved via reverse field_map lookup
+    assert get_field('JobID') == '123'
+    # Resolved via alias list
+    assert get_field('State') == 'RUNNING'
+    # Resolved directly by same name
+    assert get_field('Foo') == 'bar'
+    # Absent -> None
+    assert get_field('Missing') is None
+
+
+# ---------------------------------------------------------------------------
+# Malformed JSON, missing/invalid job IDs, empty queues, partial multi-job
+# actions, non-UTF-8 output, and very large output.
+# ---------------------------------------------------------------------------
+
+async def test_scontrol_hold_malformed_json_body(jp_fetch):
+    """A body that claims to be JSON but isn't must not crash the handler; it
+    should degrade to the same "no job IDs provided" failure envelope used
+    for an actually-empty request, rather than a 500."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/hold",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body="{not valid json",
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request body
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['errorMessage'] == "No job IDs provided"
+    assert result['data']['requestedIds'] == []
+    assert result['data']['changedIds'] == []
+
+
+async def test_scancel_malformed_json_body(jp_fetch):
+    """A malformed JSON body on scancel must surface as a failed response
+    envelope, not an unhandled server error."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        headers={'Content-Type': 'application/json'},
+        body="{not valid json",
+        allow_nonstandard_methods=True,
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request body
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['data']['requestedIds'] == []
+    assert result['data']['changedIds'] == []
+
+
+async def test_squeue_empty_queue(jp_fetch):
+    """squeue must report success with an empty rows list when no jobs are
+    queued, rather than an error or a malformed payload."""
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'squeue_test_data.txt')
+    with open(data_path, 'w') as f:
+        f.write("")
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    assert payload['exitCode'] == 0
+    assert payload['data']['rows'] == []
+    assert payload['data']['columns'] == [
+        "JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES", "NODELIST(REASON)"
+    ]
+
+
+async def test_scontrol_hold_partial_multi_job_failure(jp_fetch, monkeypatch):
+    """When holding several jobs and one fails, `changedIds` must reflect only
+    the jobs that actually succeeded, `success` must be False overall, and the
+    failing job id must be identifiable from the error message.
+
+    The per-job command execution is monkeypatched (rather than relying on a
+    replacement mock binary wired through `SlurmCommandPaths`) so the fake
+    failure is guaranteed to be in effect regardless of fixture setup order.
+    """
+    from .. import handlers as handlers_module
+
+    async def fake_run_command(self, command=None, stdin=None, cwd=None):
+        last_token = command[-1] if isinstance(command, (list, tuple)) else (command.strip().split()[-1] if command else None)
+        if last_token == '9999':
+            return {"stdout": "", "stderr": "scontrol: error: Invalid job id specified", "returncode": 1}
+        return {"stdout": "", "stderr": "", "returncode": 0}
+
+    monkeypatch.setattr(handlers_module.SlurmCommandHandler, "_run_command", fake_run_command)
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/hold",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': ['5025_1', '9999']}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert result['data']['requestedIds'] == ['5025_1', '9999']
+    assert result['data']['changedIds'] == ['5025_1']
+    assert '9999' in result['errorMessage']
+
+
+async def test_run_command_handles_non_utf8_output(tmp_path):
+    """`SlurmCommandHandler._run_command()` decodes stdout/stderr with
+    errors='replace'; invalid byte sequences in a command's raw output must
+    not raise, and the surrounding well-formed text must still come through."""
+    from ..handlers import SlurmCommandHandler
+    from unittest.mock import MagicMock
+
+    handler = SlurmCommandHandler.__new__(SlurmCommandHandler)
+    handler._serverlog = MagicMock()
+
+    script = tmp_path / "non_utf8_emitter"
+    with open(script, 'wb') as f:
+        f.write(b"#!/usr/bin/env python3\n")
+        f.write(b"import sys\n")
+        f.write(b"sys.stdout.buffer.write(b'ok \\xff\\xfe done\\n')\n")
+        f.write(b"sys.stderr.buffer.write(b'warn \\xfd\\xfc end\\n')\n")
+    script.chmod(0o755)
+
+    out = await handler._run_command(f"{sys.executable} {script}")
+    assert out['returncode'] == 0
+    assert 'ok' in out['stdout']
+    assert 'done' in out['stdout']
+    assert 'warn' in out['stderr']
+    assert 'end' in out['stderr']
+
+
+async def test_squeue_handles_very_large_output(jp_fetch):
+    """A very large number of queued jobs must all be parsed without
+    truncation or error. Uses the default squeue mock's shared backing file
+    directly (rather than a replacement mock binary), so it is unaffected by
+    fixture setup ordering."""
+    num_jobs = 5000
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'squeue_test_data.txt')
+    lines = [
+        f"{i:>18} debug     job_{i:<8} testuser R        0:01      1 node001\n"
+        for i in range(num_jobs)
+    ]
+    with open(data_path, 'w') as f:
+        f.writelines(lines)
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    assert payload['success'] is True
+    rows = payload['data']['rows']
+    assert len(rows) == num_jobs
+    assert rows[0][0] == '0'
+    assert rows[-1][0] == str(num_jobs - 1)
+
+
+# ---------------------------------------------------------------------------
+# Path expansion placeholders (%j, %J, %A, %a, %x, %u), symlink behavior,
+# inaccessible files, and cross-user paths.
+# ---------------------------------------------------------------------------
+
+def test_expand_slurm_path_additional_placeholders():
+    """Extend basic placeholder coverage: full-string combinations, %j vs %J
+    for array jobs, and graceful handling of missing name/user."""
+    handler = _make_job_details_handler()
+
+    # %j keeps the full (possibly array-element) job id.
+    assert handler.expand_slurm_path("out-%j.log", "500", "myjob", "bob") == "out-500.log"
+    assert handler.expand_slurm_path("out-%j.log", "500_2", "myjob", "bob") == "out-500_2.log"
+
+    # All placeholders combined in a single template string.
+    combined = handler.expand_slurm_path("%u/%x/%A_%a_%j_%J.log", "700_3", "training", "alice")
+    assert combined == "alice/training/700_3_700_3_700.log"
+
+    # Missing name/user must be replaced with empty strings, not raise.
+    assert handler.expand_slurm_path("%u-%x.log", "1", None, None) == "-.log"
+
+
+def test_expand_and_verify_path_symlink(tmp_path):
+    """A symlink pointing at a real, existing file must resolve successfully
+    (the handler uses `os.path.isfile`, which follows symlinks)."""
+    handler = _make_job_details_handler()
+    real = tmp_path / "real.out"
+    real.write_text("actual output")
+    link = tmp_path / "linked.out"
+    link.symlink_to(real)
+
+    assert handler.expand_and_verify_path(
+        str(link), "1", "job", "user", str(tmp_path)) == str(link)
+
+
+def test_expand_and_verify_path_broken_symlink(tmp_path):
+    """A dangling symlink (target missing) must not be reported as an
+    existing file."""
+    handler = _make_job_details_handler()
+    target = tmp_path / "missing_target.out"
+    link = tmp_path / "broken.out"
+    link.symlink_to(target)
+
+    assert handler.expand_and_verify_path(
+        str(link), "1", "job", "user", str(tmp_path)) is None
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses directory permission checks")
+def test_get_file_info_permission_denied(tmp_path):
+    """A file that exists but sits behind a non-searchable directory must be
+    reported as not accessible (exists: False), not raise an unhandled
+    exception."""
+    handler = _make_job_details_handler()
+    restricted_dir = tmp_path / "restricted"
+    restricted_dir.mkdir()
+    target = restricted_dir / "out.log"
+    target.write_text("secret output")
+    os.chmod(str(restricted_dir), 0o000)
+    try:
+        info = handler._get_file_info(str(target))
+        assert info == {"exists": False, "size": 0}
+    finally:
+        os.chmod(str(restricted_dir), 0o755)
+
+
+def test_expand_and_verify_path_rejects_traversal_outside_workdir(tmp_path):
+    """A relative path containing `..` must not be allowed to escape the
+    job's own working directory (path-traversal protection), even if a file
+    exists at the resolved location outside `workdir`."""
+    handler = _make_job_details_handler()
+    workdir = tmp_path / "job_workdir"
+    workdir.mkdir()
+    outside = tmp_path / "secret.out"
+    outside.write_text("outside workdir")
+
+    resolved = handler.expand_and_verify_path(
+        "../secret.out", "1", "job", "user", str(workdir)
+    )
+    assert resolved is None
+
+
+def test_expand_and_verify_path_absolute_path_still_trusted(tmp_path):
+    """Absolute paths (e.g. a job's own recorded StdOut/StdErr) are trusted
+    as-is and are not subject to the relative-path workdir containment
+    check."""
+    handler = _make_job_details_handler()
+    workdir = tmp_path / "job_workdir"
+    workdir.mkdir()
+    absolute_file = tmp_path / "elsewhere.out"
+    absolute_file.write_text("absolute output")
+
+    resolved = handler.expand_and_verify_path(
+        str(absolute_file), "1", "job", "user", str(workdir)
+    )
+    assert resolved == str(absolute_file)
+
+
+def test_expand_and_verify_path_cross_user_no_ownership_check(tmp_path):
+    """Document a currently-open gap (see production_checklist.md section 4):
+    `expand_and_verify_path` only checks that a file exists on disk; it does
+    not verify the file actually belongs to (or is otherwise associated
+    with) the requesting user. A path expanded with another user's `%u` value
+    still resolves as long as the file is present."""
+    handler = _make_job_details_handler()
+    other_users_dir = tmp_path / "home" / "otheruser"
+    other_users_dir.mkdir(parents=True)
+    f = other_users_dir / "slurm-42.out"
+    f.write_text("someone else's output")
+
+    resolved = handler.expand_and_verify_path(
+        "slurm-%j.out", "42", "job", "otheruser", str(other_users_dir)
+    )
+    assert resolved == str(f)
+
+
+# ---------------------------------------------------------------------------
+# Unified response envelope: every endpoint (success and failure) must carry
+# the same 5-key shape: success, responseMessage, errorMessage, exitCode, data.
+# ---------------------------------------------------------------------------
+
+_ENVELOPE_KEYS = {"success", "responseMessage", "errorMessage", "exitCode", "data"}
+
+
+def _assert_envelope_shape(payload):
+    assert _ENVELOPE_KEYS <= set(payload.keys())
+    assert isinstance(payload["success"], bool)
+    assert isinstance(payload["exitCode"], int)
+    assert isinstance(payload["data"], dict)
+    if payload["success"]:
+        assert payload["errorMessage"] is None
+    else:
+        assert payload["errorMessage"] is not None
+
+
+async def test_status_envelope_shape(jp_fetch):
+    """/status must conform to the unified envelope while still exposing the
+    legacy top-level status/name/version fields for one release."""
+    response = await jp_fetch("jupyterlab_slurm", "status")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    assert payload["success"] is True
+    assert payload["exitCode"] == 0
+    assert payload["data"]["name"] == "jupyterlab_slurm"
+    assert "version" in payload["data"]
+    # Legacy fields kept for back-compat.
+    assert payload["status"] == "ok"
+    assert payload["name"] == "jupyterlab_slurm"
+
+
+async def test_user_envelope_shape(jp_fetch):
+    """/user success response must conform to the unified envelope."""
+    response = await jp_fetch("jupyterlab_slurm", "user")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    assert payload["success"] is True
+    assert "user" in payload["data"]
+
+
+async def test_user_error_path_returns_envelope_not_crash(monkeypatch):
+    """Regression test for the historical bug where the /user error path did
+    `json.dumps(e)` on a raw Exception object, raising TypeError instead of
+    returning a graceful error body. Exercised directly against the handler
+    since the failure path requires os.environ.get() itself to raise."""
+    from ..handlers import UserFetchHandler
+    from unittest.mock import MagicMock
+
+    app = MagicMock()
+    app.ui_methods = {}
+    app.settings = {"base_url": "/", "csp_report_uri": "/csp"}
+    request = MagicMock()
+    request.connection = MagicMock()
+    handler = UserFetchHandler(app, request)
+    handler._serverlog = MagicMock()
+
+    # Bypass the @tornado.web.authenticated check on a bare handler instance
+    # (no full request cycle ran `prepare()` to populate the current user).
+    # Use an identity object with no username/name so the handler falls back
+    # to `os.environ.get('USER')` (the path being regression-tested), while
+    # still being truthy enough to satisfy `@tornado.web.authenticated`.
+    class _IdentityWithoutName:
+        username = None
+        name = None
+
+    handler._jupyter_current_user = _IdentityWithoutName()
+
+    finished = {}
+
+    def fake_finish(body):
+        finished["body"] = body
+
+    handler.finish = fake_finish
+
+    def raising_get(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(os.environ, "get", raising_get)
+
+    # Must not raise.
+    handler.get()
+
+    payload = json.loads(finished["body"])
+    _assert_envelope_shape(payload)
+    assert payload["success"] is False
+    assert "boom" in payload["errorMessage"]
+
+
+async def test_ui_config_envelope_shape(jp_fetch):
+    """/ui-config must conform to the unified envelope (exitCode/
+    responseMessage added alongside the pre-existing success/data)."""
+    response = await jp_fetch("jupyterlab_slurm", "ui-config")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    assert payload["success"] is True
+    assert payload["exitCode"] == 0
+
+
+async def test_job_details_envelope_shape(jp_fetch):
+    """/job/<id> success response must include responseMessage alongside the
+    pre-existing success/exitCode/data keys."""
+    response = await jp_fetch("jupyterlab_slurm", "job/5025")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    assert payload["success"] is True
+
+
+async def test_job_details_missing_id_envelope_shape(jp_fetch):
+    """/job/<id> failure response (an invalid job id) must conform to the
+    unified envelope and surface as a 400 (malformed request)."""
+    response = await jp_fetch("jupyterlab_slurm", "job/nonexistent-9999999", raise_error=False)
+    assert response.code == 400
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    assert payload["success"] is False
+
+
+async def test_test_suite_envelope_shape(enabled_testing, jp_fetch):
+    """/test-suite responses (start + status) must include exitCode/
+    responseMessage alongside the pre-existing success/data/errorMessage."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "test-suite",
+        method="POST",
+        body="{}",
+    )
+    assert response.code == 202
+    payload = json.loads(response.body)
+    _assert_envelope_shape(payload)
+    run_id = payload["data"]["runId"]
+
+    for _ in range(20):
+        response = await jp_fetch("jupyterlab_slurm", f"test-suite/{run_id}")
+        payload = json.loads(response.body)
+        _assert_envelope_shape(payload)
+        if payload["data"]["status"] in {"completed", "error"}:
+            break
+        await asyncio.sleep(0.05)
+    assert payload["data"]["status"] == "completed"
+
+
+async def test_squeue_scancel_scontrol_sbatch_already_conformant(jp_fetch):
+    """The command handlers already conformed to the 5-key shape before this
+    change; confirm they still do (both on success and on a failure path)."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    assert response.code == 200
+    _assert_envelope_shape(json.loads(response.body))
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        params={'job_ids': ['not-a-job-id']},
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request (invalid job id)
+    _assert_envelope_shape(json.loads(response.body))
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({}),
+        raise_error=False,
+    )
+    assert response.code == 400  # malformed request (missing inputPath)
+    _assert_envelope_shape(json.loads(response.body))
+
+
+# ---------------------------------------------------------------------------
+# HTTP 4xx/5xx statuses, request bounding, and username resolution.
+# ---------------------------------------------------------------------------
+
+async def test_scancel_too_many_job_ids_rejected(jp_fetch):
+    """A request with more job ids than MAX_JOB_IDS_PER_REQUEST must be
+    rejected as a malformed request (400) rather than spawning a command
+    with an unbounded argument list."""
+    from ..handlers import MAX_JOB_IDS_PER_REQUEST
+
+    too_many = [str(i) for i in range(MAX_JOB_IDS_PER_REQUEST + 1)]
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        body=json.dumps({'job_ids': too_many}),
+        headers={'Content-Type': 'application/json'},
+        allow_nonstandard_methods=True,
+        raise_error=False,
+    )
+    assert response.code == 400
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert 'exceeding the limit' in result['errorMessage']
+
+
+async def test_scancel_command_not_found_maps_to_service_unavailable():
+    """When the configured Slurm executable cannot be resolved at all
+    (`_run_command` returns exitCode 127), `run_command()` must classify
+    that as a 503 (service/command unavailable) rather than the generic
+    200 used for an ordinary Slurm command failure."""
+    from ..handlers import ScancelHandler
+    from unittest.mock import MagicMock
+
+    handler = ScancelHandler.__new__(ScancelHandler)
+    handler._slurm_command = "/nonexistent/path/to/scancel-binary"
+    handler._serverlog = MagicMock()
+    handler.get_jobids = lambda: ["123"]
+
+    out = await handler.run_command()
+    assert out['success'] is False
+    assert out['exitCode'] == 127
+    assert out['_httpStatus'] == 503
+
+
+async def test_user_prefers_authenticated_identity_over_os_environ(monkeypatch):
+    """Username resolution must prefer the authenticated Jupyter identity
+    over the process `USER` environment variable, so multi-user deployments
+    (e.g. JupyterHub) don't leak/misreport a shared process owner."""
+    from ..handlers import UserFetchHandler
+    from unittest.mock import MagicMock
+
+    app = MagicMock()
+    app.ui_methods = {}
+    app.settings = {"base_url": "/", "csp_report_uri": "/csp"}
+    request = MagicMock()
+    request.connection = MagicMock()
+    handler = UserFetchHandler(app, request)
+    handler._serverlog = MagicMock()
+
+    class _Identity:
+        username = "real-authenticated-user"
+
+    handler._jupyter_current_user = _Identity()
+
+    finished = {}
+    handler.finish = lambda body: finished.setdefault("body", body)
+
+    # If the handler ever fell back to os.environ, this would report a
+    # different name and the assertion below would fail.
+    monkeypatch.setattr(os.environ, "get", lambda *a, **k: "wrong-process-user")
+
+    handler.get()
+
+    payload = json.loads(finished["body"])
+    assert payload["success"] is True
+    assert payload["data"]["user"] == "real-authenticated-user"
+
+
+# ---------------------------------------------------------------------------
+# Argv-based execution boundary: sbatch/scontrol never re-tokenize a
+# user-controlled value (script path / job id) through shlex/a shell.
+# ---------------------------------------------------------------------------
+
+async def test_sbatch_rejects_non_string_input_path(jp_fetch):
+    """A non-string inputPath (e.g. a JSON object/array) must be rejected as
+    a malformed request rather than reaching argv-based execution."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({'inputPath': {'not': 'a string'}}),
+        raise_error=False,
+    )
+    assert response.code == 400
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert 'Invalid inputPath' in result['errorMessage']
+
+
+async def test_sbatch_rejects_nul_byte_in_path(jp_fetch):
+    """A path containing an embedded NUL byte must be rejected outright."""
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({'inputPath': "script.sh\x00.sh"}),
+        raise_error=False,
+    )
+    assert response.code == 400
+    result = json.loads(response.body)
+    assert result['success'] is False
+    assert 'Invalid inputPath' in result['errorMessage']
+
+
+async def test_sbatch_script_path_with_spaces_not_retokenized(jp_fetch, tmp_path):
+    """A script path containing whitespace must be passed to sbatch as a
+    single argv element, not re-split by shlex into multiple arguments."""
+    script = tmp_path / "my test job.sh"
+    script.write_text("#!/bin/sh\necho hi\n")
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "sbatch",
+        method='POST',
+        body=json.dumps({'inputPath': str(script), 'outputPath': str(tmp_path)}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    # The mock sbatch script should receive the whole path as one argument
+    # and succeed (rather than erroring out on a mis-split extra argument).
+    assert result['success'] is True
+
+
+async def test_run_command_accepts_argv_list_directly():
+    """`_run_command` must execute a pre-built argv list verbatim (no
+    shlex re-tokenization), which is the boundary-validation-safe path for
+    any user-controlled value such as a submitted script path."""
+    from ..handlers import SlurmCommandHandler
+    from unittest.mock import MagicMock
+
+    handler = SlurmCommandHandler.__new__(SlurmCommandHandler)
+    handler._serverlog = MagicMock()
+
+    out = await handler._run_command([sys.executable, "-c", "print('hello world')"])
+    assert out['returncode'] == 0
+    assert out['stdout'].strip() == 'hello world'
+
+
+def test_validate_slurm_command_path_warns_on_missing_absolute_path(tmp_path):
+    """An absolute, configured command path that doesn't exist on disk must
+    trigger a startup warning (production_checklist.md section 4: verify
+    configured command paths are trusted/executable)."""
+    from ..handlers import _validate_slurm_command_path
+    from unittest.mock import MagicMock
+
+    log = MagicMock()
+    missing = str(tmp_path / "no-such-squeue")
+    _validate_slurm_command_path("squeue", missing, log)
+    assert log.warning.called
+    assert "does not exist" in log.warning.call_args[0][0]
+
+
+def test_validate_slurm_command_path_warns_on_non_executable_file(tmp_path):
+    """An absolute path that exists but isn't executable must also warn."""
+    from ..handlers import _validate_slurm_command_path
+    from unittest.mock import MagicMock
+
+    log = MagicMock()
+    not_exec = tmp_path / "sbatch"
+    not_exec.write_text("not a real binary")
+    os.chmod(str(not_exec), 0o644)
+    _validate_slurm_command_path("sbatch", str(not_exec), log)
+    assert log.warning.called
+    assert "not an executable file" in log.warning.call_args[0][0]
+
+
+def test_validate_slurm_command_path_warns_on_unresolvable_bare_command():
+    """A bare command name that cannot be found on PATH must warn."""
+    from ..handlers import _validate_slurm_command_path
+    from unittest.mock import MagicMock
+
+    log = MagicMock()
+    _validate_slurm_command_path("sacct", "definitely-not-a-real-slurm-command-xyz", log)
+    assert log.warning.called
+    assert "could not be resolved on PATH" in log.warning.call_args[0][0]
+
+
+def test_validate_slurm_command_path_no_warning_for_trusted_absolute_executable():
+    """A valid, executable absolute path must not trigger a warning."""
+    from ..handlers import _validate_slurm_command_path
+    from unittest.mock import MagicMock
+
+    log = MagicMock()
+    _validate_slurm_command_path("squeue", sys.executable, log)
+    log.warning.assert_not_called()
+
+
+def test_validate_slurm_command_path_no_op_for_empty_path():
+    """An empty/None configured path (nothing configured) must be a no-op,
+    not raise or warn."""
+    from ..handlers import _validate_slurm_command_path
+    from unittest.mock import MagicMock
+
+    log = MagicMock()
+    _validate_slurm_command_path("sacct", None, log)
+    _validate_slurm_command_path("sacct", "", log)
+    log.warning.assert_not_called()
+
+
+async def test_run_command_missing_executable_does_not_leak_path_env(monkeypatch):
+    """A missing/unresolvable executable must report a generic error and
+    must NOT include the raw `PATH` environment value in the response body
+    returned to the client (production_checklist.md section 4 redaction
+    policy). The PATH value is still available via debug-level logging for
+    operator troubleshooting."""
+    from ..handlers import SlurmCommandHandler
+    from unittest.mock import MagicMock
+
+    monkeypatch.setenv("PATH", "/some/very/secret-looking/internal/path:/usr/bin")
+    handler = SlurmCommandHandler.__new__(SlurmCommandHandler)
+    handler._serverlog = MagicMock()
+
+    out = await handler._run_command(["definitely-not-a-real-slurm-command-xyz"])
+    assert out["returncode"] == 127
+    assert "secret-looking" not in out["stderr"]
+    assert "PATH=" not in out["stderr"]
+
+
+# ---------------------------------------------------------------------------
+# Admin-configurable hooks: production defaults must disable user hooks/dev
+# mode, enforce the hook allowlist (fail-closed), and never let a
+# request-scope/user-scope value override server policy.
+# ---------------------------------------------------------------------------
+
+def _make_hook_handler(ui_cfg):
+    from ..handlers import JobDetailsHandler
+    from unittest.mock import MagicMock
+
+    handler = JobDetailsHandler.__new__(JobDetailsHandler)
+    handler._serverlog = MagicMock()
+    handler._hooks_loaded = False
+    handler._hooks = {
+        'pre_build': None, 'pre_exec': None, 'around_exec': None,
+        'post_process': None, 'audit': None,
+    }
+    handler.application = MagicMock()
+    handler.application.settings = {'SlurmUI': ui_cfg}
+    return handler
+
+
+def test_site_hook_empty_allowlist_rejects_every_hook_in_production(monkeypatch):
+    """An empty `site_hook_allowlist` must reject every configured hook when
+    not in dev_mode, rather than silently permitting any import (the
+    fail-open bug: `if allowlist and not dev_mode` skipped the check
+    entirely whenever the allowlist was empty)."""
+    monkeypatch.delenv('JLSLURM_DEV', raising=False)
+    handler = _make_hook_handler({
+        'dev_mode': False,
+        'site_hook_allowlist': [],
+        'site_hook_pre_exec': 'os.path:join',
+        'site_hook_audit': 'os.path:join',
+    })
+
+    handler._load_site_hooks()
+
+    assert handler._hooks['pre_exec'] is None
+    assert handler._hooks['audit'] is None
+
+
+def test_site_hook_allowlist_permits_matching_module_only(monkeypatch):
+    """A non-empty allowlist must only permit hooks whose module prefix is
+    explicitly listed; other configured hooks are still rejected."""
+    monkeypatch.delenv('JLSLURM_DEV', raising=False)
+    handler = _make_hook_handler({
+        'dev_mode': False,
+        'site_hook_allowlist': ['os.path'],
+        'site_hook_pre_exec': 'os.path:join',
+        'site_hook_audit': 'json:dumps',
+    })
+
+    handler._load_site_hooks()
+
+    assert handler._hooks['pre_exec'] is not None
+    assert handler._hooks['audit'] is None
+
+
+def test_site_hook_dev_mode_bypasses_allowlist(monkeypatch):
+    """`dev_mode: True` (an explicit admin/server-scope setting) is the only
+    way to bypass the allowlist check."""
+    monkeypatch.delenv('JLSLURM_DEV', raising=False)
+    handler = _make_hook_handler({
+        'dev_mode': True,
+        'site_hook_allowlist': [],
+        'site_hook_pre_exec': 'os.path:join',
+    })
+
+    handler._load_site_hooks()
+
+    assert handler._hooks['pre_exec'] is not None
+
+
+def test_is_admin_policy_present_reflects_server_scope_settings():
+    """`_is_admin_policy_present()` must be True whenever `SlurmUI` is
+    present in `web_app.settings` (server-scope, set once at extension load
+    from Traitlets config) and False when it is entirely absent."""
+    handler = _make_hook_handler({'dev_mode': False})
+    assert handler._is_admin_policy_present() is True
+
+    handler_no_policy = _make_hook_handler(None)
+    handler_no_policy.application.settings = {}
+    assert handler_no_policy._is_admin_policy_present() is False
