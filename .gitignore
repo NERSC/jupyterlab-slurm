@@ -123,3 +123,10 @@ dmypy.json
 
 # Yarn cache
 .yarn/
+
+# Local slurm-docker-cluster checkout (see docker/README.md)
+/docker/slurm-cluster/
+
+# jupyterlab_slurm wheel rebuilt on demand by `docker/cluster.sh wheel`
+# (see docker/jupyterhub/README.md)
+/docker/jupyterhub/jupyterlab_slurm_dist/*.whl

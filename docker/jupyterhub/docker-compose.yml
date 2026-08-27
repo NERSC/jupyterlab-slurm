@@ -1,0 +1,40 @@
+services:
+  jupyterhub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Must match the slurm-docker-cluster image tag built by
+        # `docker/cluster.sh up` (docker/slurm-cluster's own SLURM_VERSION
+        # default), since this image's Slurm client RPMs are copied
+        # straight from that local image -- see Dockerfile.
+        SLURM_VERSION: ${SLURM_VERSION:-26.05.2}
+    image: jupyterlab-slurm-hub:latest
+    container_name: jupyterhub_slurm_test
+    privileged: true
+    ports:
+      - "8000:8000"
+    networks:
+      - slurm-network
+    volumes:
+      # Shared with the slurm-docker-cluster stand-in so the real Slurm
+      # client tools installed in this image can talk to the real
+      # slurmctld/slurmdbd over munge, and read/write real job output.
+      - slurm_etc_munge:/etc/munge:ro
+      - slurm_etc_slurm:/etc/slurm:ro
+      - slurm_slurm_jobdir:/data:rw
+      - jupyterhub_data:/srv/jupyterhub
+
+networks:
+  slurm-network:
+    name: slurm_slurm-network
+    external: true
+
+volumes:
+  slurm_etc_munge:
+    external: true
+  slurm_etc_slurm:
+    external: true
+  slurm_slurm_jobdir:
+    external: true
+  jupyterhub_data:

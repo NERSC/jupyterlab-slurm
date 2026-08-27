@@ -1,0 +1,4 @@
+#!/bin/bash
+# See squeue wrapper for rationale.
+set -euo pipefail
+exec /usr/local/bin/docker exec slurmctld scancel "$@"
