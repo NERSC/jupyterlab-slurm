@@ -24,6 +24,8 @@
     "src/*.ts",
     "src/*.tsx",
     "src/components/*.tsx",
+    "src/hooks/*.ts",
+    "src/utils/*.ts",
     "src/slurm-config/config.json",
     "src/store/index.ts"
   ]

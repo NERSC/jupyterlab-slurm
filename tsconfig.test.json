@@ -1,6 +1,12 @@
 {
   "extends": "./tsconfig",
   "compilerOptions": {
-    "types": ["jest"]
-  }
+    "types": ["jest", "node"],
+    "rootDir": ".",
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "incremental": false
+  },
+  "include": ["src/**/*", "test/**/*"]
 }

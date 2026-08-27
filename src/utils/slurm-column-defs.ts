@@ -2,6 +2,14 @@ import { ITooltipParams } from 'ag-grid-community';
 import { JOB_STATUS_CODES } from './slurm-status';
 import { parseTimeInSeconds, parseJobID } from './slurm-parsing';
 
+// NERSC/standard Slurm has no distinct held state code: a user hold is a
+// PENDING job (ST=PD) whose reason column reads `(JobHeldUser)`. Detect that so
+// the queue can surface "held" explicitly instead of an indistinguishable
+// PENDING row.
+export function isHeldReason(reason: unknown): boolean {
+  return typeof reason === 'string' && /JobHeldUser/i.test(reason);
+}
+
 export function createDisplayColumnsFromServer(
   ids: string[],
   uiLabels: Record<string, string>,
@@ -18,7 +26,8 @@ export function createDisplayColumnsFromServer(
 
     if (id === 'NODES') {
       col['filter'] = 'agNumberColumnFilter';
-      col['comparator'] = (valueA: any, valueB: any) => Number(valueA) - Number(valueB);
+      col['comparator'] = (valueA: any, valueB: any) =>
+        Number(valueA) - Number(valueB);
     } else if (id === 'TIME') {
       col['comparator'] = (valueA: any, valueB: any) =>
         parseTimeInSeconds(valueA) - parseTimeInSeconds(valueB);
@@ -36,16 +45,32 @@ export function createDisplayColumnsFromServer(
       col['floatingFilter'] = false;
       (col as any)['valueFormatter'] = (p: any) => {
         const code = p?.value ?? '';
-        return JOB_STATUS_CODES[code]?.name ?? code;
+        const name = JOB_STATUS_CODES[code]?.name ?? code;
+        // A PENDING job held by the user (Reason=(JobHeldUser)) is surfaced as
+        // "PENDING (Held)" so it is distinguishable from a normal pending job.
+        if (code === 'PD' && isHeldReason(p?.data?.['NODELIST(REASON)'])) {
+          return `${name} (Held)`;
+        }
+        return name;
       };
       (col as any)['getQuickFilterText'] = (p: any) => {
         const code = p?.value ?? '';
         const name = JOB_STATUS_CODES[code]?.name ?? '';
-        return [code, name].filter(Boolean).join(' ');
+        const held =
+          code === 'PD' && isHeldReason(p?.data?.['NODELIST(REASON)'])
+            ? 'Held JobHeldUser'
+            : '';
+        return [code, name, held].filter(Boolean).join(' ');
       };
       col['tooltipValueGetter'] = (p: ITooltipParams) => {
         if (p.value && JOB_STATUS_CODES[p.value]) {
           const { name, description } = JOB_STATUS_CODES[p.value];
+          if (
+            p.value === 'PD' &&
+            isHeldReason((p as any)?.data?.['NODELIST(REASON)'])
+          ) {
+            return `${name} (Held by user): ${description}`;
+          }
           return `${name}: ${description}`;
         }
         return '';

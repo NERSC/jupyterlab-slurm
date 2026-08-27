@@ -1,131 +1,118 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 
-import { Badge, Button, CircularProgress, Stack, Typography, Snackbar, Alert } from '@mui/material';
+import {
+  Badge,
+  Button,
+  CircularProgress,
+  Stack,
+  Typography,
+  Snackbar,
+  Alert
+} from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ReplayIcon from '@mui/icons-material/Replay';
 
 import { AgGridReact } from 'ag-grid-react';
-import { AllCommunityModule, ColDef, ITooltipParams, ModuleRegistry, themeQuartz } from 'ag-grid-community';
+import {
+  AllCommunityModule,
+  ColDef,
+  ITooltipParams,
+  ModuleRegistry,
+  themeQuartz,
+  colorSchemeDark
+} from 'ag-grid-community';
 
 // Register Community features we need
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 import { JupyterFrontEnd } from '@jupyterlab/application';
-import { requestAPI } from '../handler';
-// Bundled deployment UI defaults (labels). These are merged with
-// server-provided values from /ui-config, where server values take precedence.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - allow JSON import without explicit typings
-import bundledUi from '../../jupyter-config/jupyter_server_config.d/jupyterlab-slurm-ui.json';
+import { useSlurmHistory } from '../hooks/useSlurmHistory';
+import { useJupyterThemeMode } from '../utils/theme';
 
 namespace types {
   export type Props = {
     userName: string;
-    jupyterLabFrontend: JupyterFrontEnd; // reserved for future enhancements
+    jupyterLabFrontend: JupyterFrontEnd;
+    // Whether this tab is currently visible/active. History is refetched when
+    // it becomes active so a kept-mounted tab shows fresh data on each visit.
+    active?: boolean;
   };
-
-  export type SacctResponse = {
-    success: boolean;
-    exitCode: number;
-    data: {
-      columns: string[];
-      rows: string[][];
-    };
-    errorMessage?: string | null;
-    responseMessage?: string;
-  };
-}
-
-function toRowObjects(columns: string[], rows: string[][]): any[] {
-  return rows.map(r => {
-    const obj: Record<string, string> = {};
-    columns.forEach((c, i) => {
-      obj[c] = (r[i] ?? '').toString();
-    });
-    return obj;
-  });
 }
 
 export default function SlurmJobHistory(props: types.Props) {
-  const gridRef = useRef<AgGridReact<any>>(null);
   const gridApiRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [columns, setColumns] = useState<string[]>([]);
-  const [rows, setRows] = useState<any[]>([]);
-  const [historyLabels, setHistoryLabels] = useState<Record<string, string>>({});
+
+  const { loading, error, columns, rows, historyLabels, fetchHistory } =
+    useSlurmHistory(props.userName);
+
   const [selectedCount, setSelectedCount] = useState<number>(0);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
-  const fetchHistory = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const copyToClipboard = useCallback(async (text: string, format: string) => {
     try {
-      // Pass the current user to the server so it can filter results
-      const params = new URLSearchParams();
-      if (props.userName && props.userName.trim().length > 0) {
-        params.set('user', props.userName.trim());
-      }
-      const resp = await requestAPI<types.SacctResponse>('sacct', params);
-      if (!resp.success) {
-        throw new Error(resp.errorMessage || 'Unknown error fetching sacct');
-      }
-      const cols = resp.data.columns || [];
-      const data = toRowObjects(cols, resp.data.rows || []);
-      setColumns(cols);
-      setRows(data);
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
-      setColumns([]);
-      setRows([]);
-    } finally {
-      setLoading(false);
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(`${format} copied to clipboard`);
+    } catch (e) {
+      console.warn('Failed to copy', e);
+      setCopySuccess('Failed to copy to clipboard');
     }
-  }, [props.userName]);
-
-  useEffect(() => {
-    void fetchHistory();
-  }, [fetchHistory]);
-
-  // Load deployment-specific UI config for history labels, merging bundled defaults
-  // so that labels are applied even if the server isn't configured with SlurmUI.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const resp = await requestAPI<any>('ui-config');
-        const serverLabels = (resp && resp.data && resp.data.history_column_labels) || {};
-        const bundled = (bundledUi && (bundledUi as any).SlurmUI && (bundledUi as any).SlurmUI.history_column_labels) || {};
-        const effective = { ...bundled, ...serverLabels };
-        if (!cancelled) {
-          setHistoryLabels(effective);
-        }
-      } catch (e) {
-        // Fallback to bundled defaults only
-        const bundled = (bundledUi && (bundledUi as any).SlurmUI && (bundledUi as any).SlurmUI.history_column_labels) || {};
-        if (!cancelled) {
-          // eslint-disable-next-line no-console
-          console.warn('Failed to load /ui-config; using bundled history labels', e);
-          setHistoryLabels(bundled);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
+  const copyMarkdownToClipboard = useCallback(() => {
+    if (!rows.length) {
+      return;
+    }
+    const labels = historyLabels;
+    const cols = columns;
+    const headerRow = cols.map(c => labels[c] ?? c);
+    let md = '### Slurm Job History\n\n';
+    md += '| ' + headerRow.join(' | ') + ' |\n';
+    md += '| ' + headerRow.map(() => ':---').join(' | ') + ' |\n';
+    for (const row of rows) {
+      const vals = cols.map(c => (row[c] ?? '').toString());
+      md += '| ' + vals.join(' | ') + ' |\n';
+    }
+    copyToClipboard(md, 'Markdown');
+  }, [rows, columns, historyLabels, copyToClipboard]);
+
+  const copyJsonToClipboard = useCallback(() => {
+    if (!rows.length) {
+      return;
+    }
+    const labels = historyLabels;
+    const labeled = rows.map(row => {
+      const obj: Record<string, string> = {};
+      for (const c of columns) {
+        obj[labels[c] ?? c] = (row[c] ?? '').toString();
+      }
+      return obj;
+    });
+    copyToClipboard(JSON.stringify(labeled, null, 2), 'JSON');
+  }, [rows, columns, historyLabels, copyToClipboard]);
+
   const sizeColumnsToFitSafe = useCallback(() => {
-    if (!gridApiRef.current) {
+    const api = gridApiRef.current;
+    if (!api) {
+      return;
+    }
+    if (typeof api.isDestroyed === 'function' && api.isDestroyed()) {
       return;
     }
     try {
-      const sz = gridApiRef.current.getGridSize ? gridApiRef.current.getGridSize() : null;
+      const sz = api.getGridSize ? api.getGridSize() : null;
       if (!sz || (sz && sz.width > 0)) {
-        gridApiRef.current.sizeColumnsToFit();
+        api.sizeColumnsToFit();
       }
     } catch (e) {
       // ignore
@@ -134,7 +121,6 @@ export default function SlurmJobHistory(props: types.Props) {
 
   const onGridReady = useCallback((params: any) => {
     gridApiRef.current = params.api;
-    // Fit columns when grid is initialized and visible
     try {
       const sz = params.api.getGridSize ? params.api.getGridSize() : null;
       if (!sz || (sz && sz.width > 0)) {
@@ -147,7 +133,9 @@ export default function SlurmJobHistory(props: types.Props) {
 
   const getSelectedJobIdsInDisplayOrder = useCallback((): string[] => {
     const api = gridApiRef.current;
-    if (!api) return [];
+    if (!api) {
+      return [];
+    }
     const ids: string[] = [];
     const count = api.getDisplayedRowCount ? api.getDisplayedRowCount() : 0;
     for (let i = 0; i < count; i++) {
@@ -155,7 +143,9 @@ export default function SlurmJobHistory(props: types.Props) {
       if (row && row.isSelected && row.isSelected()) {
         const data = row.data || {};
         const id = (data['JobID'] ?? data['JOBID'] ?? '').toString();
-        if (id) ids.push(id);
+        if (id) {
+          ids.push(id);
+        }
       }
     }
     return ids;
@@ -174,10 +164,8 @@ export default function SlurmJobHistory(props: types.Props) {
         sortable: true,
         resizable: true,
         filter: true,
-        // Show full cell content on hover
         tooltipValueGetter: (p: ITooltipParams) => `${p.value ?? ''}`
       };
-      // Add checkbox selection on the first column for consistency with Queue tab
       if (idx === 0) {
         (col as any).headerCheckboxSelection = true;
         (col as any).checkboxSelection = true;
@@ -186,26 +174,27 @@ export default function SlurmJobHistory(props: types.Props) {
     });
   }, [columns, historyLabels]);
 
-  // Use AG Grid v33+ React theming API by passing the theme object via the `theme` prop on AgGridReact
-  const gridTheme = useMemo(() => themeQuartz.withParams({ headerHeight: 34, rowHeight: 30 }), []);
+  const themeMode = useJupyterThemeMode();
+  const gridTheme = useMemo(() => {
+    const base = themeQuartz.withParams({ headerHeight: 34, rowHeight: 30 });
+    return themeMode === 'dark' ? base.withPart(colorSchemeDark) : base;
+  }, [themeMode]);
 
-  // Default column behavior: keep header wrap, disable row auto-wrap/auto-height
-  const defaultColDef = useMemo<ColDef>(() => ({
-    resizable: true,
-    sortable: true,
-    filter: true,
-    // Encourage columns to share available width
-    flex: 1,
-    minWidth: 120,
-    // Wrapping for long headers and dynamic header height
-    wrapHeaderText: true as any,
-    autoHeaderHeight: true as any,
-    // Row data: do not auto-wrap or auto-grow rows; rely on tooltips/hover
-    wrapText: false as any,
-    autoHeight: false as any
-  }), []);
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      resizable: true,
+      sortable: true,
+      filter: true,
+      flex: 1,
+      minWidth: 120,
+      wrapHeaderText: true as any,
+      autoHeaderHeight: true as any,
+      wrapText: false as any,
+      autoHeight: false as any
+    }),
+    []
+  );
 
-  // Observe container size and fit columns when it becomes visible or resizes
   useEffect(() => {
     const el = containerRef.current;
     if (!el) {
@@ -234,12 +223,60 @@ export default function SlurmJobHistory(props: types.Props) {
     };
   }, [sizeColumnsToFitSafe]);
 
+  // Refetch history when the tab transitions from hidden -> active. The hook
+  // already fetches once on mount, so we skip the very first activation to
+  // avoid a duplicate initial request.
+  const wasActiveRef = useRef<boolean>(props.active !== false);
+  useEffect(() => {
+    const isActive = props.active !== false;
+    if (isActive && !wasActiveRef.current) {
+      void fetchHistory();
+      // Re-fit columns once shown; AG Grid measures width 0 while hidden.
+      const id = setTimeout(() => sizeColumnsToFitSafe(), 50);
+      wasActiveRef.current = isActive;
+      return () => clearTimeout(id);
+    }
+    wasActiveRef.current = isActive;
+  }, [props.active, fetchHistory, sizeColumnsToFitSafe]);
+
   return (
     <div className="jp-SlurmWidget-content">
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ mb: 1, mx: 1 }}
+      >
         <Typography variant="h6" component="div" sx={{ flex: 1, ml: 1 }}>
           Job History{props.userName ? ` for ${props.userName}` : ''}
         </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontWeight: 'bold' }}
+          >
+            Copy to Clipboard:
+          </Typography>
+          <Button
+            size="small"
+            startIcon={<ContentCopyIcon fontSize="inherit" />}
+            onClick={copyMarkdownToClipboard}
+            disabled={!rows.length}
+            sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0 }}
+          >
+            Markdown
+          </Button>
+          <Button
+            size="small"
+            startIcon={<ContentCopyIcon fontSize="inherit" />}
+            onClick={copyJsonToClipboard}
+            disabled={!rows.length}
+            sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0 }}
+          >
+            JSON
+          </Button>
+        </Stack>
         <Button
           onClick={fetchHistory}
           variant="outlined"
@@ -252,26 +289,28 @@ export default function SlurmJobHistory(props: types.Props) {
         <Button
           onClick={() => {
             const ids = getSelectedJobIdsInDisplayOrder();
-            if (!ids.length) return;
+            if (!ids.length) {
+              return;
+            }
             try {
-              // Call the command by id directly to avoid import-time cycles
               const result = props.jupyterLabFrontend.commands.execute(
                 'jupyterlab-slurm:show-job-details',
                 { jobIds: ids, index: 0 }
               );
-              // If the command returns a promise, catch rejections to surface errors to the user
               if (result && typeof (result as any).then === 'function') {
                 (result as Promise<any>).catch(e => {
-                  // eslint-disable-next-line no-console
                   console.error('Failed to open Job Details from history', e);
-                  setErrorMessage('Failed to open Job Details. You may not have permission to view one or more selected jobs.');
+                  setErrorMessage(
+                    'Failed to open Job Details. You may not have permission to view one or more selected jobs.'
+                  );
                   setErrorOpen(true);
                 });
               }
             } catch (e) {
-              // eslint-disable-next-line no-console
               console.error('Failed to open Job Details from history', e);
-              setErrorMessage('Failed to open Job Details. You may not have permission to view one or more selected jobs.');
+              setErrorMessage(
+                'Failed to open Job Details. You may not have permission to view one or more selected jobs.'
+              );
               setErrorOpen(true);
             }
           }}
@@ -281,13 +320,21 @@ export default function SlurmJobHistory(props: types.Props) {
         >
           Show details
           {selectedCount > 0 && (
-            <Badge className={'jp-SlurmWidget-table-button-badge'} badgeContent={selectedCount} color={'secondary'} />
+            <Badge
+              className={'jp-SlurmWidget-table-button-badge'}
+              badgeContent={selectedCount}
+              color={'secondary'}
+            />
           )}
         </Button>
       </Stack>
 
       {loading && (
-        <Stack alignItems="center" justifyContent="center" sx={{ flex: 1, minHeight: 160 }}>
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          sx={{ flex: 1, minHeight: 160 }}
+        >
           <CircularProgress size={24} />
         </Stack>
       )}
@@ -304,12 +351,10 @@ export default function SlurmJobHistory(props: types.Props) {
       {!loading && !error && (
         <div className={'jp-SlurmWidget-table'} ref={containerRef}>
           <AgGridReact
-            ref={gridRef}
             columnDefs={columnDefs}
             rowData={rows}
             defaultColDef={defaultColDef}
             theme={gridTheme}
-            // Fit columns to avoid horizontal scrolling
             onGridReady={onGridReady}
             onFirstDataRendered={sizeColumnsToFitSafe}
             onGridSizeChanged={sizeColumnsToFitSafe}
@@ -321,15 +366,33 @@ export default function SlurmJobHistory(props: types.Props) {
         </div>
       )}
 
-      {/* Error Snackbar for failures opening Job Details from History */}
       <Snackbar
         open={errorOpen}
         autoHideDuration={6000}
         onClose={() => setErrorOpen(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setErrorOpen(false)} severity="error" sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setErrorOpen(false)}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
           {errorMessage}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!copySuccess}
+        autoHideDuration={3000}
+        onClose={() => setCopySuccess(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setCopySuccess(null)}
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {copySuccess}
         </Alert>
       </Snackbar>
     </div>

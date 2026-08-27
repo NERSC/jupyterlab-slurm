@@ -7,7 +7,7 @@
     "sacct_path": "sacct"
   },
   "SlurmAccounting": {
-    "sacct_fields": "JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode"
+    "sacct_fields": "JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode,Submit"
   },
   "SlurmUI": {
     "queue_column_labels": {
@@ -27,17 +27,18 @@
       "Account": "Account",
       "AllocCPUS": "CPUs",
       "State": "State",
-      "ExitCode": "Exit Code"
+      "ExitCode": "Exit Code",
+      "Submit": "Submitted"
     },
     "queue_column_sizing": {
-      "ST": {"width": 56, "minWidth": 48},
-      "NODES": {"width": 80, "minWidth": 72},
-      "USER": {"width": 104, "minWidth": 96},
-      "PARTITION": {"width": 120},
-      "TIME": {"width": 120},
-      "JOBID": {"width": 150},
-      "NAME": {"flex": 2},
-      "NODELIST(REASON)": {"flex": 2}
+      "ST": { "width": 56, "minWidth": 48 },
+      "NODES": { "width": 80, "minWidth": 72 },
+      "USER": { "width": 104, "minWidth": 96 },
+      "PARTITION": { "width": 120 },
+      "TIME": { "width": 120 },
+      "JOBID": { "width": 150 },
+      "NAME": { "flex": 2 },
+      "NODELIST(REASON)": { "flex": 2 }
     }
   }
 }

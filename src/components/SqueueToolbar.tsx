@@ -10,11 +10,14 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DeselectIcon from '@mui/icons-material/Deselect';
+import InfoIcon from '@mui/icons-material/Info';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import ReplayIcon from '@mui/icons-material/Replay';
 import Grid from '@mui/material/Grid2';
 import { JobAction } from '../types';
 
-interface SqueueToolbarProps {
+interface ISqueueToolbarProps {
   filterQuery: string;
   setFilterQuery: (val: string) => void;
   autoReload: boolean;
@@ -30,7 +33,7 @@ interface SqueueToolbarProps {
   onShowSelectedOnlyClick: () => void;
 }
 
-export const SqueueToolbar: React.FC<SqueueToolbarProps> = ({
+export const SqueueToolbar: React.FC<ISqueueToolbarProps> = ({
   filterQuery,
   setFilterQuery,
   autoReload,
@@ -81,6 +84,7 @@ export const SqueueToolbar: React.FC<SqueueToolbarProps> = ({
             disabled={selectedCount === 0}
             onClick={onShowDetails}
           >
+            <InfoIcon />
             Show details
             {selectedCount > 0 && (
               <Badge
@@ -103,6 +107,7 @@ export const SqueueToolbar: React.FC<SqueueToolbarProps> = ({
             disabled={selectedCount === 0}
             onClick={() => onJobAction('hold')}
           >
+            <PauseCircleOutlineIcon />
             Hold
           </Button>
           <Button
@@ -110,6 +115,7 @@ export const SqueueToolbar: React.FC<SqueueToolbarProps> = ({
             disabled={selectedCount === 0}
             onClick={() => onJobAction('release')}
           >
+            <PlayCircleOutlineIcon />
             Release
           </Button>
         </ButtonGroup>
@@ -123,7 +129,7 @@ export const SqueueToolbar: React.FC<SqueueToolbarProps> = ({
               onChange={onUserOnlyClick}
             />
           }
-          label="User only"
+          label="My jobs only"
         />
         <FormControlLabel
           control={

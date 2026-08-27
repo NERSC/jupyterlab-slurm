@@ -52,7 +52,7 @@ export default class SlurmWidget extends ReactWidget {
     super();
     this.id = uniqueId('slurm-');
     this.addClass('jp-SlurmWidget');
-    this.title.label = 'Slurm Queue Manager';
+    this.title.label = 'Slurm Dashboard';
     this.title.closable = true;
     this.frontend = frontend;
     this.filebrowser = filebrowser;
@@ -74,7 +74,14 @@ export default class SlurmWidget extends ReactWidget {
   private async fetchUser(): Promise<UserData> {
     return requestAPI<any>('user')
       .then(data => {
-        return { user: data.user };
+        if (data && data.success === false) {
+          console.error(
+            'fetchUser: server reported failure',
+            data.errorMessage
+          );
+          return { user: '', exception: data.errorMessage };
+        }
+        return { user: data.user ?? data?.data?.user ?? '' };
       })
       .catch(reason => {
         console.error('fetchUser error', reason);
@@ -83,7 +90,9 @@ export default class SlurmWidget extends ReactWidget {
   }
 
   onAfterAttach(): void {
-    this.fetchUser();
+    this.fetchUser().then(result => {
+      this.user = result.user;
+    });
   }
 
   render(): any {

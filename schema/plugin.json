@@ -1,6 +1,6 @@
 {
-  "title": "Slurm Queue Manager",
-  "description": "Slurm Queue Manager settings",
+  "title": "Slurm Dashboard",
+  "description": "Slurm Dashboard settings",
   "properties": {
     "userOnly": {
       "type": "boolean",
@@ -36,8 +36,21 @@
       "type": "array",
       "title": "itemsPerPageOptions",
       "description": "Selections for number of rows to display per page of squeue results",
-      "items": { "type":  "number"},
+      "items": { "type": "number" },
       "default": [10, 15, 20, 25, 30, 40, 50]
+    },
+    "columnState": {
+      "type": "array",
+      "title": "Column state",
+      "description": "Persisted ag-grid column order, visibility, width and pinning for the queue table. Managed automatically as columns are reordered/resized/hidden; not intended for manual editing.",
+      "items": { "type": "object" },
+      "default": []
+    },
+    "notifyOnStateChange": {
+      "type": "boolean",
+      "title": "Notify on job state change",
+      "description": "Show a notification when one of your tracked jobs' state changes (e.g. RUNNING to COMPLETED)",
+      "default": false
     }
   },
   "additionalProperties": false,

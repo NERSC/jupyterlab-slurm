@@ -1,4 +1,7 @@
-import type { JupyterFrontEnd, JupyterFrontEndPlugin } from '@jupyterlab/application';
+import type {
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin
+} from '@jupyterlab/application';
 import { ILayoutRestorer } from '@jupyterlab/application';
 
 import { ICommandPalette, WidgetTracker } from '@jupyterlab/apputils';
@@ -14,6 +17,7 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { requestAPI } from './handler';
 import SlurmWidget from './slurmWidget';
 import { ISlurmUserSettings } from './types';
+import { devLog } from './utils/logger';
 
 /**
  * The class names for the Slurm extension icon, for launcher and
@@ -48,11 +52,13 @@ const extension: JupyterFrontEndPlugin<void> = {
     settingRegistry: ISettingRegistry,
     launcher: ILauncher | null
   ) => {
-    console.log('JupyterLab extension jupyterlab-slurm is activated!');
+    devLog('JupyterLab extension jupyterlab-slurm is activated!');
 
     // Declare widgets
     let widget: SlurmWidget | null = null;
-    let detailsTracker = new WidgetTracker<any>({ namespace: 'slurm-job-details' });
+    const detailsTracker = new WidgetTracker<any>({
+      namespace: 'slurm-job-details'
+    });
 
     const parsedSettings: ISlurmUserSettings = {
       itemsPerPageAuto: true,
@@ -60,7 +66,9 @@ const extension: JupyterFrontEndPlugin<void> = {
       itemsPerPage: 10,
       itemsPerPageOptions: [10, 15, 20, 25, 30, 40, 50],
       autoReload: false,
-      autoReloadRate: 60
+      autoReloadRate: 60,
+      columnState: [],
+      notifyOnStateChange: false
     };
     function loadSetting(setting: ISettingRegistry.ISettings): void {
       // Read the settings and convert to the correct type
@@ -75,6 +83,10 @@ const extension: JupyterFrontEndPlugin<void> = {
         .composite as boolean;
       parsedSettings.autoReloadRate = setting.get('autoReloadRate')
         .composite as number;
+      parsedSettings.columnState = setting.get('columnState')
+        .composite as Array<Record<string, any>>;
+      parsedSettings.notifyOnStateChange = setting.get('notifyOnStateChange')
+        .composite as boolean;
     }
 
     // Track and restore the widget state
@@ -98,18 +110,13 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     // add open command, when there is no active widget show the open label
     app.commands.addCommand(COMMAND_ID_OPEN, {
-      label: 'Slurm Queue Manager',
+      label: 'Slurm Dashboard',
       iconClass: SLURM_ICON_CLASS_LAUNCHER,
       execute: () => {
         if (!widget) {
           // Instantiate a new widget if one does not exist
           const fb = filebrowser as unknown as FileBrowser;
-          widget = new SlurmWidget(
-            app,
-            fb,
-            parsedSettings,
-            settingRegistry
-          );
+          widget = new SlurmWidget(app, fb, parsedSettings, settingRegistry);
           widget.title.iconClass = SLURM_ICON_CLASS_TAB;
         }
 
@@ -133,12 +140,12 @@ const extension: JupyterFrontEndPlugin<void> = {
       label: 'Show job details',
       isEnabled: () => true,
       execute: async (args: any) => {
-        const { JobDetailsWidget } = await import('./jobdetailsWidget');
+        const { SlurmJobDetailsWidget } = await import('./slurmJobDetailsWidget');
         // Try to find an existing widget that is still usable
         let w = detailsTracker.currentWidget as any;
         // Check if widget exists, is not disposed, and is still attached
         if (!w || w.isDisposed || !w.isAttached) {
-          w = new JobDetailsWidget(app);
+          w = new SlurmJobDetailsWidget(app);
           w.title.label = 'Job Details';
           app.shell.add(w, 'main');
           await detailsTracker.add(w);
@@ -168,18 +175,13 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     // add options toggle command, when there is no active widget show the open label
     app.commands.addCommand(COMMAND_ID_TOGGLE_USERONLY, {
-      label: 'Slurm Queue Manager',
+      label: 'Slurm Dashboard',
       iconClass: SLURM_ICON_CLASS_LAUNCHER,
       execute: () => {
         if (!widget) {
           // Instantiate a new widget if one does not exist
           const fb = filebrowser as unknown as FileBrowser;
-          widget = new SlurmWidget(
-            app,
-            fb,
-            parsedSettings,
-            settingRegistry
-          );
+          widget = new SlurmWidget(app, fb, parsedSettings, settingRegistry);
           widget.title.iconClass = SLURM_ICON_CLASS_TAB;
         }
 
@@ -189,18 +191,13 @@ const extension: JupyterFrontEndPlugin<void> = {
 
     // add options toggle command, when there is no active widget show the open label
     app.commands.addCommand(COMMAND_ID_TOGGLE_AUTORELOAD, {
-      label: 'Slurm Queue Manager',
+      label: 'Slurm Dashboard',
       iconClass: SLURM_ICON_CLASS_LAUNCHER,
       execute: () => {
         if (!widget) {
           // Instantiate a new widget if one does not exist
           const fb = filebrowser as unknown as FileBrowser;
-          widget = new SlurmWidget(
-            app,
-            fb,
-            parsedSettings,
-            settingRegistry
-          );
+          widget = new SlurmWidget(app, fb, parsedSettings, settingRegistry);
           widget.title.iconClass = SLURM_ICON_CLASS_TAB;
         }
 
@@ -208,13 +205,15 @@ const extension: JupyterFrontEndPlugin<void> = {
       }
     });
 
-    requestAPI<any>('get_example')
+    // Health check: confirm the server extension is installed and reachable.
+    requestAPI<any>('status')
       .then(data => {
-        console.log('get_example', data);
+        devLog('jupyterlab-slurm server extension status', data);
       })
       .catch(reason => {
         console.error(
-          `The jupyterlab_slurm server extension appears to have a problem starting.\n${reason}`
+          'The jupyterlab_slurm server extension appears to have a problem starting.',
+          reason
         );
       });
   }

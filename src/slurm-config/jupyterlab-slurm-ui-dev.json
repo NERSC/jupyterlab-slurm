@@ -7,7 +7,7 @@
     "sacct_path": "sacct"
   },
   "SlurmAccounting": {
-    "sacct_fields": "JobID,Partition,JobName,User,State,Elapsed,NNodes,ExitCode"
+    "sacct_fields": "JobID,Partition,JobName,User,State,Submit,Elapsed,NNodes,ExitCode"
   },
   "SlurmUI": {
     "queue_column_labels": {
@@ -20,15 +20,26 @@
       "NODES": "Nodes",
       "NODELIST(REASON)": "Node/Reason"
     },
+    "history_column_labels": {
+      "JobID": "Job ID",
+      "Partition": "QOS",
+      "JobName": "Job Name",
+      "User": "User",
+      "State": "State",
+      "Submit": "Submitted",
+      "Elapsed": "Elapsed",
+      "NNodes": "Nodes",
+      "ExitCode": "Exit Code"
+    },
     "queue_column_sizing": {
-      "ST": {"width": 56, "minWidth": 48},
-      "NODES": {"width": 80, "minWidth": 72},
-      "USER": {"width": 104, "minWidth": 96},
-      "PARTITION": {"width": 120},
-      "TIME": {"width": 120},
-      "JOBID": {"width": 150},
-      "NAME": {"flex": 2},
-      "NODELIST(REASON)": {"flex": 2}
+      "ST": { "width": 56, "minWidth": 48 },
+      "NODES": { "width": 80, "minWidth": 72 },
+      "USER": { "width": 104, "minWidth": 96 },
+      "PARTITION": { "width": 120 },
+      "TIME": { "width": 120 },
+      "JOBID": { "width": 150 },
+      "NAME": { "flex": 2 },
+      "NODELIST(REASON)": { "flex": 2 }
     }
   }
 }

@@ -5,7 +5,7 @@ import { ReactWidget } from '@jupyterlab/apputils';
 import { JupyterFrontEnd } from '@jupyterlab/application';
 import JobDetailsPanel from './components/JobDetailsPanel';
 
-export class JobDetailsWidget extends ReactWidget {
+export class SlurmJobDetailsWidget extends ReactWidget {
   private app: JupyterFrontEnd;
   private jobIds: string[] = [];
   private index = 0;
@@ -14,14 +14,17 @@ export class JobDetailsWidget extends ReactWidget {
     super();
     this.app = app;
     this.id = `slurm-job-details-${Private.nextId++}`;
-    this.addClass('jp-Slurm-JobDetailsWidget');
+    this.addClass('jp-Slurm-SlurmJobDetailsWidget');
     this.title.label = 'Job Details';
     this.title.closable = true;
   }
 
   setSnapshot(jobIds: string[], index = 0) {
     this.jobIds = jobIds ?? [];
-    this.index = Math.max(0, Math.min(index, Math.max(0, this.jobIds.length - 1)));
+    this.index = Math.max(
+      0,
+      Math.min(index, Math.max(0, this.jobIds.length - 1))
+    );
     // Update badge: we reuse label text with [N] suffix for now
     const n = this.jobIds.length;
     this.title.label = n >= 1 ? `Job Details [${n}]` : 'Job Details';
@@ -52,5 +55,8 @@ export class JobDetailsWidget extends ReactWidget {
 }
 
 namespace Private {
+  // Mutated via `Private.nextId++` above; eslint's static analysis doesn't
+  // see namespace-export mutation, so prefer-const is a false positive here.
+  // eslint-disable-next-line prefer-const
   export let nextId = 0;
 }
