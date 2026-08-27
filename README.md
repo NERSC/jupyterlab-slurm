@@ -39,59 +39,35 @@ jupyter serverextension enable --py --sys-prefix jupyterlab_slurm
 ```
 
 After launching JupyterLab, the extension can be found in the command palette under
-the name `Slurm Queue Manager`, and is listed under the `HPC TOOLS` section
+the name `Slurm Dashboard`, and is listed under the `HPC TOOLS` section
 of the palette and the launcher.
 
 ### Development install
 
 As described in the [JupyterLab documentation](https://jupyterlab.readthedocs.io/en/stable/extension/extension_dev.html#extension-authoring) for a development install of the labextension you can run the following in this directory:
 
-### Setup a local slurm cluster
-
 ```bash
-git clone https://github.com/giovtorres/slurm-docker-cluster
-cd slurm-docker-cluster
-git clone --branch lab3 https://github.com/NERSC/jupyterlab-slurm.git
-cp jupyterlab-slurm/slurm_cluster/docker-compose.yml .
-# from slurm-docker-cluster README
-docker build -t slurm-docker-cluster:19.05.1 .
-# if you encounter an error with the PGP key step
-# update line 46 with gpg --keyserver pgp.mit.edu ...
-# this will build the jupyterlab image minimal-notebook with a slurm client
-docker-compose build
-# start the cluster
-docker-compose up -d
-# register the slurm cluster
-./register_cluster.sh
-# run munged on the jupyterlab instance to get the slurm commands to connect
-docker-compose exec jupyterlab bash
-runuser -u slurm -- munged
-# test that squeue comes back with a header, if it gets stuck you can't connect
-squeue
-```
-
-### Install jupyterlab-slurm into your environment
-
-```bash
-docker-compose exec -u jovyan jupyterlab bash
-cd /usr/local/jupyterlab-slurm/
-# install jupyter_packaging which is a missing dependency
-pip install jupyter_packaging
-# this command takes a while the first it is run
+# install the extension in editable mode
 pip install -e .
-# point the labextension dev install at current dir
+# point the labextension dev install at the current dir
 jupyter labextension develop --overwrite .
-
 # rerun this if there are updates:
 jlpm run build
 ```
 
-### Restart the jupyterlab docker container
+### Testing against a local Slurm cluster
 
-```bash
-docker compose restart jupyterlab
-
-# rerun munged on the jupyterlab instance
-docker compose exec jupyterlab bash
-runuser -u slurm -- munged
-```
+For realistic, end-to-end testing against a real Slurm controller, this repo
+builds on top of the upstream
+[`giovtorres/slurm-docker-cluster`](https://github.com/giovtorres/slurm-docker-cluster)
+project, which provides a Docker Compose stack running a current,
+version-selectable Slurm (multi-arch, with pre-built images). It is a plain
+git checkout (not a submodule) into `docker/slurm-cluster`, which is
+git-ignored in this repo. `docker/cluster.sh up` automates checking it out
+and bringing it up (see `docker/README.md` for the full set of automated
+commands and the manual steps they replace), then install this extension
+(`pip install -e .`) into a
+JupyterLab 4 environment that shares the cluster's munge key and
+`/etc/slurm` so the Slurm client commands can connect. `docker/jupyterhub/`
+builds on top of that cluster to also exercise per-user JupyterHub spawning
+against it.
