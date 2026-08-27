@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: master
+    branches: main
   pull_request:
     branches: '*'
 
@@ -15,83 +15,104 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Base Setup
-      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+      - name: Base Setup
+        uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
 
-    - name: Install dependencies
-      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+      - name: Install dependencies
+        run: python -m pip install -U "jupyterlab>=4.0.0,<5"
 
-    - name: Lint the extension
-      run: |
-        set -eux
-        jlpm
-        jlpm run lint:check
+      - name: Lint the extension
+        run: |
+          set -eux
+          jlpm
+          jlpm run lint:check
 
-#    - name: Test the extension
-#      run: |
-#        set -eux
-#        jlpm run test
+      - name: Type-check the extension
+        run: |
+          set -eux
+          jlpm tsc --noEmit
 
-    - name: Build the extension
-      run: |
-        set -eux
-        python -m pip install .[test]
+      - name: Test the extension
+        run: |
+          set -eux
+          jlpm run test
 
-        pytest -vv -r ap --cov jupyterlab_slurm
-        jupyter server extension list
-        jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK"
+      - name: Audit frontend dependencies
+        # Advisory only: report known-vulnerability findings without failing the
+        # build. An engineer should periodically review this output (see
+        # production_checklist.md §2); upgrade to a hard failure once a
+        # triage/owner process is in place.
+        run: |
+          set -eux
+          jlpm npm audit --severity moderate --all || true
 
-        jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*OK"
-        python -m jupyterlab.browser_check
+      - name: Build the extension
+        run: |
+          set -eux
+          python -m pip install .[test]
 
-    - name: Package the extension
-      run: |
-        set -eux
+          pytest -vv -r ap --cov jupyterlab_slurm
+          jupyter server extension list
+          jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK"
 
-        pip install build
-        python -m build
-        pip uninstall -y "jupyterlab_slurm" jupyterlab
+          jupyter labextension list
+          jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*OK"
+          python -m jupyterlab.browser_check
 
-    - name: Upload extension packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: extension-artifacts
-        path: dist/jupyterlab_slurm*
-        if-no-files-found: error
+      - name: Audit backend dependencies
+        # Advisory only, see the frontend audit step above for rationale.
+        run: |
+          set -eux
+          python -m pip install pip-audit
+          python -m pip_audit || true
+
+      - name: Package the extension
+        run: |
+          set -eux
+
+          pip install build
+          python -m build
+          pip uninstall -y "jupyterlab_slurm" jupyterlab
+
+      - name: Upload extension packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-artifacts
+          path: dist/jupyterlab_slurm*
+          if-no-files-found: error
 
   test_isolated:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-        architecture: 'x64'
-    - uses: actions/download-artifact@v4
-      with:
-        name: extension-artifacts
-    - name: Install and Test
-      run: |
-        set -eux
-        # Remove NodeJS, twice to take care of system and locally installed node versions.
-        sudo rm -rf $(which node)
-        sudo rm -rf $(which node)
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          architecture: 'x64'
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-artifacts
+      - name: Install and Test
+        run: |
+          set -eux
+          # Remove NodeJS, twice to take care of system and locally installed node versions.
+          sudo rm -rf $(which node)
+          sudo rm -rf $(which node)
 
-        pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
+          pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
 
 
-        jupyter server extension list
-        jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK"
+          jupyter server extension list
+          jupyter server extension list 2>&1 | grep -ie "jupyterlab_slurm.*OK"
 
-        jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*OK"
-        python -m jupyterlab.browser_check --no-browser-test
+          jupyter labextension list
+          jupyter labextension list 2>&1 | grep -ie "jupyterlab-slurm.*OK"
+          python -m jupyterlab.browser_check --no-browser-test
 
   integration-tests:
     name: Integration tests
@@ -102,53 +123,53 @@ jobs:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/pw-browsers
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Base Setup
-      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+      - name: Base Setup
+        uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
 
-    - name: Download extension package
-      uses: actions/download-artifact@v4
-      with:
-        name: extension-artifacts
+      - name: Download extension package
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-artifacts
 
-    - name: Install the extension
-      run: |
-        set -eux
-        python -m pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
+      - name: Install the extension
+        run: |
+          set -eux
+          python -m pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
 
-    - name: Install dependencies
-      working-directory: ui-tests
-      env:
-        YARN_ENABLE_IMMUTABLE_INSTALLS: 0
-        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-      run: jlpm install
+      - name: Install dependencies
+        working-directory: ui-tests
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 0
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+        run: jlpm install
 
-    - name: Set up browser cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/pw-browsers
-        key: ${{ runner.os }}-${{ hashFiles('ui-tests/yarn.lock') }}
+      - name: Set up browser cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/pw-browsers
+          key: ${{ runner.os }}-${{ hashFiles('ui-tests/yarn.lock') }}
 
-    - name: Install browser
-      run: jlpm playwright install chromium
-      working-directory: ui-tests
+      - name: Install browser
+        run: jlpm playwright install chromium
+        working-directory: ui-tests
 
-    - name: Execute integration tests
-      working-directory: ui-tests
-      run: |
-        jlpm playwright test
+      - name: Execute integration tests
+        working-directory: ui-tests
+        run: |
+          jlpm playwright test
 
-    - name: Upload Playwright Test report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: jupyterlab_slurm-playwright-tests
-        path: |
-          ui-tests/test-results
-          ui-tests/playwright-report
+      - name: Upload Playwright Test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jupyterlab_slurm-playwright-tests
+          path: |
+            ui-tests/test-results
+            ui-tests/playwright-report
 
   check_links:
     name: Check Links
