@@ -22,8 +22,8 @@ from ._common import logger, make_envelope, SLURM_COMMAND_TIMEOUT_SECONDS
 
 # The compatibility test-suite harness lives in its own optional module so
 # that it can be omitted entirely from a production build/deployment (see
-# `test_suite.py` and `production_checklist.md`). If it isn't present, the
-# `/test-suite` route is simply never registered below.
+# `test_suite.py`). If it isn't present, the `/test-suite` route is simply
+# never registered below.
 try:
     from .test_suite import SlurmTestSuiteHandler
 except ImportError:  # pragma: no cover - expected in a stripped-down prod build
@@ -83,9 +83,9 @@ def http_status_for_failure(exit_code: int, error_message: str = None) -> int:
 
     Genuine Slurm command failures (e.g. `scancel` on a job that already
     finished) are still valid responses to a valid request and stay at 200
-    with `success: false` in the envelope. This helper is only used for the
-    handler-level failure classes called out by the production checklist:
-    malformed requests, unavailable commands, and internal errors.
+    with `success: false` in the envelope. This helper is only used for
+    handler-level failure classes: malformed requests, unavailable commands,
+    and internal errors.
     """
     if exit_code == 127:
         # Executable could not be resolved on PATH / configured path.
@@ -110,18 +110,11 @@ class HealthCheckHandler(APIHandler):
                 data={"name": "jupyterlab_slurm", "version": __version__},
                 message="ok",
             )
-            # Keep the legacy top-level `status`/`name`/`version` fields for one
-            # release in case anything outside the extension polls this
-            # endpoint directly (also mirrored under `data`).
-            envelope["status"] = "ok"
-            envelope["name"] = "jupyterlab_slurm"
-            envelope["version"] = __version__
             self.finish(json.dumps(envelope))
         except Exception as e:
             self._serverlog.exception(e)
             self.set_status(500)
             envelope = make_envelope(False, error=str(e), exit_code=1)
-            envelope["status"] = "error"
             self.finish(json.dumps(envelope))
 
 
@@ -206,7 +199,7 @@ class SlurmCommandHandler(APIHandler):
         # Log at debug level only: the full argv/cwd can contain filesystem
         # paths (job script/output locations, usernames embedded in home
         # directories), which shouldn't appear in production-default (INFO)
-        # logs per the redaction policy in production_checklist.md section 4.
+        # logs per the redaction policy applied throughout this module.
         self._serverlog.debug('SlurmCommandHandler._run_command(): %s %s %s', command, stdin, cwd)
         if isinstance(command, (list, tuple)):
             commands = list(command)
@@ -228,8 +221,8 @@ class SlurmCommandHandler(APIHandler):
             # If still not found, return a clear error. Do not include the raw
             # PATH environment value in the response body: PATH is an
             # environment value, not something that should be returned to the
-            # client (production_checklist.md section 4). Log it at debug
-            # level instead, for operator troubleshooting only.
+            # client. Log it at debug level instead, for operator
+            # troubleshooting only.
             if not os.path.isabs(resolved) or not os.path.exists(resolved):
                 self._serverlog.debug(
                     'SlurmCommandHandler._run_command(): executable not found: %s. PATH=%s',
@@ -1024,7 +1017,7 @@ class JobDetailsHandler(APIHandler):
     def expand_and_verify_path(self, path: str, jid: str, jname: str, user: str, workdir: str) -> str:
         """Expand Slurm placeholders and verify file exists. Return None if not found.
 
-        Path policy (documented for `production_checklist.md` §4):
+        Path policy:
           - Absolute paths (including those resolved from `~`) are trusted as
             configured by Slurm/the admin's `details_queries` policy or the
             job's own recorded `StdOut`/`StdErr`/`WorkDir` values; they are not

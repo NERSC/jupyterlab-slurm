@@ -104,13 +104,12 @@ rollout:
 - The actual production authenticator/spawner combination (e.g. NERSC's
   real JupyterHub batch/SSH spawner), as opposed to `LocalProcessSpawner`.
 - Real GPU hardware/driver behavior (the rig's GPU/GRES partition is a
-  fake/`Fake`-GRES config on CPU-only hardware — see `production_checklist.md`
-  §5 for what was and wasn't covered).
+  fake/`Fake`-GRES config on CPU-only hardware).
 - A real shared/parallel filesystem for job stdout/stderr paths (the rig's
   compute-node/controller filesystem topology does not match a real HPC
   shared filesystem).
 - Health checks, alerting, rollback, and the remaining
-  Operations/Release checklist items (`production_checklist.md` §7).
+  Operations/Release checklist items.
 
 ## Troubleshooting
 

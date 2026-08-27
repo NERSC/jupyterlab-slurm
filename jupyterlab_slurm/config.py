@@ -69,8 +69,8 @@ class SlurmAccounting(Configurable):
 
 # NOTE: `SlurmTesting` (the opt-in cluster compatibility harness config) now
 # lives in `test_suite.py`, alongside `SlurmTestSuiteHandler`, so that both
-# can be omitted entirely from a production build. See test_suite.py and
-# production_checklist.md for details.
+# can be omitted entirely from a production build. See test_suite.py for
+# details.
 
 
 class SlurmUI(Configurable):

@@ -13,7 +13,7 @@ from .handlers import setup_handlers
 
 # The opt-in compatibility test-suite harness lives in its own optional
 # module (test_suite.py) so it can be omitted entirely from a production
-# build. See test_suite.py and production_checklist.md for details.
+# build. See test_suite.py for details.
 try:
     from .test_suite import SlurmTesting
 except ImportError:  # pragma: no cover - expected in a stripped-down prod build

@@ -62,10 +62,10 @@ async def test_status_health_check(jp_fetch):
 
     assert response.code == 200
     payload = json.loads(response.body)
-    assert payload["status"] == "ok"
-    assert payload["name"] == "jupyterlab_slurm"
+    assert payload["success"] is True
+    assert payload["data"]["name"] == "jupyterlab_slurm"
     # Version is reported so the frontend can verify a matched deployment.
-    assert "version" in payload and isinstance(payload["version"], str)
+    assert "version" in payload["data"] and isinstance(payload["data"]["version"], str)
 
 
 async def test_test_suite_is_disabled_by_default(jp_fetch):
@@ -1290,7 +1290,7 @@ def test_expand_and_verify_path_absolute_path_still_trusted(tmp_path):
 
 
 def test_expand_and_verify_path_cross_user_no_ownership_check(tmp_path):
-    """Document a currently-open gap (see production_checklist.md section 4):
+    """Document a currently-open gap:
     `expand_and_verify_path` only checks that a file exists on disk; it does
     not verify the file actually belongs to (or is otherwise associated
     with) the requesting user. A path expanded with another user's `%u` value
@@ -1327,8 +1327,7 @@ def _assert_envelope_shape(payload):
 
 
 async def test_status_envelope_shape(jp_fetch):
-    """/status must conform to the unified envelope while still exposing the
-    legacy top-level status/name/version fields for one release."""
+    """/status must conform to the unified envelope."""
     response = await jp_fetch("jupyterlab_slurm", "status")
     assert response.code == 200
     payload = json.loads(response.body)
@@ -1337,9 +1336,6 @@ async def test_status_envelope_shape(jp_fetch):
     assert payload["exitCode"] == 0
     assert payload["data"]["name"] == "jupyterlab_slurm"
     assert "version" in payload["data"]
-    # Legacy fields kept for back-compat.
-    assert payload["status"] == "ok"
-    assert payload["name"] == "jupyterlab_slurm"
 
 
 async def test_user_envelope_shape(jp_fetch):
@@ -1634,8 +1630,8 @@ async def test_run_command_accepts_argv_list_directly():
 
 def test_validate_slurm_command_path_warns_on_missing_absolute_path(tmp_path):
     """An absolute, configured command path that doesn't exist on disk must
-    trigger a startup warning (production_checklist.md section 4: verify
-    configured command paths are trusted/executable)."""
+    trigger a startup warning (configured command paths must be
+    trusted/executable)."""
     from ..handlers import _validate_slurm_command_path
     from unittest.mock import MagicMock
 
@@ -1696,9 +1692,8 @@ def test_validate_slurm_command_path_no_op_for_empty_path():
 async def test_run_command_missing_executable_does_not_leak_path_env(monkeypatch):
     """A missing/unresolvable executable must report a generic error and
     must NOT include the raw `PATH` environment value in the response body
-    returned to the client (production_checklist.md section 4 redaction
-    policy). The PATH value is still available via debug-level logging for
-    operator troubleshooting."""
+    returned to the client. The PATH value is still available via
+    debug-level logging for operator troubleshooting."""
     from ..handlers import SlurmCommandHandler
     from unittest.mock import MagicMock
 

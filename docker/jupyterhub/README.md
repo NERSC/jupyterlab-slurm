@@ -6,8 +6,8 @@ client binaries (`sbatch`/`squeue`/`scontrol`/`sacct`/`scancel`) authenticated
 via the cluster's shared munge key — not via `docker exec ... --user root`
 wrapper scripts. Each Hub-spawned single-user JupyterLab server runs as a
 real, distinct OS user (via `LocalProcessSpawner` + PAM login), so this rig
-can validate the parts of `production_checklist.md` that a single root
-server can't:
+can validate the parts of production hardening that a single root server
+can't:
 
 - The extension's server process actually runs Slurm commands as the
   logged-in user's own OS identity (release-blocker "validate command

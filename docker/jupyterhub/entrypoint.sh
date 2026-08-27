@@ -32,8 +32,8 @@ if ! id slurm >/dev/null 2>&1; then
 fi
 
 # Demo Hub users. UIDs match the OS users created on the slurmctld/worker
-# containers via `sacctmgr add user` earlier (see production_checklist.md),
-# so job ownership/authorization lines up across containers.
+# containers via `sacctmgr add user` earlier, so job ownership/authorization
+# lines up across containers.
 for spec in "hubadmin:2000" "testuser1:2001" "testuser2:2002"; do
   name="${spec%%:*}"
   uid="${spec##*:}"

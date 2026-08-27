@@ -27,9 +27,9 @@ where `<base_url>` is the Jupyter Server's configured base URL (e.g.
   require Jupyter Server's standard XSRF token handling (the `_xsrf`
   cookie plus the `X-XSRFToken` header), inherited from `APIHandler`.
 - **Username**: handlers that need the OS username (`/user`, `sacct`
-  filtering) currently resolve it from the `USER` environment variable of
-  the notebook server process, not from the authenticated Jupyter identity.
-  This is a known limitation tracked in `production_checklist.md`.
+  filtering) prefer the authenticated Jupyter identity, falling back to the
+  `USER` environment variable of the notebook server process only when no
+  Jupyter identity is configured (e.g. single-user/local deployments).
 
 ## Response envelope
 
@@ -394,10 +394,10 @@ The handler and its config class (`SlurmTestSuiteHandler`/`SlurmTesting`)
 live in their own module, `jupyterlab_slurm/test_suite.py`, which is
 imported by the rest of the extension inside a `try/except ImportError`.
 This means a **production build can omit the module entirely** — not just
-disable it at runtime — by running `python scripts/strip_test_suite.py`
-before packaging; see `production_checklist.md` for details. Development
-and CI builds keep the module (and its default-disabled config) so the
-harness remains available for staging/dev use and its tests keep running.
+disable it at runtime — by running `python scripts/strip_test_suite_from_build.py`
+before packaging. Development and CI builds keep the module (and its
+default-disabled config) so the harness remains available for staging/dev
+use and its tests keep running.
 
 - **Handler**: `SlurmTestSuiteHandler`
 - **Auth**: required (+ XSRF token for `POST`/`DELETE`)
@@ -474,6 +474,5 @@ suite.
 
 ```{note}
 Standardizing 4xx/5xx usage across *all* endpoints (rather than folding
-most failures into a `200` envelope) is a tracked, still-open item in
-`production_checklist.md`.
+most failures into a `200` envelope) is a tracked, still-open item.
 ```

@@ -2,11 +2,11 @@
 
 This module is intentionally kept separate from `handlers.py`/`config.py`
 so that a production build/deployment can omit it entirely (see
-`production_checklist.md` and `docs/contents/api.md` for the rationale and
-build instructions). `handlers.py` imports `SlurmTestSuiteHandler` from
-here inside a `try/except ImportError`, so if this file is stripped out of
-a build, the `/test-suite` route is simply never registered and behaves
-exactly like a route that never existed (HTTP 404).
+`docs/contents/api.md` for the rationale and build instructions).
+`handlers.py` imports `SlurmTestSuiteHandler` from here inside a
+`try/except ImportError`, so if this file is stripped out of a build, the
+`/test-suite` route is simply never registered and behaves exactly like a
+route that never existed (HTTP 404).
 """
 import asyncio
 import json
