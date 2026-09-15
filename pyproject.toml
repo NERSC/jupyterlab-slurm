@@ -1,5 +1,11 @@
 [build-system]
-requires = ["hatchling>=1.5.0", "jupyterlab>=4.5.7,<5", "hatch-nodejs-version>=0.3.2"]
+# `jupyter-builder` (PyPI)/`@jupyter/builder` (npm) is the standalone
+# successor to `jupyterlab`'s bundled build tooling (see the JupyterLab 4.5
+# to 4.6 migration guide). Depending on the full `jupyterlab` package here
+# pulled in the legacy `@jupyterlab/builder`/`@jupyterlab/core-meta` lookup,
+# which fails outright for 4.5.x since no 4.5.x `@jupyterlab/core-meta`
+# releases were ever published on npm.
+requires = ["hatchling>=1.5.0", "jupyter-builder>=1.0.0", "hatch-nodejs-version>=0.3.2"]
 build-backend = "hatchling.build"
 
 [project]
