@@ -24,7 +24,7 @@
       "type": "number",
       "title": "Auto-refresh rate",
       "description": "Time to wait (in seconds) in between auto refreshes of squeue",
-      "default": 10
+      "default": 60
     },
     "itemsPerPageAuto": {
       "type": "boolean",

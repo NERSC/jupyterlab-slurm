@@ -1,7 +1,7 @@
 {
   "userOnly": false,
   "autoReload": true,
-  "autoReloadRate": 10,
+  "autoReloadRate": 60,
   "cutoff": 16,
   "wordbreak": true,
   "escapeHtml": true

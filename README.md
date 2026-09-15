@@ -7,7 +7,7 @@ providing simple and intuitive controls for viewing and managing jobs on the que
 
 ## Prerequisites
 
-- JupyterLab >= 4.0.0
+- JupyterLab 4.5.7
 - Slurm
 
 ## Architecture

@@ -20,7 +20,7 @@ The following settings are currently available:
   separate `userOnly` grid filter above.
 - `autoReload` (boolean, default `true`) — automatically poll `squeue` for
   updates.
-- `autoReloadRate` (number, default `10`) — seconds between automatic
+- `autoReloadRate` (number, default `60`) — seconds between automatic
   `squeue` refreshes.
 - `itemsPerPageAuto` (boolean, default `true`) — automatically size the
   page to fit the available vertical space.
