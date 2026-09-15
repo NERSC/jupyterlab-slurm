@@ -32,7 +32,14 @@ test = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-jupyter[server]>=0.6.0"
+    "pytest-jupyter[server]>=0.6.0",
+    # Tornado 6.5.9 added a required `allowed_symlink_directory` attribute to
+    # `StaticFileHandler` that jupyter_server's `FileFindHandler` subclass
+    # doesn't set yet, breaking static file serving (and thus
+    # `jupyter.browser_check`/Playwright browser tests) with an
+    # AttributeError. Pin below the broken release until jupyter_server ships
+    # a fix (see https://github.com/jupyter-server/jupyter_server/issues/1702).
+    "tornado<6.5.9"
 ]
 docs = [
     "sphinx",

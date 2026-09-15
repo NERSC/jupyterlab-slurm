@@ -120,7 +120,11 @@ jobs:
           sudo rm -rf $(which node)
           sudo rm -rf $(which node)
 
-          pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
+          # See the tornado pin note on the "Build the extension" step: pin
+          # below tornado 6.5.9, which broke jupyter_server's FileFindHandler
+          # (https://github.com/jupyter-server/jupyter_server/issues/1702),
+          # needed here since browser_check still touches static handlers.
+          pip install "jupyterlab>=4.0.0,<5" "tornado<6.5.9" jupyterlab_slurm*.whl
 
 
           jupyter server extension list
@@ -153,7 +157,11 @@ jobs:
       - name: Install the extension
         run: |
           set -eux
-          python -m pip install "jupyterlab>=4.0.0,<5" jupyterlab_slurm*.whl
+          # Pin below tornado 6.5.9, which broke jupyter_server's
+          # FileFindHandler (https://github.com/jupyter-server/jupyter_server/issues/1702)
+          # and would otherwise break the Playwright integration tests below,
+          # which fully load the JupyterLab page (served via static handlers).
+          python -m pip install "jupyterlab>=4.0.0,<5" "tornado<6.5.9" jupyterlab_slurm*.whl
 
       - name: Install dependencies
         working-directory: ui-tests
