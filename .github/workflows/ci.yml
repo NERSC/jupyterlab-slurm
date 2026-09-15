@@ -15,10 +15,18 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      # The build backend (hatchling + hatch-jupyter-builder, configured via a
+      # custom `[tool.hatch.metadata.hooks.nodejs]` metadata hook) has to run a
+      # full `jlpm install`/build even just to prepare metadata for an editable
+      # install (see https://github.com/pypa/hatch/issues/1114), so Node/Yarn
+      # must be available before `pip install -e .` runs, otherwise it fails
+      # with "AttributeError: module 'hatchling.build' has no attribute
+      # 'prepare_metadata_for_build_editable'". `base-setup` provisions both
+      # Python (matching the matrix version) and Node/jlpm.
+      - name: Base Setup
+        uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          python_version: ${{ matrix.python-version }}
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
