@@ -62,9 +62,9 @@ produced by the `make_envelope()` helper:
 - `data` (object) — always an object, `{}` on failure, never `null` or
   absent.
 
-`/status` additionally keeps legacy top-level `status`/`name`/
-`version` fields (mirrored inside `data`) for one release, for any
-external monitoring that polls it directly.
+All endpoints, including `/status`, use only the envelope shape above --
+there are no additional top-level fields outside of `success`,
+`responseMessage`, `errorMessage`, `exitCode`, and `data`.
 
 ## Endpoints
 
@@ -101,15 +101,12 @@ reporting its version so the frontend can detect a mismatched deployment.
   "responseMessage": "ok",
   "errorMessage": null,
   "exitCode": 0,
-  "data": {"name": "jupyterlab_slurm", "version": "<version>"},
-  "status": "ok",
-  "name": "jupyterlab_slurm",
-  "version": "<version>"
+  "data": {"name": "jupyterlab_slurm", "version": "<version>"}
 }
 ```
 
 - **Errors**: on an unexpected internal error, responds `500` with
-  `success: false`, `errorMessage` set, and legacy `status: "error"`.
+  `success: false` and `errorMessage` set.
 
 ### GET /user
 
@@ -125,7 +122,7 @@ Returns the OS username of the notebook server process.
  "exitCode": 0, "data": {"user": "<username>"}}
 ```
 
-- **Errors**: `200` with `success: false` and `errorMessage` set if
+- **Errors**: `500` with `success: false` and `errorMessage` set if
   username resolution raises (e.g. environment lookup failure). This
   endpoint previously crashed with an unhandled `TypeError` on its error
   path (attempting `json.dumps()` on a raw exception); this is fixed.
@@ -156,12 +153,22 @@ Traitlets config (`SlurmUI`), never user-editable from the frontend.
     "details_sources": {},
     "details_hidden": {},
     "squeue_reload_limit_ms": null,
-    "dev_diagnostics": {"dev_mode_active": false, "policy_source": "runtime"}
+    "dev_diagnostics": {"dev_mode_active": false, "policy_source": "runtime"},
+    "server_root_dir": "<absolute path to the server's Contents root>"
   }
 }
 ```
 
-- **Errors**: `200` with `success: false`/`errorMessage` on an
+`server_root_dir` is the resolved, real (symlink-free) absolute path of the
+Jupyter Server's Contents root (`ServerApp.root_dir`, falling back to the
+contents manager's `root_dir` or the process's current directory). The
+frontend uses it to translate the absolute filesystem paths returned by
+`scontrol`/`sacct` (e.g. `Command`, `WorkDir`, `Stdout`, `Stderr`) into
+paths relative to the Contents root for "Open in Editor"/"Open folder"
+actions, and to disable those actions when a path falls outside
+`server_root_dir` entirely. It is `null` if it could not be resolved.
+
+- **Errors**: `500` with `success: false`/`errorMessage` on an
   unexpected internal error; individual missing config keys default to
   `{}`/`null` rather than failing the request.
 
@@ -249,7 +256,9 @@ per-array-element fallback for array jobs.
       "Account": "...", "State": "...", "Command": "...",
       "Partition": "...", "SubmitTime": "...", "StartTime": "...",
       "EndTime": "...", "Elapsed": "...", "Nodes": "...",
-      "Nodelist": "...", "CPUs": "...", "GPUs": "...", "Mem": "...",
+      "Nodelist": "...", "CPUs": "...", "GPUs": "...",
+      "GPUType": "...", "GPUMemVariant": "...", "GPUMem": "...",
+      "GPUUtil": "...", "Mem": "...",
       "GRES": "...", "TimeLimit": "...", "Stdout": "...",
       "Stderr": "...", "WorkDir": "...", "ArrayParent": "...",
       "ArrayRanges": "...", "ExitCode": "...", "DerivedExitCode": "...",
@@ -268,8 +277,11 @@ logic (`%j`/`%J`/`%A`/`%a`/`%x`/`%u` placeholders, symlink and cross-user
 checks).
 
 - **Errors**:
-  - Missing/empty `job_id` → `200` with `success: false`,
+  - Missing/empty `job_id` → `400` with `success: false`,
     `errorMessage: "Missing job_id"`, `exitCode: 1`.
+  - `job_id` present but not matching the expected job-id shape → `400`
+    with `success: false`, `errorMessage: "Invalid job_id: ..."`,
+    `exitCode: 1`.
   - Job not found by either `scontrol` or `sacct` → `200` with
     `success: false`, `errorMessage` set to the command's stderr (or
     `"Job not found"`), `exitCode` set to the underlying return code.
@@ -300,11 +312,17 @@ no-op success).
 }
 ```
 
-- **Errors**: on a missing/invalid job id, or a non-zero `scancel` exit
-  code, `200` with `success: false`, `errorMessage` describing the
-  problem, `exitCode` set from the command (or `-1`),
-  `data.changedIds` empty. Note: cancelling a job id that Slurm does not
-  recognize may still return `exitCode: 0` (Slurm's own behavior).
+- **Errors**:
+  - Non-zero `scancel` exit code (a genuine Slurm-level failure to cancel
+    a valid request) → `200` with `success: false`, `errorMessage` set
+    to `scancel` stderr, `exitCode` set from the command,
+    `data.changedIds` empty. Note: cancelling a job id that Slurm does
+    not recognize may still return `exitCode: 0` (Slurm's own behavior).
+  - Handler-level failure (missing/invalid job id, malformed JSON body,
+    too many job ids) → `400` with `success: false`, `errorMessage`
+    describing the problem, `exitCode: -1`.
+  - `scancel` executable not found on `PATH` → `503`.
+  - Unexpected internal error → `500`.
 
 ### PATCH /scontrol/{action}
 
@@ -314,9 +332,12 @@ operation is not idempotent/safe in the `PUT` sense.
 
 - **Handler**: `ScontrolHandler`
 - **Auth**: required (+ XSRF token)
-- **Path parameter**: `action` — currently used by the frontend for
-  `hold` and `release`; any other action string is passed through as
-  `scontrol <action> <job_ids...>`.
+- **Path parameter**: `action` — `hold`, `release`, `suspend`,
+  `resume`, `requeue`, and `requeuehold` are issued as native `scontrol
+  <action> <jobid>` subcommands (one job id at a time, see below); any
+  other action string is passed through as `scontrol <action>
+  <job_ids...>` in a single call, following the same status-code rules
+  as `/scancel`.
 - **Request body / query**: job IDs, same accepted forms as `/scancel`.
 - **Response** (`200`, `hold`/`release`):
 
@@ -336,14 +357,16 @@ hold|release <id>` call; the aggregate `success` is `true` only if
 errors joined into `errorMessage`, while `data.changedIds` still
 reflects whichever ids succeeded).
 
-- **Errors**:
-  - No job IDs provided → `200`, `success: false`,
+- **Errors** (for `hold`/`release`/`suspend`/`resume`/`requeue`/`requeuehold`):
+  - No job IDs provided → `400`, `success: false`,
     `errorMessage: "No job IDs provided"`, `exitCode: -1`.
   - Partial/total failure → `200`, `success: false`, `errorMessage`
     with one line per failed id, `exitCode` set to the first failing
     command's exit code.
-  - Unexpected internal error → `200`, `success: false`,
-    `exitCode: -1`.
+  - For any other `action`, the same handler-level status codes as
+    `/scancel` apply (`400` for missing/invalid job id or malformed
+    body, `503` if `scontrol` is not found, `500` on an unexpected
+    internal error).
 - **Known Slurm-behavior quirk**: holding an already-running job is a Slurm
   no-op (still reported as success).
 
@@ -374,12 +397,17 @@ Submits a batch script via `sbatch`.
 ```
 
 - **Errors**:
-  - Missing `inputPath` → `200`, `success: false`,
-    `errorMessage: "Unhandled Exception: ..."` (raised as
+  - Missing `inputPath` → `400`, `success: false`,
+    `errorMessage: "Malformed request: ..."` (raised as
     `tornado.web.MissingArgumentError`), `exitCode: -1`.
+  - `inputPath`/`outputPath` not a plain string, or containing a NUL
+    byte → `400`, `success: false`, `exitCode: -1`.
   - `sbatch` failure (bad script, invalid options, etc.) → `200`,
     `success: false`, `errorMessage` set to `sbatch` stderr,
     `exitCode` set to its return code, `data: {}`.
+  - Unexpected internal error while running `sbatch` itself → still
+    `200`, `success: false`, `exitCode: -1`; any other unhandled error
+    (e.g. in request handling) → `500`.
 
 ### POST /test-suite, GET /test-suite/{run_id}, DELETE /test-suite/{run_id}
 
@@ -457,22 +485,30 @@ suite.
 
 ## HTTP status codes summary
 
-- `200` — the overwhelming majority of responses, *including most
-  application-level failures* (bad job id, command failure, missing
+- `200` — the overwhelming majority of responses, *including*
+  genuine Slurm-level command failures against a valid request (bad
+  job id passed to a working `scancel`/`scontrol`/`sbatch`, missing
   config); callers must check `success`/`exitCode` in the body, not
   just the HTTP status.
 - `202` — `POST /test-suite` accepted and started asynchronously.
+- `400` — handler-level request problems on `/job/{job_id}`,
+  `/scancel`, `/scontrol/{action}`, and `/sbatch`: missing/invalid job
+  id, malformed JSON body, too many job ids, no job IDs provided, or an
+  invalid `inputPath`/`outputPath`.
 - `404` — unknown `/test-suite/{run_id}`, or the harness route itself
   when `SlurmTesting.enabled` is false (route not registered at all).
 - `409` — `POST /test-suite` while a run is already in progress.
 - `403` — missing/invalid authentication or XSRF token (raised by
   Jupyter Server before the handler runs).
-- `500` — reserved for truly unexpected failures in `/status` only;
-  all other handlers prefer to catch exceptions and return a `200`
-  envelope with `success: false` so the frontend always has a JSON body
-  to parse.
+- `500` — truly unexpected internal errors, on any endpoint.
+- `503` — the underlying Slurm executable (`scancel`/`scontrol`) could
+  not be found on `PATH`/the configured path.
 
 ```{note}
-Standardizing 4xx/5xx usage across *all* endpoints (rather than folding
-most failures into a `200` envelope) is a tracked, still-open item.
+Some endpoints (`/scancel`, `/scontrol/{action}`, `/sbatch`) already use
+`400`/`500`/`503` for handler-level failures, but genuine Slurm command
+failures (bad job id, non-zero exit code on an otherwise well-formed
+request) still fold into a `200` envelope everywhere. Fully standardizing
+4xx/5xx usage across *all* endpoints and failure classes is a tracked,
+still-open item.
 ```

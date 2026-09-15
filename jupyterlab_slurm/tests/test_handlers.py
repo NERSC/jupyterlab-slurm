@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import re
@@ -163,6 +164,134 @@ async def test_squeue(jp_fetch):
     assert len(row) == 8
     # Job ID may be numeric or array-like (e.g., 5025_2); just ensure it is non-empty
     assert isinstance(row[0], str) and len(row[0]) > 0
+
+async def test_sacct_cancelled_by_uid_resolved_to_username(jp_fetch, monkeypatch):
+    """Real `sacct` output renders a self-cancelled job's State as the
+    literal text "CANCELLED by <uid>" -- a bare numeric uid, never a
+    username. This should be resolved to a real username via the local
+    passwd/NSS database when possible, so the frontend never shows a bare,
+    unexplained number."""
+    from .. import handlers as handlers_module
+
+    async def fake_run_command(self, exec_command):
+        return {
+            "returncode": 0,
+            "stdout": "9999|debug|myjob|testuser|CANCELLED by {}|00:00:10|1|0:0\n".format(os.getuid()),
+            "stderr": ""
+        }
+
+    monkeypatch.setattr(
+        handlers_module.SacctHandler, "_run_command", fake_run_command
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "sacct")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    rows = payload['data']['rows']
+    row = next((r for r in rows if r[0] == '9999'), None)
+    assert row is not None
+    columns = payload['data']['columns']
+    state_idx = next(i for i, c in enumerate(columns) if c.lower() == 'state')
+    import pwd
+    expected_username = pwd.getpwuid(os.getuid()).pw_name
+    assert row[state_idx] == "CANCELLED by {}".format(expected_username)
+
+
+async def test_sacct_cancelled_by_unresolvable_uid_falls_back_to_user_prefix(jp_fetch, monkeypatch):
+    """When the uid can't be resolved via the local passwd/NSS database
+    (e.g. incomplete LDAP/sssd setup, or a decommissioned/renamed account),
+    keep the numeric id but make clear it IS a user id, rather than leaving
+    an ambiguous bare number."""
+    from .. import handlers as handlers_module
+
+    async def fake_run_command(self, exec_command):
+        return {
+            "returncode": 0,
+            "stdout": "9998|debug|myjob|testuser|CANCELLED by 999999999|00:00:10|1|0:0\n",
+            "stderr": ""
+        }
+
+    monkeypatch.setattr(
+        handlers_module.SacctHandler, "_run_command", fake_run_command
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "sacct")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    rows = payload['data']['rows']
+    row = next((r for r in rows if r[0] == '9998'), None)
+    assert row is not None
+    columns = payload['data']['columns']
+    state_idx = next(i for i, c in enumerate(columns) if c.lower() == 'state')
+    assert row[state_idx] == "CANCELLED by user 999999999"
+
+
+async def test_sacct_excludes_non_terminal_states(jp_fetch, monkeypatch):
+    """Job History (sacct) should only show jobs that have actually
+    finished. Real `sacct` reports every job in the queried time window
+    regardless of state, including PENDING/RUNNING/SUSPENDED/etc. -- those
+    are already live/actionable in the Queue tab, so they must be filtered
+    out here to avoid duplicate, stale, and potentially misleading (e.g.
+    a still-running job's placeholder ExitCode) rows in History."""
+    from .. import handlers as handlers_module
+
+    async def fake_run_command(self, exec_command):
+        return {
+            "returncode": 0,
+            "stdout": "\n".join([
+                "8001|debug|still_pending|testuser|PENDING|0:00|1|0:0",
+                "8002|debug|still_running|testuser|RUNNING|0:05|1|0:0",
+                "8003|debug|paused|testuser|SUSPENDED|0:10|1|0:0",
+                "8004|debug|finished_ok|testuser|COMPLETED|0:20|1|0:0",
+                "8005|debug|finished_bad|testuser|FAILED|0:15|1|1:0",
+                "8006|debug|self_cancelled|testuser|CANCELLED by {}|0:01|1|0:0".format(os.getuid()),
+            ]) + "\n",
+            "stderr": ""
+        }
+
+    monkeypatch.setattr(
+        handlers_module.SacctHandler, "_run_command", fake_run_command
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "sacct")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    rows = payload['data']['rows']
+    ids = {r[0] for r in rows}
+
+    # Non-terminal states must be excluded.
+    assert "8001" not in ids
+    assert "8002" not in ids
+    assert "8003" not in ids
+
+    # Terminal states (including a resolved self-cancellation) must remain.
+    assert "8004" in ids
+    assert "8005" in ids
+    assert "8006" in ids
+
+
+async def test_squeue_long_username_not_truncated(jp_fetch):
+    """`squeue`'s `%.Nx` format specifier truncates (not just pads) a value
+    wider than N -- `%.8u` previously dropped the trailing character(s) of
+    any username longer than 8 characters (e.g. a real "testuser1" account
+    rendered as "testuser"), corrupting both the User column display and the
+    "My jobs only" filter (which compares against the full username). The
+    format string must use a wide enough field (e.g. `%.20u`) to preserve
+    real-world usernames intact."""
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'squeue_test_data.txt')
+    long_user = "verylongusername1"  # 18 chars, well past the old 8-char limit
+    with open(data_path, 'a') as f:
+        f.write(
+            "              9001     debug some_job {} PD       0:00      1 (Priority)\n".format(long_user)
+        )
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    rows = payload['data']['rows']
+    row = next((r for r in rows if r[0] == '9001'), None)
+    assert row is not None
+    assert row[3] == long_user
+
 
 async def test_scancel(jp_fetch):
     # Get a current job id from live squeue data
@@ -425,6 +554,50 @@ async def test_job_details_not_found(jp_fetch):
     assert "errorMessage" in payload or payload.get("exitCode") != 0
 
 
+def test_job_details_is_infra_failure_classifier():
+    """`_is_infra_failure()` must distinguish a genuine "job not found"
+    scontrol/sacct exit from a backend/infrastructure failure (missing
+    executable, timeout, unreachable controller, exec-layer error), so
+    callers can report 503 instead of a misleading 404."""
+    from ..handlers import JobDetailsHandler
+
+    # Genuine "job not found" - a normal Slurm-level non-zero exit with no
+    # infra-failure signature in the message.
+    assert JobDetailsHandler._is_infra_failure(1, "slurm_load_jobs error: Invalid job id specified") is False
+    assert JobDetailsHandler._is_infra_failure(0, "") is False
+
+    # Missing executable / timeout (already-recognized rc sentinels).
+    assert JobDetailsHandler._is_infra_failure(127, "") is True
+    assert JobDetailsHandler._is_infra_failure(-1, "command timed out after 60s") is True
+
+    # Backend/infra error text, even with an ambiguous non-sentinel rc.
+    assert JobDetailsHandler._is_infra_failure(1, "Unable to contact slurm controller (connect failure)") is True
+    assert JobDetailsHandler._is_infra_failure(
+        1, "Error response from daemon: container abc123 is not running"
+    ) is True
+    assert JobDetailsHandler._is_infra_failure(2, "Connection refused") is True
+
+
+async def test_job_details_infra_failure_returns_503_not_404(jp_fetch, monkeypatch):
+    """When both scontrol and sacct fail because the backend/controller is
+    unreachable (not because the job genuinely doesn't exist), /job/<id>
+    must report HTTP 503, not a misleading HTTP 404."""
+    from .. import handlers as handlers_module
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        return 1, "", "Unable to contact slurm controller (connect failure)"
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/12345", raise_error=False)
+    assert response.code == 503
+    payload = json.loads(response.body)
+    assert payload["success"] is False
+    assert "controller" in payload["errorMessage"].lower()
+
+
 async def test_sacct_uses_30_day_window(jp_fetch):
     """Test that the sacct endpoint uses a 30-day time window by default."""
     response = await jp_fetch("jupyterlab_slurm", "sacct")
@@ -605,6 +778,316 @@ async def test_job_details_gpu_job_pending_via_scontrol(jp_fetch):
     # No typed AllocTRES yet (job hasn't started); GPU count must come from
     # TresPerNode/ReqTRES instead.
     assert fields.get("GPUs") == "4"
+
+
+async def test_job_details_command_null_sentinel_normalized(jp_fetch, monkeypatch):
+    """A job submitted via `sbatch --wrap=...` has no underlying script file,
+    so real `scontrol show job` reports `Command=(null)` (Slurm's own literal
+    text for "unset"), not an omitted/blank key. The active-job (scontrol)
+    path must normalize that sentinel to a real `None`/absent value rather
+    than passing the literal text `"(null)"` straight through to the
+    frontend, where it would render as the confusing string "(null)"."""
+    from .. import handlers as handlers_module
+
+    scontrol_output = (
+        "JobId=5025_1 JobName=wrap_job UserId=testuser(1000) "
+        "Account=myaccount QOS=debug JobState=RUNNING Reason=None "
+        "NumNodes=1 NumCPUs=2 NumTasks=1 CPUs/Task=1 "
+        "ReqTRES=cpu=2,mem=256M,node=1 AllocTRES=cpu=2,mem=256M,node=1 "
+        "MinMemoryNode=256M Partition=debug NodeList=node001 "
+        "TimeLimit=00:05:00 SubmitTime=2026-01-20T10:00:00 "
+        "StartTime=2026-01-20T10:05:00 EndTime=Unknown "
+        "WorkDir=/home/testuser/jobs Command=(null) Features=cpu "
+        "TresPerNode= TresPerTask=cpu=1"
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        # The internal SubmitLine enrichment lookup (sacct) -- return
+        # nothing here so the test isolates the `(null)` normalization
+        # behavior of the scontrol path itself.
+        return 1, "", "no accounting data"
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_1")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    data = payload["data"]
+    assert data.get("source") == "scontrol"
+    fields = data.get("fields", {})
+    # Must be normalized to a real absent value, never the literal "(null)"
+    # sentinel text leaking straight through to the frontend.
+    assert fields.get("Command") is None
+
+
+async def test_job_details_command_includes_sbatch_arguments(jp_fetch, monkeypatch):
+    """Real `scontrol show job` output only ever reports the bare script
+    path in `Command`, NEVER any arguments the user passed to `sbatch` (e.g.
+    `sbatch args_test.sh hello world`) -- confirmed against a real Docker
+    Slurm cluster job. `sacct`'s `SubmitLine` field DOES capture the full
+    original invocation including arguments and is available immediately,
+    even for a still-active job; the active-job path must enrich Command
+    with it so a job's real arguments are visible, matching what the
+    completed-job (sacct-fallback) path already does."""
+    from .. import handlers as handlers_module
+
+    scontrol_output = (
+        "JobId=5025_1 JobName=args_test UserId=testuser(1000) "
+        "JobState=RUNNING Partition=debug NodeList=node001 "
+        "Command=/data/testuser1_jobs/args_test.sh WorkDir=/data/testuser1_jobs"
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        assert command_name == 'sacct'
+        return 0, "sbatch args_test.sh hello world\n", ""
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_1")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("Command") == "args_test.sh hello world"
+
+
+async def test_job_details_command_requotes_wrap_value_with_spaces(jp_fetch, monkeypatch):
+    """`sacct`'s `SubmitLine` (used to enrich `Command`) loses the original
+    shell quoting around a multi-word `--wrap` value, so a job submitted as
+    `sbatch --chdir=<dir> --wrap="sleep 60" --job-name=foo` is reported as
+    the unquoted text `--chdir=<dir> --wrap=sleep 60 --job-name=foo`.
+    Pasted back into a shell as-is, that text is NOT the full/original
+    command -- it splits `sleep` and `60` into two unrelated tokens instead
+    of one `--wrap` argument. The Command field must re-quote the `--wrap`
+    value so what's shown/copied is a faithful, re-runnable reproduction of
+    the original invocation."""
+    from .. import handlers as handlers_module
+
+    scontrol_output = (
+        "JobId=5030 JobName=s08_wrap_job UserId=testuser1(1000) "
+        "JobState=RUNNING Partition=debug NodeList=node001 "
+        "Command=(null) WorkDir=/data/testuser1_scenarios"
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        assert command_name == 'sacct'
+        return 0, (
+            "sbatch --chdir=/data/testuser1_scenarios --wrap=sleep 60 "
+            "--job-name=s08_wrap_job\n"
+        ), ""
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5030")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("Command") == (
+        'sbatch --chdir=/data/testuser1_scenarios --wrap="sleep 60" '
+        '--job-name=s08_wrap_job'
+    )
+
+
+async def test_job_details_completed_wrap_job_command_is_requoted_and_unprefixed(jp_fetch, monkeypatch):
+    """The `--wrap` requoting/`sbatch`-prefix normalization fix must also
+    apply to *completed* jobs served via the sacct-fallback branch, not
+    just the scontrol active-job path (`_get_submit_line`). The fallback
+    branch reads `SubmitLine` directly from its own `sacct` query, so
+    without this fix a finished `--wrap` job's Command would regress to
+    the raw, broken (unquoted) text once the job left the scontrol
+    active-job view."""
+    from .. import handlers as handlers_module
+
+    async def fake_run_command(self, args=None):
+        return {
+            "success": True,
+            "responseMessage": "ok",
+            "errorMessage": None,
+            "exitCode": 0,
+            "data": {"rows": [], "columns": []},
+        }
+
+    monkeypatch.setattr(
+        handlers_module.SqueueHandler, "run_command", fake_run_command
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            # Job is no longer visible to scontrol -- forces the sacct
+            # fallback branch.
+            return 1, "", "Invalid job id specified"
+        assert command_name == 'sacct'
+        col_list = [
+            "JobID", "JobName", "User", "Partition", "Account", "AllocCPUS",
+            "State", "ExitCode", "Start", "End", "Elapsed", "Submit",
+            "Timelimit", "QOS", "NodeList", "NNodes", "NTasks", "ReqMem",
+            "MaxRSS", "TotalCPU", "UserCPU", "SystemCPU", "AveDiskRead",
+            "AveDiskWrite", "WorkDir", "StdOut", "StdErr", "SubmitLine",
+            "DerivedExitCode", "AllocTRES", "ReqTRES",
+        ]
+        values = {c: "" for c in col_list}
+        values.update({
+            "JobID": "5031",
+            "JobName": "s08_wrap_job",
+            "User": "testuser1",
+            "Partition": "debug",
+            "State": "COMPLETED",
+            "SubmitLine": (
+                'sbatch --chdir=/data/testuser1_scenarios --wrap=sleep 60 '
+                '--job-name=s08_wrap_job'
+            ),
+        })
+        row = '|'.join(values[c] for c in col_list)
+        return 0, row + "\n", ""
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5031")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("Command") == (
+        'sbatch --chdir=/data/testuser1_scenarios --wrap="sleep 60" '
+        '--job-name=s08_wrap_job'
+    )
+
+
+async def test_job_details_command_falls_back_when_submit_line_unavailable(jp_fetch, monkeypatch):
+    """If the SubmitLine enrichment lookup fails (no accounting data yet,
+    sacct unreachable, etc.), fall back to scontrol's bare Command rather
+    than losing the field entirely."""
+    from .. import handlers as handlers_module
+
+    scontrol_output = (
+        "JobId=5025_1 JobName=args_test UserId=testuser(1000) "
+        "JobState=RUNNING Partition=debug NodeList=node001 "
+        "Command=/data/testuser1_jobs/args_test.sh WorkDir=/data/testuser1_jobs"
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        return 1, "", "sacct: error: no accounting data"
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_1")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("Command") == "/data/testuser1_jobs/args_test.sh"
+
+
+async def test_job_details_elapsed_uses_now_not_estimated_end_time_while_running(jp_fetch, monkeypatch):
+    """Regression test: `scontrol show job`'s `EndTime` for a still-active
+    job is Slurm's *estimate* of completion (StartTime + TimeLimit), always
+    present once the job starts -- NOT the job's actual end time. Using it
+    directly for the Elapsed calculation made a running job's Elapsed jump
+    straight to its full requested walltime (e.g. "5:00" for a 5-minute
+    job) from the very first poll and stay pinned there for the entire run,
+    instead of reflecting real elapsed time. Elapsed must be computed
+    against "now" whenever the job hasn't actually reached a terminal
+    state, regardless of what `EndTime` says."""
+    from .. import handlers as handlers_module
+
+    now = datetime.datetime.now()
+    start_dt = now - datetime.timedelta(seconds=30)
+    # 5-minute TimeLimit -> EndTime is ~4.5 minutes in the future relative
+    # to "now", well past the ~30s actually elapsed so far.
+    end_dt = start_dt + datetime.timedelta(minutes=5)
+
+    scontrol_output = (
+        "JobId=5025_1 JobName=long_job UserId=testuser(1000) "
+        "JobState=RUNNING Partition=debug NodeList=node001 "
+        "TimeLimit=00:05:00 "
+        "StartTime={start} EndTime={end} "
+        "WorkDir=/data/testuser1_jobs"
+    ).format(
+        start=start_dt.strftime('%Y-%m-%dT%H:%M:%S'),
+        end=end_dt.strftime('%Y-%m-%dT%H:%M:%S'),
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        return 1, "", "no accounting data"
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/5025_1")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("State") == "RUNNING"
+    # Elapsed must reflect ~30s (now - StartTime), NOT ~5:00 (EndTime -
+    # StartTime, the full requested walltime).
+    elapsed = fields.get("Elapsed")
+    assert elapsed is not None
+    assert elapsed != "05:00"
+    minutes, seconds = (elapsed.split(':') + ['0'])[:2]
+    assert int(minutes) == 0
+
+
+async def test_job_details_terminal_scontrol_enriches_cpu_time_from_sacct(jp_fetch, monkeypatch):
+    """Regression test: some Slurm sites keep a finished job visible to
+    `scontrol show job` for a while after completion (until `MinJobAge`
+    elapses), so the details handler can still take the `scontrol`
+    (active-job) branch even once the job is terminal. That branch never
+    populates CPU/memory usage accounting fields (TotalCPU/UserCPU/
+    SystemCPU/MaxRSS) -- those only exist in `sacct` -- so "Total CPU Time"
+    stayed blank/stale forever for such a job, even after it completed.
+    The handler must enrich with a real `sacct` usage query once the
+    scontrol-reported state is terminal."""
+    from .. import handlers as handlers_module
+
+    scontrol_output = (
+        "JobId=6001 JobName=cpu_job UserId=testuser(1000) "
+        "JobState=COMPLETED Partition=debug NodeList=node001 "
+        "TimeLimit=00:05:00 "
+        "StartTime=2024-03-21T10:00:00 EndTime=2024-03-21T10:04:30 "
+        "WorkDir=/data/testuser1_jobs"
+    )
+
+    async def fake_run_with_hooks(self, command_name, argv, env, context):
+        if command_name == 'scontrol':
+            return 0, scontrol_output, ""
+        if command_name == 'sacct':
+            # -j is followed by the job id; use it to build a plausible row.
+            jid = argv[argv.index('-j') + 1] if '-j' in argv else '6001'
+            row = f"{jid}.batch|512K|00:04:15|00:03:50|00:00:25|1.00M|2.00M"
+            return 0, row, ""
+        return 1, "", "unexpected command"
+
+    monkeypatch.setattr(
+        handlers_module.JobDetailsHandler, "_run_with_hooks", fake_run_with_hooks
+    )
+
+    response = await jp_fetch("jupyterlab_slurm", "job/6001")
+    assert response.code == 200
+    payload = json.loads(response.body)
+    fields = payload["data"]["fields"]
+    assert fields.get("State") == "COMPLETED"
+    assert fields.get("TotalCPU") == "00:04:15"
+    assert fields.get("UserCPU") == "00:03:50"
+    assert fields.get("SystemCPU") == "00:00:25"
+    assert fields.get("MaxRSS") == "512K"
 
 
 async def test_job_details_placeholder_expansion(jp_fetch, tmp_path):
@@ -848,6 +1331,31 @@ async def test_scancel_multiple_jobs(jp_fetch):
     assert all(jid not in remaining for jid in ids)
 
 
+async def test_scancel_accepts_grouped_array_range_job_id(jp_fetch):
+    """A batch containing a *grouped* array-range job id (e.g.
+    "107_[17-20%4]", squeue's collapsed display form for several still-
+    pending array tasks sharing a throttle limit) must not cause the whole
+    kill/scancel request to be rejected as malformed. Unlike `/job/{id}`,
+    real `scancel` genuinely supports cancelling such a range as a single
+    target, so this shape must pass validation alongside ordinary job ids.
+    """
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    ids = [rows[0][0], rows[1][0], "107_[17-20%4]", "107_15", "107_16"]
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scancel",
+        method='DELETE',
+        params=[('job_ids', jid) for jid in ids],
+        raise_error=False,
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    assert set(result['data']['requestedIds']) == set(ids)
+
+
 async def test_scontrol_hold_missing_job_ids(jp_fetch):
     """Holding with an empty job list must fail with a clear message rather than
     silently succeeding."""
@@ -891,6 +1399,50 @@ async def test_scontrol_hold_multiple_jobs(jp_fetch):
     held = {r[0]: (r[4], r[7]) for r in rows}
     for jid in ids:
         assert held.get(jid) == ('PD', '(JobHeldUser)')
+
+
+async def test_scontrol_hold_expands_grouped_array_range_job_id(jp_fetch, monkeypatch):
+    """Holding a *grouped* array-range job id (e.g. "132_[3-20%4]", squeue's
+    collapsed display form for several still-pending array tasks sharing a
+    throttle limit) must not be passed to `scontrol` verbatim: unlike
+    `scancel`, real `scontrol hold`/`release`/etc. only understand a single
+    job or array element and reject the bracketed range outright with
+    "Invalid job id specified for job ...". The handler must expand it into
+    its individual array-element ids before invoking `scontrol`.
+    """
+    from .. import handlers as handlers_module
+
+    seen_job_ids = []
+
+    async def fake_run_command(self, command=None, stdin=None, cwd=None):
+        last_token = command[-1] if isinstance(command, (list, tuple)) else None
+        seen_job_ids.append(last_token)
+        if last_token and re.search(r"\[.*\]", last_token):
+            # Mirror real scontrol's rejection of the bracketed range form.
+            return {
+                "stdout": "",
+                "stderr": f"{last_token}: Invalid job id specified for job {last_token}",
+                "returncode": 1,
+            }
+        return {"stdout": "", "stderr": "", "returncode": 0}
+
+    monkeypatch.setattr(handlers_module.SlurmCommandHandler, "_run_command", fake_run_command)
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/hold",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': ['132_[3-4]']}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    assert result['data']['requestedIds'] == ['132_[3-4]']
+    assert set(result['data']['changedIds']) == {'132_3', '132_4'}
+    # None of the actual `scontrol` invocations should ever receive the raw
+    # bracketed range form.
+    assert all(jid is None or '[' not in jid for jid in seen_job_ids)
 
 
 async def test_sbatch_missing_input_path(jp_fetch):
@@ -1027,6 +1579,23 @@ def test_extract_script_path():
     assert handler._extract_script_path(None) is None
 
 
+def test_extract_script_path_wrap_jobs_have_no_script():
+    """`sbatch --wrap="<command>"` jobs have no associated script file at
+    all. Slurm's `SubmitLine`/`Command` reconstruction loses the original
+    shell quoting around a multi-word `--wrap` value, so
+    e.g. `--wrap="sleep 600" --job-name=foo --hold` is reported as the
+    unquoted text `--wrap=sleep 600 --job-name=foo --hold`. Without special
+    handling, the leftover `600` token (which doesn't start with "-") would
+    be mistaken for the job's positional script-path argument, producing a
+    bogus "script path" that doesn't correspond to any real file."""
+    handler = _make_job_details_handler()
+
+    assert handler._extract_script_path(
+        '--wrap=sleep 600 --job-name=t1_pend_test --hold') is None
+    assert handler._extract_script_path('sbatch --wrap="sleep 600"') is None
+    assert handler._extract_script_path("--wrap=true") is None
+
+
 def test_get_field_factory():
     """get_field_factory resolves fields via the field_map (raw->normalized),
     aliases, direct names, and returns None when absent."""
@@ -1140,6 +1709,106 @@ async def test_scontrol_hold_partial_multi_job_failure(jp_fetch, monkeypatch):
     assert result['data']['requestedIds'] == ['5025_1', '9999']
     assert result['data']['changedIds'] == ['5025_1']
     assert '9999' in result['errorMessage']
+
+
+async def test_scontrol_suspend_resume_running_job(jp_fetch):
+    """Suspending a RUNNING job should mark it ST=S; resuming it should
+    return it to ST=R. Mirrors the existing hold/release coverage, but for
+    the runtime-control pair (`scontrol suspend`/`scontrol resume`)."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    running_id = next(r[0] for r in rows if r[4] == 'R')
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/suspend",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': [running_id]}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+    assert result['data']['changedIds'] == [running_id]
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    suspended = {r[0]: r[4] for r in rows}
+    assert suspended[running_id] == 'S'
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/resume",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': [running_id]}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    resumed = {r[0]: r[4] for r in rows}
+    assert resumed[running_id] == 'R'
+
+
+async def test_scontrol_requeue_and_requeuehold(jp_fetch):
+    """Requeue returns a job to PENDING without a hold; Requeue & Hold
+    returns it to PENDING but immediately held (JobHeldUser), matching real
+    Slurm semantics for `scontrol requeue`/`scontrol requeuehold`."""
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    running_id = next(r[0] for r in rows if r[4] == 'R')
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/requeue",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': [running_id]}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    requeued = {r[0]: (r[4], r[7]) for r in rows}
+    assert requeued[running_id] == ('PD', '(JobRequeued)')
+
+    response = await jp_fetch(
+        "jupyterlab_slurm",
+        "scontrol/requeuehold",
+        method='PATCH',
+        headers={'Content-Type': 'application/json'},
+        body=json.dumps({'job_ids': [running_id]}),
+    )
+    assert response.code == 200
+    result = json.loads(response.body)
+    assert result['success'] is True
+
+    response = await jp_fetch("jupyterlab_slurm", "squeue")
+    rows = json.loads(response.body)['data']['rows']
+    held = {r[0]: (r[4], r[7]) for r in rows}
+    assert held[running_id] == ('PD', '(JobHeldUser)')
+
+
+async def test_scontrol_suspend_resume_missing_job_ids(jp_fetch):
+    """Suspend/resume/requeue/requeuehold must all reject an empty job list
+    with a clear 400, matching hold/release's existing behavior."""
+    for action in ('suspend', 'resume', 'requeue', 'requeuehold'):
+        response = await jp_fetch(
+            "jupyterlab_slurm",
+            f"scontrol/{action}",
+            method='PATCH',
+            body=json.dumps({'job_ids': []}),
+            raise_error=False,
+        )
+        assert response.code == 400
+        result = json.loads(response.body)
+        assert result['success'] is False
+        assert result['errorMessage'] == "No job IDs provided"
 
 
 async def test_run_command_handles_non_utf8_output(tmp_path):

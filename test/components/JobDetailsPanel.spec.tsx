@@ -4,6 +4,16 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import JobDetailsPanel from '../../src/components/JobDetailsPanel';
 import { useJobDetails } from '../../src/hooks/useJobDetails';
 
+// `@jupyterlab/apputils` doesn't transform cleanly under Jest (its
+// dependency chain pulls in `@jupyter/react-components`, which ships raw
+// ESM `export`); mock it the same way `SqueueDataTable.spec.tsx` does.
+const mockNotificationWarning = jest.fn();
+jest.mock('@jupyterlab/apputils', () => ({
+  Notification: {
+    warning: (...args: any[]) => mockNotificationWarning(...args)
+  }
+}));
+
 jest.mock('../../src/hooks/useJobDetails');
 
 const mockUseJobDetails = useJobDetails as jest.MockedFunction<
@@ -41,6 +51,8 @@ const LOADED = {
       Elapsed: '00:01:20'
     }
   ],
+  nextPollAt: null as Date | null,
+  pollIntervalMs: 15000,
   refresh: jest.fn()
 };
 
@@ -148,5 +160,27 @@ describe('JobDetailsPanel', () => {
       />
     );
     expect(setBadge).toHaveBeenCalledWith(2);
+  });
+
+  test('does not show a "Next update" timer when no poll is scheduled (terminal job)', () => {
+    mockUseJobDetails.mockReturnValue(LOADED as any);
+    render(<JobDetailsPanel app={makeApp()} jobIds={['7040']} />);
+    expect(screen.queryByText(/Next update in/)).not.toBeInTheDocument();
+  });
+
+  test('shows a "Next update" pie timer countdown when a poll is scheduled', () => {
+    mockUseJobDetails.mockReturnValue({
+      ...LOADED,
+      fields: { ...LOADED.fields, State: 'RUNNING' },
+      nextPollAt: new Date(Date.now() + 15000),
+      pollIntervalMs: 15000
+    } as any);
+    render(<JobDetailsPanel app={makeApp()} jobIds={['7040']} />);
+    expect(screen.getByText(/Next update in \d+s/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', {
+        name: 'Time until next job details update'
+      })
+    ).toBeInTheDocument();
   });
 });

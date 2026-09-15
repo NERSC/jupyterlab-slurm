@@ -89,7 +89,7 @@ graph TD
     Client -->|GET /ui-config| UiConfigHandler
     Client -->|GET /squeue| SqueueHandler
     Client -->|DELETE /scancel| ScancelHandler
-    Client -->|GET/POST /scontrol/&lt;action&gt;| ScontrolHandler
+    Client -->|PATCH /scontrol/&lt;action&gt;| ScontrolHandler
     Client -->|POST /sbatch| SbatchHandler
     Client -->|GET /sacct| SacctHandler
     Client -->|GET /job/&lt;job_id&gt;| JobDetailsHandler
@@ -109,8 +109,8 @@ graph TD
 
     SlurmCommandHandler -->|"pre_build / pre_exec /\naround_exec / post_process / audit"| SiteHooks["Site hooks\n(module.submodule:callable,\nfail-closed allowlist)"]
     SlurmCommandHandler -->|subprocess exec| SlurmCLI["Slurm CLI\nsqueue / sbatch / scancel /\nscontrol / sacct"]
-    JobDetailsHandler -->|reuses| SqueueHandler
-    JobDetailsHandler -->|reuses| SacctHandler
+    JobDetailsHandler -->|"scontrol show job\n(direct subprocess, via hooks)"| SlurmCLI
+    JobDetailsHandler -->|"sacct fallback\n(direct subprocess, via hooks)"| SlurmCLI
 
     HealthCheckHandler --> Envelope["_common.make_envelope()\n(unified success/data/error JSON)"]
     UserFetchHandler --> Envelope
@@ -136,8 +136,10 @@ Key points:
 - All handlers respond with the same envelope shape
   (`{success, data, errorMessage, exitCode, responseMessage}`), which is
   what `handler.ts`/`SlurmApiError` on the frontend expect.
-- `JobDetailsHandler` composes data from `squeue`/`sacct` rather than
-  calling a dedicated Slurm command, to build a consolidated per-job view.
+- `JobDetailsHandler` does not reuse `SqueueHandler`/`SacctHandler`; it
+  runs `scontrol show job` (falling back to `sacct` for completed/purged
+  jobs) directly, through the same site-hooks mechanism, to build a
+  consolidated per-job view.
 - Site hooks are opt-in and fail-closed: they only run if explicitly
   listed in `SlurmUI.site_hook_allowlist`, see {ref}`configuration` for
   details.

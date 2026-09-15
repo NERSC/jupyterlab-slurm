@@ -8,6 +8,12 @@
       "description": "Show jobs only from this user",
       "default": false
     },
+    "notifyOnStateChange": {
+      "type": "boolean",
+      "title": "Notify on job state change",
+      "description": "Show a notification when one of your own tracked jobs' state changes (e.g. RUNNING to COMPLETED)",
+      "default": false
+    },
     "autoReload": {
       "type": "boolean",
       "title": "Auto-refresh",
@@ -45,12 +51,6 @@
       "description": "Persisted ag-grid column order, visibility, width and pinning for the queue table. Managed automatically as columns are reordered/resized/hidden; not intended for manual editing.",
       "items": { "type": "object" },
       "default": []
-    },
-    "notifyOnStateChange": {
-      "type": "boolean",
-      "title": "Notify on job state change",
-      "description": "Show a notification when one of your tracked jobs' state changes (e.g. RUNNING to COMPLETED)",
-      "default": false
     }
   },
   "additionalProperties": false,

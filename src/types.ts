@@ -20,7 +20,14 @@ export interface ISlurmUserSettings {
   notifyOnStateChange: boolean;
 }
 
-export type JobAction = 'kill' | 'hold' | 'release';
+export type JobAction =
+  | 'cancel'
+  | 'hold'
+  | 'release'
+  | 'suspend'
+  | 'resume'
+  | 'requeue'
+  | 'requeuehold';
 
 export interface ISlurmWidgetProps extends ISlurmUserSettings {
   userName: string;
@@ -49,6 +56,13 @@ export type UiDetailsConfig = {
   details_labels?: Record<string, string>;
   details_sources?: Record<string, string>;
   details_hidden?: Record<string, any>;
+  // The Jupyter server's Contents root (`ServerApp.root_dir`), needed to
+  // translate an absolute Slurm-reported path (Command/WorkDir/Stdout/
+  // Stderr) into the root-relative path `docmanager`/`filebrowser` commands
+  // require, and to detect when a path falls outside root_dir entirely (in
+  // which case "Open in Editor"/"Open folder" can never work and should be
+  // disabled rather than silently no-op).
+  server_root_dir?: string | null;
 };
 
 export type SacctResponse = {

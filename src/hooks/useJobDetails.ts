@@ -16,12 +16,30 @@ const TERMINAL_STATES = new Set([
   'REVOKED'
 ]);
 
+// Slurm's `State` field isn't always one of the bare TERMINAL_STATES values
+// verbatim -- e.g. a cancelled job is reported as the literal text
+// "CANCELLED by <user>", not just "CANCELLED". A strict Set.has() lookup
+// never matches that, so polling (and the "Next update" pie timer) would
+// never stop for such finished jobs. Match on the leading whitespace-
+// delimited token instead of exact string equality.
+function isTerminalState(state: string | undefined): boolean {
+  if (!state) {
+    return false;
+  }
+  const leadingToken = state.trim().split(/\s+/)[0];
+  return TERMINAL_STATES.has(leadingToken);
+}
+
 export function useJobDetails(jobId: string | undefined) {
   const [uiCfg, setUiCfg] = useState<UiDetailsConfig>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, any> | null>(null);
   const [steps, setSteps] = useState<Array<Record<string, any>>>([]);
+  // When the next silent background poll is scheduled to fire, used by the
+  // panel to render a "Next update" countdown/pie timer. `null` whenever no
+  // poll is currently scheduled (job terminal, no job selected, etc.).
+  const [nextPollAt, setNextPollAt] = useState<Date | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -30,6 +48,7 @@ export function useJobDetails(jobId: string | undefined) {
       clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
     }
+    setNextPollAt(null);
   }, []);
 
   const fetchDetails = useCallback(async (id: string, silent = false) => {
@@ -93,9 +112,10 @@ export function useJobDetails(jobId: string | undefined) {
   useEffect(() => {
     clearPollTimer();
     const state = fields?.['State'];
-    if (!jobId || !state || TERMINAL_STATES.has(state)) {
+    if (!jobId || !state || isTerminalState(state)) {
       return;
     }
+    setNextPollAt(new Date(Date.now() + POLL_INTERVAL_MS));
     pollTimerRef.current = setTimeout(() => {
       void fetchDetails(jobId, true);
     }, POLL_INTERVAL_MS);
@@ -112,6 +132,8 @@ export function useJobDetails(jobId: string | undefined) {
     error,
     fields,
     steps,
+    nextPollAt,
+    pollIntervalMs: POLL_INTERVAL_MS,
     refresh: () => jobId && fetchDetails(jobId)
   };
 }

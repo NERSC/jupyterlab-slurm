@@ -1,7 +1,8 @@
 import {
   joinAndNormalizePosix,
   isPathLike,
-  resolveForActions
+  resolveForActions,
+  toRootRelativePath
 } from '../../src/utils/paths';
 
 describe('paths', () => {
@@ -32,6 +33,38 @@ describe('paths', () => {
     test('should handle empty or missing paths', () => {
       expect(joinAndNormalizePosix('/work', '')).toBe('');
       expect(joinAndNormalizePosix('', 'rel/path')).toBe('rel/path');
+    });
+  });
+
+  describe('toRootRelativePath', () => {
+    test('returns the relative path when the target is under rootDir', () => {
+      expect(
+        toRootRelativePath('/home/testuser1/jobs/hello.out', '/home/testuser1')
+      ).toBe('jobs/hello.out');
+    });
+
+    test('returns empty string when the target equals rootDir exactly', () => {
+      expect(toRootRelativePath('/home/testuser1', '/home/testuser1')).toBe('');
+    });
+
+    test('returns undefined when the target is outside rootDir', () => {
+      expect(
+        toRootRelativePath('/data/testuser1_jobs/hello.out', '/home/testuser1')
+      ).toBeUndefined();
+    });
+
+    test('returns undefined when either argument is missing', () => {
+      expect(toRootRelativePath(undefined, '/home/testuser1')).toBeUndefined();
+      expect(toRootRelativePath('/data/hello.out', undefined)).toBeUndefined();
+      expect(toRootRelativePath('/data/hello.out', null)).toBeUndefined();
+    });
+
+    test('treats rootDir "/" as covering every absolute path (regression: previously disabled every action)', () => {
+      expect(toRootRelativePath('/data/testuser1_jobs/hello.out', '/')).toBe(
+        'data/testuser1_jobs/hello.out'
+      );
+      expect(toRootRelativePath('/home/testuser1', '/')).toBe('home/testuser1');
+      expect(toRootRelativePath('/', '/')).toBe('');
     });
   });
 

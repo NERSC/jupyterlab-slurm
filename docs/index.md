@@ -1,7 +1,7 @@
 # Introducing the Slurm Extension for JupyterLab
 
 `jupyterlab-slurm` is an extension for JupyterLab that interfaces with the Slurm Workload Manager,
-providing simple and intuitive controls for viewing and managing jobs on the queue, as well as submitting new jobs to the queue.
+providing simple and intuitive controls for viewing and managing jobs on the queue.
 
 ```{image} ./images/slurm.png
 :align: center

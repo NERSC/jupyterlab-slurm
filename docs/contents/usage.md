@@ -24,34 +24,60 @@ By default, the extension will be launched in "user view", meaning only jobs reg
 Every field of the queue table is searchable via the **Search** entry box on the top right of the extension's GUI. You can sort the table based off any column as well. This means it is very simple to show only your active jobs, held jobs, etc.
 ```
 
+## Viewing job details
+
+Select a single job row and click **Details** to open a separate panel
+with the full, normalized set of fields for that job (submit/start/end
+time, resources, working directory, stdout/stderr paths with
+file-existence info, etc.), sourced from `scontrol`/`sacct` on the
+backend. **Details** is disabled for a *grouped* range of still-pending
+array tasks (e.g. `1234_[3-20%4]`, squeue's display form for array
+elements sharing a throttle limit), since such a range isn't a single
+addressable job; select an individual task instead.
+
+```{only} html
+![Viewing the details of a selected job](../animations/job_details.gif)
+```
+
 ## Managing existing jobs in the queue
 
-This extension provides an interface to three of the most common actions on existing jobs: **Kill Job(s)**, **Hold Job(s)**, and **Release Job(s)**. The underlying Slurm commands used are `scancel`, `scontrol hold`, and `scontrol release`, respectively. To carry out one of these actions on an existing job, simply select the row corresponding to the job, and click the appropriate button to submit the action. Multiple jobs can be selected by holding **Command**/**Ctrl** or **Shift** clicking, and then the same action can be requested on all selected jobs. Rows will become temporarily disabled until the request has finished. After a request completes, a manually dismissable alert will appear just beneath the queue, with background color corresponding to success (green) or failure (red).
+Select one or more rows in the queue (**Command**/**Ctrl** or **Shift**
+clicking extends the selection) to enable a row of action buttons above
+the table:
+
+- **Cancel** — cancels the selected job(s) via `scancel`.
+- **Pause** — a single button that Holds (`scontrol hold`) any selected
+  *pending* job and Suspends (`scontrol suspend`, sends `SIGSTOP`) any
+  selected *running* job, applying whichever is relevant to each row in a
+  mixed selection. Already-held jobs are left alone (Slurm treats a
+  repeated hold as a no-op).
+- **Resume** — the corresponding "unpause": Releases (`scontrol release`)
+  any selected *held* job and Resumes (`scontrol resume`, sends
+  `SIGCONT`) any selected *suspended* job. Jobs held by an administrator
+  (e.g. automatically, after a suspended job is requeued) can't be
+  released by a regular user and are excluded.
+- **Requeue** / **Requeue & Hold** — a split button that requeues the
+  selected job(s) (`scontrol requeue`), optionally holding them
+  immediately afterward (`scontrol requeuehold`); pick the mode from the
+  small dropdown arrow. Requeuing a *suspended* job always results in an
+  admin-only hold, regardless of which mode is chosen, so a confirmation
+  dialog appears first in that case.
+
+Each button's badge shows how many of the selected rows the action
+actually applies to (e.g. `2/5`), since a mixed selection may include rows
+an action doesn't apply to. Rows become temporarily disabled until the
+request finishes, after which a dismissable success/failure alert appears
+beneath the queue.
 
 ```{only} html
 ![Performing some actions on existing jobs. An action on another user's job fails.](../animations/manage_existing.gif)
 ```
 
-## Submitting new batch jobs
-
-The Slurm extension also allows users to submit new jobs to the queue. The interface for doing so is accessed by clicking the **Submit Job** button. This button will launch a form that provides two different methods of job submission. After the job submission request completes, a success/failure alert will be displayed.
-
-### Submitting a job via path to existing batch script
-
-The first field of the job submission form requires an absolute or relative path to an existing file that contains a valid batch script. The relative path is easy to acquire via the JupyterLab file browser, by right-clicking the desired file and selecting **Copy Path**.
-
-```{only} html
-![Submitting a job via existing file](../animations/submit_path.gif)
-```
-
-### Submitting a job via raw batch script
-
-The second field of the job submission form will take in a raw batch script. This field can be good for writing a one-off script, or for pasting in an existing batch script and changing parameters on the fly.
-
-```{only} html
-![Editing a batch script on the fly, and submitting the raw code](../animations/submit_script.gif)
-```
-
 ```{note}
-Sometimes submitting a job can take a long time! An alert message will appear once the job submission request has completed. We plan to add more visual feedback to indicate that a job submission is pending (e.g., a spinner) in the near future.
+Earlier versions of this extension also let users submit new batch jobs
+(via a path to an existing script, or a raw script pasted into a form)
+directly from the queue toolbar. That submission UI has since been
+removed from the frontend; the backend `POST /sbatch` endpoint is still
+implemented (see {ref}`api`) but is not currently wired up to any control
+in the extension's interface.
 ```

@@ -37,10 +37,19 @@ RUN dnf -y install /tmp/rpms/*.rpm && rm -rf /tmp/rpms
 ENV PATH="/usr/bin:${PATH}"
 
 # JupyterHub, single-user JupyterLab, and the jupyterlab-slurm extension.
+# tornado is pinned below 6.5.9: that release introduced a regression
+# where several StaticFileHandler subclasses (e.g. jupyter_server's
+# ThemesHandler) call `_resolve_symlink_target`, which now unconditionally
+# reads `self.allowed_symlink_directory` -- an attribute those handlers
+# never set -- causing "AttributeError: ... object has no attribute
+# 'allowed_symlink_directory'" on basic requests like loading the lab
+# theme CSS. Tracked upstream at tornadoweb/tornado#3724; unpin once
+# fixed upstream.
 RUN pip3 install --no-cache-dir \
       jupyterhub==4.* \
       jupyterlab==4.* \
-      notebook==7.*
+      notebook==7.* \
+      "tornado<6.5.9"
 # Pin to a version compatible with the Node 16 shipped by Rocky 9's default
 # nodejs module stream; newer configurable-http-proxy releases ship as ESM
 # and fail to load ("Unknown file extension") on this Node version.

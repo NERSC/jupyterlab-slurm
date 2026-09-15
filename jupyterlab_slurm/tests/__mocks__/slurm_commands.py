@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from slurm import SlurmControllerMock
 
@@ -72,7 +73,7 @@ class SlurmCommandMock:
 
     def sbatch(self):
         # Simulate adding a new job: append a line matching the expected squeue output format
-        # Format per handlers: %.18i %.9P %j %.8u %.2t %.10M %.6D %R
+        # Format per handlers: %.18i %.9P %j %.20u %.2t %.15M %.6D %R
         new_job_id = self._next_job_id()
         partition, job_name, nodes = self._scan_sbatch_script()
         new_line = f"{new_job_id:>18} {partition:<8} {job_name:<13} testuser PD       0:00      {nodes} (Dependency)\n"
@@ -236,12 +237,12 @@ class SlurmCommandMock:
                 elif arg.startswith('Hold='):
                     hold_val = arg.split('=', 1)[1].lower()
                     action = 'hold' if hold_val == 'on' else 'release'
-        elif args[0] in {'hold', 'release'}:
-            # Format: scontrol hold|release <jobid> [<jobid>...]
+        elif args[0] in {'hold', 'release', 'suspend', 'resume', 'requeue', 'requeuehold'}:
+            # Format: scontrol hold|release|suspend|resume|requeue|requeuehold <jobid> [<jobid>...]
             action = args[0]
             job_ids = set(args[1:])
         
-        if action not in {"hold", "release"} or not job_ids:
+        if action not in {"hold", "release", "suspend", "resume", "requeue", "requeuehold"} or not job_ids:
             return
         
         lines = self._read_lines()
@@ -258,10 +259,32 @@ class SlurmCommandMock:
                 if action == 'hold':
                     parts[4] = 'PD'
                     parts[7] = '(JobHeldUser)'
-                else:  # release
+                elif action == 'release':
                     if parts[7].strip() == '(JobHeldUser)':
                         parts[4] = 'PD'
                         parts[7] = '(Priority)'
+                elif action == 'suspend':
+                    # Suspend only has a meaningful effect on a RUNNING job:
+                    # real `scontrol suspend` pauses the job (SIGSTOP) while
+                    # it keeps its allocation, reported as ST=S.
+                    if parts[4].strip() == 'R':
+                        parts[4] = 'S'
+                        parts[7] = '(Suspended)'
+                elif action == 'resume':
+                    # Resume only has a meaningful effect on a suspended job.
+                    if parts[4].strip() == 'S':
+                        parts[4] = 'R'
+                        parts[7] = 'node001'
+                elif action == 'requeue':
+                    # Requeue stops the job and returns it to PENDING from
+                    # the beginning, without applying a hold.
+                    parts[4] = 'PD'
+                    parts[7] = '(JobRequeued)'
+                elif action == 'requeuehold':
+                    # Requeue & Hold: same as requeue, but immediately held
+                    # so it doesn't automatically re-enter scheduling.
+                    parts[4] = 'PD'
+                    parts[7] = '(JobHeldUser)'
                 # Rebuild line while attempting to preserve formatting (simplified)
                 rebuilt = f"{parts[0].strip():>18} {parts[1]:<8} {parts[2]:<13} {parts[3]:<8} {parts[4]:<8} {parts[5]:<9} {parts[6]:<1} {parts[7]}\n"
                 new_lines.append(rebuilt)
@@ -287,20 +310,28 @@ class SlurmCommandMock:
         i = 0
         while i < len(args):
             arg = args[i]
-            if arg == '-j' and i + 1 < len(args):
+            if (arg == '-j' or arg == '--jobs') and i + 1 < len(args):
                 job_filter = args[i + 1]
                 i += 2
             elif arg.startswith('-j'):
                 job_filter = arg[2:]
                 i += 1
-            elif arg == '-o' and i + 1 < len(args):
+            elif arg.startswith('--jobs='):
+                job_filter = arg[len('--jobs='):]
+                i += 1
+            elif (arg == '-o' or arg == '--format') and i + 1 < len(args):
                 output_format = args[i + 1]
                 i += 2
             elif arg.startswith('-o'):
                 output_format = arg[2:]
                 i += 1
+            elif arg.startswith('--format='):
+                output_format = arg[len('--format='):]
+                i += 1
             elif arg in ('-X', '--allocations'):
                 allocations_only = True
+                i += 1
+            elif arg in ('-n', '--noheader'):
                 i += 1
             else:
                 i += 1
@@ -375,9 +406,13 @@ class SlurmCommandMock:
                     filtered.append(row)
             rows = filtered
         
-        # Determine output columns
+        # Determine output columns. Real sacct accepts an optional "%<width>"
+        # truncation suffix on each field name (e.g. "SubmitLine%512"); strip
+        # it since this mock always prints the full value.
         if output_format:
-            out_columns = [c.strip() for c in output_format.split(',')]
+            out_columns = [
+                re.sub(r'%\d+$', '', c.strip()) for c in output_format.split(',')
+            ]
         else:
             out_columns = file_columns
 

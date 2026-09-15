@@ -1,13 +1,15 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Box, Button, Divider, IconButton, Stack, Typography } from '@mui/material';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ArrowBackIosNewIconMui from '@mui/icons-material/ArrowBackIosNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 import { JupyterFrontEnd } from '@jupyterlab/application';
+import { Notification } from '@jupyterlab/apputils';
 import { JobField } from './JobField';
 import { JupyterThemeProvider } from './JupyterThemeProvider';
 import { useJobDetails } from '../hooks/useJobDetails';
+import { toRootRelativePath } from '../utils/paths';
 
 export type JobDetailsPanelProps = {
   app: JupyterFrontEnd;
@@ -24,12 +26,45 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
   const jobIds = props.jobIds ?? [];
   const currentJobId = jobIds[index];
 
-  const { uiCfg, loading, error, fields, steps } = useJobDetails(currentJobId);
+  const { uiCfg, loading, error, fields, steps, nextPollAt, pollIntervalMs } =
+    useJobDetails(currentJobId);
 
   // Update badge
   React.useEffect(() => {
     props.setBadge?.(jobIds.length);
   }, [jobIds.length, props]);
+
+  // Live "now" ticker so the "Next update" countdown/pie timer stays
+  // current, following the same pattern used for the queue's refresh pie
+  // timer in SqueueDataTable.tsx.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!nextPollAt) {
+      return;
+    }
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [nextPollAt]);
+
+  const secondsToNextUpdate = useMemo(() => {
+    if (!nextPollAt) {
+      return null;
+    }
+    return Math.max(0, Math.ceil((nextPollAt.getTime() - now) / 1000));
+  }, [nextPollAt, now]);
+
+  const nextUpdateElapsedPercent = useMemo(() => {
+    if (!nextPollAt || !pollIntervalMs) {
+      return null;
+    }
+    const remainingMs = Math.max(0, nextPollAt.getTime() - now);
+    const elapsedMs = Math.min(
+      pollIntervalMs,
+      Math.max(0, pollIntervalMs - remainingMs)
+    );
+    return (elapsedMs / pollIntervalMs) * 100;
+  }, [nextPollAt, now, pollIntervalMs]);
 
   const labels = uiCfg.details_labels ?? {};
 
@@ -99,29 +134,56 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
     props.onSnapshotChange?.(jobIds, n);
   }, [index, jobIds, props]);
 
+  const rootDir = uiCfg.server_root_dir;
+
+  // `docmanager:open`/`filebrowser:go-to-path` take paths *relative to the
+  // server's Contents root*, never a raw absolute OS path. `path` here is
+  // always the absolute path Slurm reported (JobField only invokes these
+  // callbacks when a path was resolved at all); translate it via
+  // `server_root_dir` and surface a clear notification -- instead of a
+  // silent no-op -- when the path genuinely falls outside root_dir and so
+  // cannot be reached through JupyterLab's file APIs from this server.
   const openInEditor = useCallback(
     async (path: string) => {
+      const relative = toRootRelativePath(path, rootDir);
+      if (relative === undefined) {
+        Notification.warning(
+          `"${path}" is outside this server's root directory and can't be opened here.`,
+          { autoClose: 6000 }
+        );
+        return;
+      }
       try {
         await props.app.commands.execute('docmanager:open', {
-          path,
+          path: relative,
           factory: 'Editor'
         });
       } catch (e) {
         console.warn('Failed to open in editor', e);
       }
     },
-    [props.app]
+    [props.app, rootDir]
   );
 
   const openFolder = useCallback(
     async (path: string) => {
+      const relative = toRootRelativePath(path, rootDir);
+      if (relative === undefined) {
+        Notification.warning(
+          `"${path}" is outside this server's root directory and can't be opened here.`,
+          { autoClose: 6000 }
+        );
+        return;
+      }
       try {
-        await props.app.commands.execute('filebrowser:go-to-path', { path });
+        await props.app.commands.execute('filebrowser:go-to-path', {
+          path: relative
+        });
       } catch (e) {
         console.warn('Failed to open folder', e);
       }
     },
-    [props.app]
+    [props.app, rootDir]
   );
 
   const copyToClipboard = useCallback(async (text: string) => {
@@ -181,7 +243,17 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
 
   return (
     <JupyterThemeProvider>
-      <Stack spacing={1} sx={{ p: 1.5 }}>
+      <Stack
+        spacing={1}
+        sx={{
+          p: 1.5,
+          pb: 4,
+          height: '100%',
+          maxHeight: '100%',
+          overflowY: 'auto',
+          boxSizing: 'border-box'
+        }}
+      >
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="h6" sx={{ flex: 1 }}>
             Job {currentJobId ?? '—'}
@@ -235,15 +307,42 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
           </Stack>
         </Stack>
 
+        {secondsToNextUpdate !== null && (
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="caption" color="text.secondary">
+              Next update in {secondsToNextUpdate}s
+            </Typography>
+            {nextUpdateElapsedPercent !== null && (
+              <span
+                className="jp-SlurmWidget-refresh-pie"
+                role="progressbar"
+                aria-label="Time until next job details update"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(nextUpdateElapsedPercent)}
+                style={
+                  {
+                    '--jp-slurm-pie-percent': `${nextUpdateElapsedPercent}%`
+                  } as React.CSSProperties
+                }
+              />
+            )}
+          </Stack>
+        )}
+
         {loading && <Typography variant="body2">Loading…</Typography>}
         {!loading && error && <Typography color="error">{error}</Typography>}
 
         {!loading && !error && fields && (
-          <Stack spacing={1.25}>
+          <Stack spacing={1.5}>
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              <Typography
+                variant="subtitle2"
+                className="jp-SlurmWidget-details-section-header"
+              >
                 Summary
               </Typography>
+              <Divider sx={{ mb: 0.75 }} />
               <Stack spacing={0.5}>
                 {summaryRows.map((row: any) => (
                   <JobField
@@ -256,6 +355,7 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
                     commandScript={row.commandScript}
                     isStatus={row.isStatus}
                     isReason={row.isReason}
+                    rootDir={rootDir}
                     expanded={commandExpanded}
                     onToggleExpand={() => setCommandExpanded(!commandExpanded)}
                     onOpenInEditor={openInEditor}
@@ -267,9 +367,13 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              <Typography
+                variant="subtitle2"
+                className="jp-SlurmWidget-details-section-header"
+              >
                 Timing
               </Typography>
+              <Divider sx={{ mb: 0.75 }} />
               <Stack spacing={0.5}>
                 {timingRows.map((row: any) => (
                   <JobField
@@ -283,9 +387,13 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              <Typography
+                variant="subtitle2"
+                className="jp-SlurmWidget-details-section-header"
+              >
                 Resources
               </Typography>
+              <Divider sx={{ mb: 0.75 }} />
               <Stack spacing={0.5}>
                 {resourceRows
                   .filter((row: any) => row.v)
@@ -304,9 +412,13 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
             {/* Steps section */}
             {!!steps && steps.length > 0 && (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                <Typography
+                  variant="subtitle2"
+                  className="jp-SlurmWidget-details-section-header"
+                >
                   Steps
                 </Typography>
+                <Divider sx={{ mb: 0.75 }} />
                 <Stack spacing={0.5}>
                   {steps.map((s, idx) => {
                     const jid =
@@ -356,10 +468,30 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
               </Box>
             )}
 
+            {/* TODO(sstat): Live monitoring (`sstat -j <id>`) belongs here,
+                not on the queue toolbar -- it's inherently single-job, and
+                this panel already knows the single job's current state.
+                Add a "Live Usage" section/tab that:
+                  1. Only renders/activates when fields['State'] === 'RUNNING'
+                     (sstat is meaningless for PD/CD/F jobs).
+                  2. Polls a new `/sstat/{job_id}` endpoint on its own short
+                     interval while the panel is open and the job is running,
+                     independent of the main queue's autoReload/reloadRate.
+                  3. Stops polling on panel close/unmount.
+                No new toolbar button is needed -- opening Job Details is
+                itself the trigger. See prior design discussion for the full
+                rationale (single-job scope, independent refresh cadence,
+                avoids competing with the Suspend/Resume/Requeue toolbar
+                button budget). */}
+
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              <Typography
+                variant="subtitle2"
+                className="jp-SlurmWidget-details-section-header"
+              >
                 Logs
               </Typography>
+              <Divider sx={{ mb: 0.75 }} />
               {['Stdout', 'Stderr', 'WorkDir'].map(k => (
                 <JobField
                   key={k}
@@ -370,6 +502,7 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
                   isPath={true}
                   fileExists={fields?.[k + 'Exists']}
                   fileSize={fields?.[k + 'Size']}
+                  rootDir={rootDir}
                   onOpenInEditor={openInEditor}
                   onOpenFolder={openFolder}
                   onCopy={copyToClipboard}

@@ -10,7 +10,7 @@ import {
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { isPathLike, resolveForActions } from '../utils/paths';
+import { isPathLike, resolveForActions, toRootRelativePath } from '../utils/paths';
 
 export interface IJobFieldProps {
   label: string;
@@ -24,6 +24,13 @@ export interface IJobFieldProps {
   commandScript?: string;
   fileExists?: boolean;
   fileSize?: number;
+  // The Jupyter server's Contents root (ServerApp.root_dir). When known,
+  // Edit/Open-Folder are visually disabled (not hidden, so the user can
+  // still see the action exists and hover for why it's unavailable) rather
+  // than left clickable-but-silently-broken, for any path outside this root
+  // (which docmanager/filebrowser can never open) or, for Stdout/Stderr, a
+  // path the server has confirmed doesn't exist (fileExists === false).
+  rootDir?: string | null;
   onOpenInEditor?: (path: string) => void;
   onOpenFolder?: (path: string) => void;
   onCopy?: (text: string) => void;
@@ -44,6 +51,7 @@ export const JobField: React.FC<IJobFieldProps> = ({
   commandScript,
   fileExists,
   fileSize,
+  rootDir,
   onOpenInEditor,
   onOpenFolder,
   onCopy,
@@ -63,7 +71,29 @@ export const JobField: React.FC<IJobFieldProps> = ({
           workDir
         )
       : undefined;
-  const showPathActions = resolved && isPathLike(resolved);
+  // Path actions (Edit/Open Folder) are always rendered -- never hidden --
+  // for any field that is *conceptually* a path/command field (isPath or
+  // isCommand), so the toolbar/field layout stays stable and the user can
+  // always see the action exists. They're disabled (with an explanatory
+  // tooltip) whenever there's no resolvable path at all -- e.g. a
+  // `--wrap`-style job with no associated script file, or a `—` (empty)
+  // value -- rather than being hidden, matching the "disable, don't hide"
+  // convention used everywhere else in this UI.
+  const showPathActions = isCommand || isPath;
+  const noResolvablePath = !resolved || !isPathLike(resolved);
+  // Only visually disable (not hide) Edit/Open-Folder once `rootDir` is
+  // actually known -- while it's still loading, `undefined` would otherwise
+  // make every path look permanently out-of-scope. Once known: a path
+  // outside `rootDir` can never be opened via docmanager/filebrowser from
+  // this server, and (for Stdout/Stderr specifically) a path the server has
+  // confirmed doesn't exist isn't worth opening either.
+  const pathOutOfRoot =
+    rootDir != null &&
+    !!resolved &&
+    toRootRelativePath(resolved, rootDir) === undefined;
+  const pathActionsDisabled =
+    noResolvablePath || pathOutOfRoot || fileExists === false;
+  const isEmptyValue = value === '—' || value === '' || value == null;
 
   if (isCommand) {
     const v = value as string;
@@ -81,50 +111,83 @@ export const JobField: React.FC<IJobFieldProps> = ({
         >
           <Typography
             variant="body2"
-            sx={{
-              maxWidth: '60ch',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
+            sx={
+              expanded
+                ? {
+                    maxWidth: '60ch',
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'break-word'
+                  }
+                : {
+                    maxWidth: '60ch',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }
+            }
           >
             {display}
           </Typography>
         </Tooltip>
         {showPathActions && (
           <>
-            <Tooltip title="Open in Editor">
-              <IconButton
-                size="small"
-                onClick={() => onOpenInEditor?.(resolved!)}
-                aria-label="Open in Editor"
-              >
-                <EditNoteIcon fontSize="small" />
-              </IconButton>
+            <Tooltip
+              title={
+                noResolvablePath
+                  ? 'No associated script file'
+                  : pathOutOfRoot
+                    ? "Outside this server's root directory"
+                    : 'Open in Editor'
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={pathActionsDisabled}
+                  onClick={() => onOpenInEditor?.(resolved!)}
+                  aria-label="Open in Editor"
+                >
+                  <EditNoteIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
-            <Tooltip title="Open containing folder">
-              <IconButton
-                size="small"
-                onClick={() => onOpenFolder?.(resolved!)}
-                aria-label="Open folder"
-              >
-                <FolderOpenIcon fontSize="small" />
-              </IconButton>
+            <Tooltip
+              title={
+                noResolvablePath
+                  ? 'No associated script file'
+                  : pathOutOfRoot
+                    ? "Outside this server's root directory"
+                    : 'Open containing folder'
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={pathActionsDisabled}
+                  onClick={() => onOpenFolder?.(resolved!)}
+                  aria-label="Open folder"
+                >
+                  <FolderOpenIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </>
         )}
         <Tooltip title="Copy command">
-          <IconButton
-            size="small"
-            onClick={() => onCopy?.(v)}
-            aria-label="Copy command"
-          >
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton
+              size="small"
+              disabled={isEmptyValue}
+              onClick={() => onCopy?.(v)}
+              aria-label="Copy command"
+            >
+              <ContentCopyIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
         {truncated && onToggleExpand && (
           <Button size="small" onClick={onToggleExpand}>
-            {expanded ? 'Show less' : 'Show full'}
+            {expanded ? 'Show Less' : 'Show Full'}
           </Button>
         )}
       </Stack>
@@ -184,38 +247,67 @@ export const JobField: React.FC<IJobFieldProps> = ({
         {showPathActions && (
           <>
             {!isDirectory && (
-              <Tooltip title="Open in Editor">
-                <IconButton
-                  size="small"
-                  onClick={() => onOpenInEditor?.(resolved!)}
-                  aria-label="Open in Editor"
-                >
-                  <EditNoteIcon fontSize="small" />
-                </IconButton>
+              <Tooltip
+                title={
+                  isEmptyValue
+                    ? 'No path available'
+                    : fileExists === false
+                      ? 'File not found'
+                      : pathOutOfRoot
+                        ? "Outside this server's root directory"
+                        : 'Open in Editor'
+                }
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={pathActionsDisabled}
+                    onClick={() => onOpenInEditor?.(resolved!)}
+                    aria-label="Open in Editor"
+                  >
+                    <EditNoteIcon fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
             <Tooltip
-              title={isDirectory ? 'Open folder' : 'Open containing folder'}
+              title={
+                isEmptyValue
+                  ? 'No path available'
+                  : fileExists === false
+                    ? 'File not found'
+                    : pathOutOfRoot
+                      ? "Outside this server's root directory"
+                      : isDirectory
+                        ? 'Open folder'
+                        : 'Open containing folder'
+              }
             >
-              <IconButton
-                size="small"
-                onClick={() => onOpenFolder?.(resolved!)}
-                aria-label="Open folder"
-              >
-                <FolderOpenIcon fontSize="small" />
-              </IconButton>
+              <span>
+                <IconButton
+                  size="small"
+                  disabled={pathActionsDisabled}
+                  onClick={() => onOpenFolder?.(resolved!)}
+                  aria-label="Open folder"
+                >
+                  <FolderOpenIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </>
         )}
         {!isDirectory && (
           <Tooltip title="Copy path">
-            <IconButton
-              size="small"
-              onClick={() => onCopy?.(v)}
-              aria-label="Copy path"
-            >
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
+            <span>
+              <IconButton
+                size="small"
+                disabled={isEmptyValue}
+                onClick={() => onCopy?.(v)}
+                aria-label="Copy path"
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </span>
           </Tooltip>
         )}
       </Stack>

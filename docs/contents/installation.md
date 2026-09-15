@@ -9,7 +9,8 @@ install.
 
 ## Requirements
 
-- JupyterLab >= 4.0.0
+- JupyterLab 4.5.7 or compatible
+- Python >= 3.9, `jupyter_server` >= 2.0.1, < 3
 - Slurm client commands (`squeue`, `sbatch`, `scancel`, `scontrol`, `sacct`)
   available on the machine running the Jupyter server
 

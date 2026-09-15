@@ -10,9 +10,10 @@ The `jupyterlab-slurm` extension provides a graphical user interface for interac
 
 The extension implements a few of the most common user operations in a Slurm system:
 
-- Holding (or pausing) a job
-- Releasing (or continuing) a job
-- Killing a job
-- Submitting new jobs
+- Viewing the full details of a job
+- Holding/pausing a pending/running job, respectively
+- Releasing/resuming a held/suspended job, respectively
+- Requeuing a job, optionally holding it immediately afterward
+- Cancelling a job
 
 This extension was originally designed and built by student interns and staff at the National Energy Research Scientific Computing Center (NERSC), a high performance computing facility based out of Lawrence Berkeley National Laboratory (LBL). Our aim is to make the extension portable to any high performance computing system that uses Slurm.

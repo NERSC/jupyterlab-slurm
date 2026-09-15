@@ -163,4 +163,40 @@ describe('useJobDetails', () => {
     // No additional fetch: the job is in a terminal state.
     expect(calls).toBe(afterInitial);
   });
+
+  test('does not poll (or expose a next-poll time) for a job cancelled by a user', async () => {
+    // Slurm reports cancelled jobs as "CANCELLED by <user>", not the bare
+    // "CANCELLED" string -- this must still be recognized as terminal.
+    jest.useFakeTimers();
+    let calls = 0;
+    routeRequest({
+      'ui-config': () => ({ success: true, data: {} }),
+      'job/': () => {
+        calls += 1;
+        return {
+          success: true,
+          data: {
+            source: 'sacct',
+            fields: { State: 'CANCELLED by testuser' },
+            steps: []
+          }
+        };
+      }
+    });
+
+    const { result } = renderHook(() => useJobDetails('7040'));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const afterInitial = calls;
+    expect(result.current.nextPollAt).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+      await Promise.resolve();
+    });
+    expect(calls).toBe(afterInitial);
+    expect(result.current.nextPollAt).toBeNull();
+  });
 });

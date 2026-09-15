@@ -81,7 +81,19 @@ export async function requestAPI<T>(
     } catch {
       data = text;
     }
-    throw new ServerConnection.ResponseError(response, data);
+    // `ServerConnection.ResponseError`'s second constructor argument is a
+    // *string* message (it's passed straight to `Error`'s constructor,
+    // which stringifies any non-string value to the useless
+    // "[object Object]"). The unified envelope is an object, not a string,
+    // so extract a real message from it (falling back to the envelope's
+    // default) rather than passing the whole parsed object as `message`.
+    const message =
+      data && typeof data === 'object'
+        ? (data.errorMessage ?? data.responseMessage ?? undefined)
+        : typeof data === 'string' && data.length > 0
+          ? data
+          : undefined;
+    throw new ServerConnection.ResponseError(response, message);
   } else {
     data = await response.json();
   }

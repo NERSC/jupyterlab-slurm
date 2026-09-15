@@ -45,10 +45,14 @@ describe('JobField', () => {
       />
     );
 
-    fireEvent.click(screen.getByLabelText('Copy path'));
+    // Buttons are wrapped in a <span> (required so MUI can show a Tooltip on
+    // a disabled IconButton), and MUI copies the aria-label onto that
+    // wrapper too -- query specifically for the `button` role to avoid
+    // matching both the span and the button it wraps.
+    fireEvent.click(screen.getByRole('button', { name: 'Copy path' }));
     expect(onCopy).toHaveBeenCalledWith('/global/home/u/user/slurm-123.out');
 
-    fireEvent.click(screen.getByLabelText('Open in Editor'));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Editor' }));
     expect(onOpenInEditor).toHaveBeenCalledWith(
       '/global/home/u/user/slurm-123.out'
     );
@@ -65,6 +69,89 @@ describe('JobField', () => {
       />
     );
     expect(screen.getByText('not found')).toBeInTheDocument();
+  });
+
+  test('disables Open in Editor/Open folder when the file does not exist', () => {
+    render(
+      <JobField
+        label="Stderr"
+        value="/tmp/missing.err"
+        fieldKey="StdErr"
+        isPath
+        fileExists={false}
+        rootDir="/tmp"
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Open in Editor' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Open folder' })).toBeDisabled();
+  });
+
+  test('disables Open in Editor/Open folder when the path is outside rootDir', () => {
+    render(
+      <JobField
+        label="Stdout"
+        value="/global/home/u/user/slurm-123.out"
+        fieldKey="StdOut"
+        isPath
+        fileExists={true}
+        rootDir="/home/testuser1"
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Open in Editor' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Open folder' })).toBeDisabled();
+  });
+
+  test('enables Open in Editor/Open folder when the path is inside rootDir and exists', () => {
+    render(
+      <JobField
+        label="Stdout"
+        value="/home/testuser1/slurm-123.out"
+        fieldKey="StdOut"
+        isPath
+        fileExists={true}
+        rootDir="/home/testuser1"
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Open in Editor' })
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Open folder' })).toBeEnabled();
+  });
+
+  test('disables (does not hide) Edit/Open Folder for a command with no resolvable script path', () => {
+    // e.g. `sbatch --wrap=...` jobs have no associated script file --
+    // `commandScript` is empty/undefined in that case. The buttons must
+    // still be rendered (not hidden), just disabled, matching the
+    // "disable, don't hide" convention used everywhere else.
+    render(
+      <JobField
+        label="Command"
+        value="--wrap=sleep 600 --job-name=t1_long_1"
+        fieldKey="Command"
+        isCommand
+        commandScript={undefined}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Open in Editor' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Open folder' })).toBeDisabled();
+  });
+
+  test('disables the Copy button when the value is the empty "—" placeholder', () => {
+    render(<JobField label="Stdout" value={null} fieldKey="StdOut" isPath />);
+    expect(screen.getByRole('button', { name: 'Copy path' })).toBeDisabled();
+    // No resolvable path either, so Open folder stays visible but disabled.
+    expect(screen.getByRole('button', { name: 'Open folder' })).toBeDisabled();
+  });
+
+  test('disables the Copy command button when the value is the empty "—" placeholder', () => {
+    render(<JobField label="Command" value={null} fieldKey="Command" isCommand />);
+    expect(screen.getByRole('button', { name: 'Copy command' })).toBeDisabled();
   });
 
   test('command fields truncate long values and toggle expansion', () => {

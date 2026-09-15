@@ -18,7 +18,7 @@ try:
 except Exception:  # pragma: no cover - fallback for uninstalled/dev use
     __version__ = "dev"
 
-from ._common import logger, make_envelope, SLURM_COMMAND_TIMEOUT_SECONDS
+from ._common import logger, make_envelope, SLURM_COMMAND_TIMEOUT_SECONDS, is_infra_failure, resolve_cancelled_by_uid
 
 # The compatibility test-suite harness lives in its own optional module so
 # that it can be omitted entirely from a production build/deployment (see
@@ -30,6 +30,60 @@ except ImportError:  # pragma: no cover - expected in a stripped-down prod build
     SlurmTestSuiteHandler = None
 
 jobIDMatcher = re.compile(r"^[0-9]+(_[0-9]+)?$")
+
+# Broader matcher accepted by job-*action* endpoints (scancel/scontrol
+# hold|release|suspend|resume|requeue). Unlike `/job/{id}` (details), which
+# can only ever resolve one specific job/array element, real `scancel`/
+# `scontrol` genuinely support Slurm's *grouped* array-range display form
+# (e.g. "107_[17-20%4]", squeue's collapsed form for several still-pending
+# array tasks sharing a throttle limit) as a single valid target: e.g.
+# `scancel 107_[17-20%4]` cancels every pending task in that range in one
+# call. Rejecting this shape here (as the stricter `jobIDMatcher` does)
+# previously caused `get_jobids()` to raise for the *entire* batch as soon
+# as one such ID was present, failing an action (e.g. "kill") for every
+# selected job -- not just the range entry -- even though scancel/scontrol
+# can genuinely act on it.
+jobIDActionMatcher = re.compile(r"^[0-9]+(_[0-9]+|_\[[0-9,\-]+(%[0-9]+)?\])?$")
+
+# Matches the grouped array-range job id form itself, e.g. "107_[17-20%4]"
+# or "107_[3,5-8]", so it can be detected and expanded into individual
+# array-element ids (see `expand_grouped_array_range_job_id` below).
+groupedArrayRangeMatcher = re.compile(r"^([0-9]+)_\[([0-9,\-]+)(?:%[0-9]+)?\]$")
+
+
+def expand_grouped_array_range_job_id(job_id):
+    """Expand a Slurm *grouped* array-range job id (squeue's collapsed
+    display form for several still-pending array tasks sharing a throttle
+    limit, e.g. "107_[17-20%4]" or "107_[3,5-8]") into the list of
+    individually-addressable array-element ids it represents (e.g.
+    ["107_17", ..., "107_20"]).
+
+    Unlike `scancel`, which natively accepts this bracketed range form as a
+    single target, `scontrol hold`/`release`/`suspend`/`resume`/`requeue`
+    only understand a single job or a single array element and reject the
+    range form outright with "Invalid job id specified for job ...". So any
+    caller that needs to run `scontrol` per-id (rather than delegating the
+    range to a single Slurm command invocation) must expand it first.
+
+    Returns [job_id] unchanged if it isn't in the grouped array-range form.
+    """
+    match = groupedArrayRangeMatcher.match(job_id)
+    if not match:
+        return [job_id]
+
+    base, ranges = match.group(1), match.group(2)
+    expanded = []
+    for part in ranges.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            start, end = part.split("-", 1)
+            for i in range(int(start), int(end) + 1):
+                expanded.append("{}_{}".format(base, i))
+        else:
+            expanded.append("{}_{}".format(base, part))
+    return expanded or [job_id]
 
 
 class MissingSlurmJobID(Exception):
@@ -66,6 +120,27 @@ class InvalidSlurmPath(Exception):
         self.field = field
         self.message = "Invalid {}: must be a plain string with no NUL bytes".format(field)
 
+
+# Non-terminal sacct `State` values to exclude from Job History (see
+# SacctHandler.run_command below). sacct reports every job in the queried
+# time window regardless of state, including ones still visible/actionable
+# in the live Queue tab -- Job History is meant to show jobs that have
+# actually finished, so these are filtered out. Matched via `str.startswith`
+# against the uppercased State value, since some variants carry extra
+# detail (e.g. "CANCELLED by <user>", "COMPLETED" vs "COMPLETING").
+NON_TERMINAL_SACCT_STATES = (
+    "PENDING",
+    "RUNNING",
+    "SUSPENDED",
+    "CONFIGURING",
+    "COMPLETING",
+    "RESIZING",
+    "REQUEUED",
+    "REQUEUE_HOLD",
+    "REQUEUE_FED",
+    "STAGE_OUT",
+    "SIGNALING",
+)
 
 # Maximum number of job IDs accepted in a single request body/query, to
 # bound the number of Slurm subprocesses a single request can spawn.
@@ -180,7 +255,7 @@ class SlurmCommandHandler(APIHandler):
             raise TooManySlurmJobIDs(len(job_ids), MAX_JOB_IDS_PER_REQUEST)
 
         for job_id in job_ids:
-            if not jobIDMatcher.search(job_id):
+            if not jobIDActionMatcher.search(job_id):
                 raise InvalidSlurmJobID(job_id, "job_id {} is invalid".format(job_id))
 
         return job_ids
@@ -413,7 +488,7 @@ class ScontrolHandler(SlurmCommandHandler):
             # `update JobId=<id> Hold=on/off` form is rejected on some sites
             # (e.g. NERSC/Perlmutter) with "Update of this parameter is not
             # supported: Hold=on".
-            if action in ("hold", "release"):
+            if action in ("hold", "release", "suspend", "resume", "requeue", "requeuehold"):
                 requested = []
                 changed = []
                 exit_codes = []
@@ -435,14 +510,30 @@ class ScontrolHandler(SlurmCommandHandler):
                     await self.finish(json.dumps(resp))
                     return
 
+                # Unlike `scancel`, `scontrol` doesn't accept a grouped
+                # array-range id (e.g. "132_[3-20%4]") as a single target --
+                # it only understands individual jobs/array elements, and
+                # rejects the bracketed range outright with "Invalid job id
+                # specified for job ...". Expand any such id into its
+                # individual array-element ids before iterating.
+                expanded_jids = []
                 for jid in requested:
+                    expanded_jids.extend(expand_grouped_array_range_job_id(jid))
+
+                for jid in expanded_jids:
                     out = await self._run_command([self._slurm_command, action, jid])
                     exit_codes.append(out.get("returncode", -1))
                     if out.get("returncode", -1) == 0:
                         changed.append(jid)
                     else:
-                        err = out.get("stderr") or out.get("stdout") or "unknown error"
-                        errors.append(f"{jid}: {err}")
+                        err = (out.get("stderr") or out.get("stdout") or "unknown error").strip()
+                        # Real scontrol error text (e.g. "132_3: Invalid job
+                        # id specified for job 132_3") already repeats the
+                        # job id, sometimes twice -- avoid tripling it up
+                        # further by only prefixing `jid` when it isn't
+                        # already present in `err`, keeping the aggregated
+                        # errorMessage (and the toast built from it) short.
+                        errors.append(err if jid in err else f"{jid}: {err}")
 
                 # Aggregate result
                 success = all(ec == 0 for ec in exit_codes) if exit_codes else False
@@ -644,8 +735,16 @@ class SqueueHandler(SlurmCommandHandler):
         # squeue -h automatically removes the header row -o <format string> ensures that the output is in a
         # format expected by the extension Hard-coding this is not great -- ideally we would allow the user to
         # customize this, or have the default output be the user's output stdout, stderr, _ = await
-        # run_command('squeue -o "%.18i %.9P %j %.8u %.2t %.10M %.6D %R" -h')
-        self.output_formatting = '-o "%.18i %.9P %j %.8u %.2t %.10M %.6D %R" -h'
+        # run_command('squeue -o "%.18i %.9P %j %.20u %.2t %.10M %.6D %R" -h')
+        # NOTE: `%.Nx` truncates (not just pads) a value wider than N --
+        # `%.8u` silently dropped the trailing character of any username
+        # longer than 8 characters (e.g. the real "testuser1" account
+        # rendered as "testuser"), corrupting both the displayed User column
+        # and the "My jobs only" filter (which compares against the full,
+        # untruncated username). 20 chars comfortably covers real usernames
+        # (Linux's own limit is 32); the row parser below splits on
+        # whitespace, so the exact width only affects alignment, not parsing.
+        self.output_formatting = '-o "%.18i %.9P %j %.20u %.2t %.15M %.6D %R" -h'
 
     def get_command(self):
         exec_command = "{} {}".format(self._slurm_command, self.output_formatting)
@@ -810,6 +909,15 @@ class SacctHandler(SlurmCommandHandler):
                 response_message = "Success: {}".format(exec_command)
                 error_message = None
 
+            # Real sacct output renders a self-cancelled job's State as the
+            # literal text "CANCELLED by <uid>" -- a bare numeric uid, never
+            # a username -- so resolve it here for whichever column is
+            # configured as "State" (site-configurable via sacct_fields).
+            try:
+                state_idx = next(i for i, c in enumerate(columns) if c.lower() == 'state')
+            except StopIteration:
+                state_idx = None
+
             data_lines = cmd_stdout.splitlines() if cmd_stdout else []
             for line in data_lines:
                 if not line:
@@ -820,7 +928,26 @@ class SacctHandler(SlurmCommandHandler):
                     values += [""] * (len(columns) - len(values))
                 elif len(values) > len(columns):
                     values = values[:len(columns)]
+                if state_idx is not None and state_idx < len(values):
+                    values[state_idx] = resolve_cancelled_by_uid(values[state_idx])
                 rows.append(values)
+
+            # Job History is meant to show jobs that have actually finished,
+            # not a live/duplicate view of what's already in the Queue tab.
+            # sacct reports *every* job in the time window regardless of
+            # state (including PENDING/RUNNING/SUSPENDED, etc.), so filter
+            # those non-terminal states out here. Matched case-insensitively
+            # and via startswith, since a self-cancelled job's State is the
+            # literal text "CANCELLED by <user>" (post-resolve_cancelled_by_uid)
+            # rather than the bare word "CANCELLED".
+            if state_idx is not None:
+                rows = [
+                    r for r in rows
+                    if len(r) <= state_idx or not any(
+                        r[state_idx].upper().startswith(s)
+                        for s in NON_TERMINAL_SACCT_STATES
+                    )
+                ]
 
             # If user was provided and underlying command didn't filter, filter here by the 'User' column
             if user:
@@ -869,7 +996,18 @@ class SacctHandler(SlurmCommandHandler):
                 user = None
             out = await self.run_command(user=user)
             if not out.get("success", False):
-                self.set_status(503 if out.get("exitCode") == 127 else 500)
+                # Only a genuine infra/backend failure (missing executable,
+                # timeout, unreachable controller) warrants a 5xx here. An
+                # ordinary sacct-level rejection -- most commonly "Invalid
+                # user id: <x>" when the `-u` filter doesn't resolve to a
+                # real system account (e.g. an anonymous/token-authenticated
+                # Jupyter session whose username isn't a real Linux user) --
+                # is a valid response to a valid request, so it stays 200
+                # (matching the same policy already applied to scancel/
+                # scontrol/job-details) instead of surfacing as a crash to
+                # the frontend's Job History view.
+                if is_infra_failure(out.get("exitCode"), out.get("errorMessage")):
+                    self.set_status(503)
             await self.finish(json.dumps(out))
         except Exception as e:
             self._serverlog.exception("Unhandled Exception: {}".format(e))
@@ -951,6 +1089,28 @@ class UiConfigHandler(APIHandler):
                 except Exception:
                     pass
 
+            # The frontend's "Open in Editor"/"Open folder" actions on Slurm
+            # job fields (Command, WorkDir, Stdout, Stderr) call `docmanager`/
+            # `filebrowser` JupyterLab commands, which take paths *relative
+            # to the server's Contents root* (`ServerApp.root_dir`), not raw
+            # absolute OS paths -- but Slurm's own `scontrol`/`sacct` output
+            # only ever gives absolute filesystem paths. Without knowing
+            # root_dir, the frontend has no way to translate one into the
+            # other (or to know a given absolute path falls outside root_dir
+            # entirely, in which case the action can never work and should be
+            # disabled rather than silently no-op). `PageConfig` deliberately
+            # doesn't expose root_dir to the browser for other reasons, so it
+            # is surfaced here instead, through this extension's own
+            # authenticated endpoint.
+            try:
+                server_root_dir = os.path.realpath(
+                    self.settings.get('server_root_dir')
+                    or getattr(self.contents_manager, 'root_dir', None)
+                    or os.getcwd()
+                )
+            except Exception:
+                server_root_dir = None
+
             payload = make_envelope(True, data={
                 "queue_column_labels": labels,
                 "queue_column_sizing": sizing,
@@ -961,6 +1121,7 @@ class UiConfigHandler(APIHandler):
                 "details_hidden": details_hidden,
                 "squeue_reload_limit_ms": reload_limit_ms,
                 "dev_diagnostics": dev_diag,
+                "server_root_dir": server_root_dir,
             })
             await self.finish(json.dumps(payload))
         except Exception as e:
@@ -1065,6 +1226,117 @@ class JobDetailsHandler(APIHandler):
             return expanded
         return None
 
+    # Matches a `--wrap=<value>` token and lazily captures everything up to
+    # (but not including) the next whitespace-then-flag boundary (`\s--`) or
+    # the end of the string, so a multi-word value can be re-quoted below.
+    _WRAP_VALUE_RE = re.compile(r'(--wrap=)(.*?)(?=\s--[A-Za-z]|$)')
+
+    @classmethod
+    def _requote_wrap_value(cls, line):
+        """Re-quote a `--wrap=<value>` token's value when it contains
+        whitespace.
+
+        `sacct`'s `SubmitLine` (and `scontrol`'s `Command`) reconstruct the
+        original `sbatch` invocation by simply joining the parsed argv back
+        together with spaces -- the original shell quoting that kept a
+        multi-word `--wrap` value (e.g. `--wrap="sleep 60"`) together as one
+        argument is lost. Left as-is, the resulting text
+        (`--wrap=sleep 60 --job-name=foo`) looks like the full command but
+        silently isn't one: pasting it back into a shell splits `sleep` and
+        `60` into two separate, unrelated tokens instead of reproducing the
+        original single `--wrap` argument. Re-wrapping the value in quotes
+        here restores a string that, if copied and re-run, behaves the same
+        as the job that was actually submitted.
+        """
+        if not line or '--wrap=' not in line:
+            return line
+
+        def _repl(m):
+            prefix, value = m.group(1), m.group(2)
+            if not value or not re.search(r'\s', value):
+                return prefix + value
+            if (value[0] == value[-1]) and value[0] in ('"', "'"):
+                # Already quoted (e.g. this was the only --wrap in the line
+                # and nothing followed it) -- leave it alone.
+                return prefix + value
+            escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+            return prefix + '"' + escaped + '"'
+
+        return cls._WRAP_VALUE_RE.sub(_repl, line)
+
+    @classmethod
+    def _normalize_submit_line(cls, line):
+        """Strip a leading `sbatch ` token (Command is always just the
+        script/argument invocation, never prefixed with the command name --
+        see `_get_submit_line`) and re-quote any multi-word `--wrap` value.
+
+        This must be applied to *every* code path that surfaces a raw
+        `sacct` `SubmitLine`-derived value as `Command` -- not just the
+        active-job (`scontrol`) path's `_get_submit_line()` helper. The
+        completed-job fallback path below queries `SubmitLine` directly via
+        `get_field('SubmitLine')` and previously skipped this normalization
+        entirely, so a `--wrap` job's copy/paste-able Command stayed broken
+        (unquoted, still `sbatch`-prefixed) once the job actually completed
+        and details started coming from `sacct` instead of `scontrol`.
+
+        For a real script job, dropping the `sbatch ` token is fine -- the
+        remaining text still starts with the script path, which is itself
+        openable/runnable and unambiguous. But a `--wrap` job has NO script
+        path at all -- the line is nothing but flags (e.g.
+        `--chdir=... --wrap="sleep 60" --job-name=...`), so stripping
+        `sbatch ` there leaves text that looks like a full command but
+        isn't one: it can't actually be run/copy-pasted as-is, since it's
+        missing the command name entirely. Detect that case (normalized
+        line starts with a flag, i.e. no leading script path) and restore
+        the `sbatch ` prefix so what's shown/copied is a genuinely
+        faithful, re-runnable reproduction of the original invocation.
+        """
+        if not line:
+            return line
+        if line.startswith('sbatch '):
+            line = line[len('sbatch '):]
+        line = cls._requote_wrap_value(line)
+        if line.startswith('-'):
+            line = 'sbatch ' + line
+        return line
+
+    async def _get_submit_line(self, job_id, context):
+        """Best-effort fetch of `sacct`'s `SubmitLine` field for `job_id` --
+        the only place Slurm records the *full* original `sbatch` invocation
+        (script path AND any arguments the user passed); `scontrol show
+        job`'s `Command` field only ever has the bare script path. Returns
+        the script-path-plus-arguments text (the leading "sbatch " token
+        stripped, since `Command` elsewhere is always just the script
+        invocation, not prefixed with the command name), or `None` if the
+        query fails/returns nothing -- callers should treat that as "no
+        enrichment available" and fall back to `scontrol`'s bare Command,
+        not as an error.
+        """
+        try:
+            query_job_id = re.sub(r'%\d+', '', job_id)
+            argv = shlex.split(self._sacct) + [
+                '--jobs', query_job_id, '--format=SubmitLine%512',
+                '--noheader', '--parsable2', '--allocations'
+            ]
+            rc, out, err = await self._run_with_hooks('sacct', argv, os.environ.copy(), context)
+            if rc != 0 or not out.strip():
+                return None
+            line = out.splitlines()[0].strip()
+            line = self._normalize_submit_line(line)
+            return line or None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _is_infra_failure(rc, err):
+        """Classify a scontrol/sacct failure as an infra/backend problem
+        (missing executable, timeout, unreachable controller, exec-layer
+        error) rather than a genuine "job not found" response, so callers
+        can report 503 instead of a misleading 404. Delegates to the shared
+        classifier in `_common.py` (also used by `SacctHandler`).
+        """
+        return is_infra_failure(rc, err)
+
     @staticmethod
     def _get_file_info(path):
         """Return dict with exists flag and size in bytes for a file path, or None/0 if missing."""
@@ -1082,8 +1354,23 @@ class JobDetailsHandler(APIHandler):
         if not command:
             return None
         # Strip leading sbatch/srun/salloc and their flags to get the script path
-        parts = shlex.split(command)
+        try:
+            parts = shlex.split(command)
+        except ValueError:
+            parts = command.split()
         if not parts:
+            return None
+        # `sbatch --wrap="<command>"` jobs have no associated script file at
+        # all -- there's nothing for "Open in Editor" to open. This needs to
+        # be detected up front, before the generic flag-skipping loop below:
+        # Slurm's `SubmitLine` reconstruction loses the original shell
+        # quoting, so a `--wrap` value containing spaces (e.g.
+        # `--wrap="sleep 600"`) gets word-split into a `--wrap=sleep` token
+        # followed by a separate, unrelated `600` token. Without this check,
+        # the loop below would treat that leftover `600` token as the job's
+        # positional script-path argument (since it doesn't start with
+        # "-"), producing a bogus, non-existent "script path".
+        if any(p == '--wrap' or p.startswith('--wrap=') for p in parts):
             return None
         # Skip the submitter command (sbatch, srun, etc.) and any flags
         i = 0
@@ -1398,6 +1685,19 @@ class JobDetailsHandler(APIHandler):
                         kv[m.group(1)] = m.group(2).strip()
                 return kv
 
+            def denull(value):
+                # `scontrol` renders any unset field as the literal text
+                # "(null)" (e.g. `Command=(null)` for jobs submitted via
+                # `sbatch --wrap=...`, which has no underlying script file)
+                # rather than omitting the key or leaving it blank. Applied
+                # only when building the final `fields` dict sent to the
+                # frontend -- NOT during raw `kv` parsing above, since some
+                # GPU-detection logic below deliberately checks `AllocTRES`
+                # for this exact sentinel (a pending job's `AllocTRES` is
+                # always `(null)` before it starts) to decide whether to
+                # trust `AllocTRES` or fall back to `TresPerNode` instead.
+                return None if value == '(null)' else value
+
             # Execute scontrol (use config if present, otherwise default to 'scontrol show job <id>')
             rc = -1; out = ''; err = ''
             if 'active' in queries:
@@ -1457,13 +1757,34 @@ class JobDetailsHandler(APIHandler):
                 elapsed = None
                 start_str = kv.get('StartTime')
                 end_str = kv.get('EndTime')
+                # `scontrol show job`'s `EndTime` for a still-active job
+                # (PENDING/RUNNING/SUSPENDED/etc.) is NOT the actual
+                # completion time -- it's Slurm's *estimate* of when the
+                # job will finish (StartTime + TimeLimit), always present
+                # once the job has started, regardless of how much wall
+                # time has actually elapsed so far. Using it directly here
+                # made Elapsed jump straight to the full requested walltime
+                # (e.g. "5:00" for a 5-minute job) from the very first
+                # poll, and stay pinned there for the job's entire run --
+                # only trust `EndTime` for this calculation once the job
+                # has actually reached a terminal state; otherwise always
+                # measure elapsed against the current time.
+                raw_state = (kv.get('JobState') or kv.get('State') or '').upper()
+                is_terminal_state = raw_state and not any(
+                    raw_state.startswith(s) for s in NON_TERMINAL_SACCT_STATES
+                )
                 if start_str and start_str != 'Unknown' and start_str != 'N/A':
                     try:
                         # Slurm usually uses ISO-like format: 2024-03-21T10:00:00
                         # or with space: 2024-03-21 10:00:00
                         s_str = start_str.replace(' ', 'T')
                         start_dt = datetime.datetime.fromisoformat(s_str)
-                        if end_str and end_str != 'Unknown' and end_str != 'N/A':
+                        if (
+                            is_terminal_state
+                            and end_str
+                            and end_str != 'Unknown'
+                            and end_str != 'N/A'
+                        ):
                             e_str = end_str.replace(' ', 'T')
                             end_dt = datetime.datetime.fromisoformat(e_str)
                         else:
@@ -1490,8 +1811,20 @@ class JobDetailsHandler(APIHandler):
                     "User": kv.get('UserId') or kv.get('User'),
                     "QOS": kv.get('QOS'),
                     "Account": kv.get('Account'),
-                    "State": (kv.get('JobState') or kv.get('State')),
-                    "Command": kv.get('Command'),
+                    "State": resolve_cancelled_by_uid(kv.get('JobState') or kv.get('State')),
+                    # `scontrol show job`'s `Command` field is always just the
+                    # bare script path (e.g. "/data/user/args_test.sh"),
+                    # NEVER including any arguments the user passed to
+                    # `sbatch` (e.g. `sbatch args_test.sh hello world`) --
+                    # confirmed against a real Docker Slurm cluster job.
+                    # `sacct`'s `SubmitLine` field DOES capture the full
+                    # original command (including arguments), and is
+                    # available immediately, even for a still-pending/running
+                    # job -- enrich with it here so an active job's Command
+                    # shows real arguments too, matching what the
+                    # sacct-fallback path below already does for completed
+                    # jobs.
+                    "Command": (await self._get_submit_line(job_id, context)) or denull(kv.get('Command')),
                     "Partition": kv.get('Partition'),
                     "SubmitTime": kv.get('SubmitTime'),
                     "StartTime": kv.get('StartTime'),
@@ -1515,6 +1848,65 @@ class JobDetailsHandler(APIHandler):
                     "Reason": kv.get('Reason'),
                     "RawScontrol": out.strip(),
                 })
+
+                # `scontrol show job` never reports CPU/memory usage
+                # accounting fields (TotalCPU/UserCPU/SystemCPU/MaxRSS/
+                # AveDiskRead/AveDiskWrite) -- those only exist in `sacct`'s
+                # accounting database, and only become meaningful once the
+                # job has actually finished. Some Slurm sites keep a
+                # completed job visible to `scontrol show job` for a while
+                # after it finishes (until `MinJobAge` elapses), so this
+                # branch can still be taken even once the job is terminal --
+                # in that case, enrich with the real `sacct` usage fields
+                # here so "Total CPU Time" etc. don't stay blank/stale
+                # forever for a job whose polling never actually fell
+                # through to the `sacct` fallback branch below.
+                if is_terminal_state:
+                    try:
+                        usage_alloc = {
+                            "args": ["--parsable2", "-n"],
+                            "format": ["JobID", "MaxRSS", "TotalCPU", "UserCPU", "SystemCPU",
+                                       "AveDiskRead", "AveDiskWrite"],
+                            "time_window_days": 30,
+                        }
+                        usage_prefix = shlex.split(self._sacct)
+                        usage_query_job_id = re.sub(r'%\d+', '', job_id)
+                        usage_argv = usage_prefix + self._build_sacct_argv(usage_alloc, usage_query_job_id)
+                        u_rc, u_out, u_err = await self._run_with_hooks(
+                            'sacct', usage_argv, os.environ.copy(), context
+                        )
+                        if u_rc == 0 and u_out.strip():
+                            u_col_list = usage_alloc["format"]
+                            u_rows = []
+                            for line in u_out.splitlines():
+                                if not line.strip():
+                                    continue
+                                u_parts = line.split('|')
+                                if len(u_parts) < len(u_col_list):
+                                    u_parts = u_parts + ([""] * (len(u_col_list) - len(u_parts)))
+                                elif len(u_parts) > len(u_col_list):
+                                    u_parts = u_parts[:len(u_col_list)]
+                                u_rows.append(dict(zip(u_col_list, u_parts)))
+                            u_batch_row = next(
+                                (r for r in u_rows if '.batch' in (r.get('JobID') or '')), None
+                            )
+                            u_pick = u_batch_row or next(
+                                (r for r in u_rows if r.get('JobID') == usage_query_job_id), None
+                            ) or (u_rows[0] if u_rows else None)
+                            if u_pick:
+                                fields.update({
+                                    "MaxRSS": denull(u_pick.get('MaxRSS')) or fields.get('MaxRSS'),
+                                    "TotalCPU": denull(u_pick.get('TotalCPU')) or fields.get('TotalCPU'),
+                                    "UserCPU": denull(u_pick.get('UserCPU')) or fields.get('UserCPU'),
+                                    "SystemCPU": denull(u_pick.get('SystemCPU')) or fields.get('SystemCPU'),
+                                    "AveDiskRead": denull(u_pick.get('AveDiskRead')) or fields.get('AveDiskRead'),
+                                    "AveDiskWrite": denull(u_pick.get('AveDiskWrite')) or fields.get('AveDiskWrite'),
+                                })
+                    except Exception as e:
+                        self._serverlog.warning(
+                            "Failed to enrich terminal scontrol job %s with sacct usage fields: %s",
+                            job_id, e
+                        )
             else:
                 # Fallback to sacct for completed jobs
                 source = 'sacct'
@@ -1617,7 +2009,7 @@ class JobDetailsHandler(APIHandler):
                         "Partition": get_field('Partition'),
                         "Account": get_field('Account'),
                         "CPUs": get_field('CPUs') or get_field('AllocCPUS'),
-                        "State": get_field('State'),
+                        "State": resolve_cancelled_by_uid(get_field('State')),
                         "ExitCode": get_field('ExitCode'),
                         "DerivedExitCode": get_field('DerivedExitCode'),
                         "SubmitTime": get_field('Submit'),
@@ -1646,7 +2038,17 @@ class JobDetailsHandler(APIHandler):
                         "WorkDir": workdir,
                         "Stdout": self.expand_and_verify_path(raw_stdout, job_id, jname, juser, workdir),
                         "Stderr": self.expand_and_verify_path(raw_stderr, job_id, jname, juser, workdir),
-                        "Command": get_field('Command') or get_field('SubmitLine'),
+                        # `sacct`'s raw `SubmitLine` (queried as part of the
+                        # default format above) still has "sbatch " prefixed
+                        # and any multi-word `--wrap` value un-quoted -- run
+                        # it through the same normalization used for the
+                        # active-job (scontrol) path so a completed job's
+                        # copy/paste-able Command is a faithful,
+                        # re-runnable reproduction of the original
+                        # invocation, not just for still-running jobs.
+                        "Command": self._normalize_submit_line(
+                            get_field('Command') or get_field('SubmitLine')
+                        ),
                     })
                     # Build steps list (other rows like <JOBID>.batch, .extern, task steps)
                     steps = []
@@ -1660,7 +2062,18 @@ class JobDetailsHandler(APIHandler):
                     except Exception:
                         steps = []
                 else:
-                    self.set_status(404)
+                    if self._is_infra_failure(rc, err):
+                        # A genuinely missing job and an unreachable
+                        # controller/backend both surface as a non-zero
+                        # scontrol/sacct exit here; conflating them under a
+                        # single 404 would mislead a client into thinking a
+                        # real job simply doesn't exist. Recognize the
+                        # infra-failure signatures (missing executable,
+                        # timeout, controller unreachable, exec-layer
+                        # errors) and report those as 503 instead.
+                        self.set_status(503)
+                    else:
+                        self.set_status(404)
                     await self.finish(json.dumps(make_envelope(
                         False,
                         error=err.strip() or "Job not found",

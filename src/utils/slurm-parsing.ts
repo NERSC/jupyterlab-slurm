@@ -28,6 +28,36 @@ export function parseTimeInSeconds(t: string): number {
 }
 
 /**
+ * True for a Slurm-displayed *grouped* array-range job ID, e.g.
+ * "1234_[3-20%4]" -- the form `squeue` uses to collapse multiple still-
+ * pending array tasks sharing the same throttle limit into a single row.
+ * This is not a real, individually-addressable job: `scontrol show job`/
+ * `sacct -j` (and this extension's `/job/{id}` endpoint) only ever resolve
+ * a single job or a single array *element* (e.g. "1234_5"), never a range
+ * expression -- so any action that targets one specific job (like "Show
+ * Details") can't be applied to a row in this form.
+ */
+export function isGroupedArrayRangeJobId(jobId: string): boolean {
+  return /^\d+_\[.*\]$/.test(jobId.trim());
+}
+
+/**
+ * JupyterLab's toast notifications render on a single line and clip
+ * (rather than wrap) anything past their fixed width, so a long raw
+ * backend error (e.g. a multi-job scontrol/scancel stderr) can get cut
+ * off mid-word, hiding the actual error text from the user. Trim to a
+ * reasonable length with an ellipsis so any toast built from arbitrary
+ * backend text always ends up looking like a complete sentence; callers
+ * should still log the untruncated text to the console separately.
+ */
+const TOAST_DETAIL_MAX_LENGTH = 160;
+export function truncateForToast(text: string): string {
+  return text.length > TOAST_DETAIL_MAX_LENGTH
+    ? `${text.slice(0, TOAST_DETAIL_MAX_LENGTH - 1).trimEnd()}\u2026`
+    : text;
+}
+
+/**
  * Build a stable numeric sort key for Slurm job IDs.
  * Supported forms:
  *   - "1234" (plain job)

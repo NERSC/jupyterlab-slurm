@@ -48,6 +48,30 @@ export function createJupyterMuiTheme(mode: 'light' | 'dark'): Theme {
   return createTheme({
     palette: {
       mode
+    },
+    components: {
+      // MUI's default `Button`/`Tab` styles force `text-transform: uppercase`
+      // regardless of the JSX source casing, which is why every toolbar
+      // button and tab label (Kill, Pause, Resume, Requeue, Queue, Job
+      // History, etc.) rendered in all caps no matter how they were
+      // capitalized in code. Disabling it here, once, at the theme level
+      // lets normal Title Case labels actually render as written, and makes
+      // the scattered per-button `sx={{ textTransform: 'none' }}` overrides
+      // used in a couple of places previously redundant (harmless to leave).
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none'
+          }
+        }
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none'
+          }
+        }
+      }
     }
   });
 }
