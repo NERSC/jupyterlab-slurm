@@ -52,7 +52,12 @@ const extension: JupyterFrontEndPlugin<void> = {
     settingRegistry: ISettingRegistry,
     launcher: ILauncher | null
   ) => {
-    devLog('JupyterLab extension jupyterlab-slurm is activated!');
+    // Intentionally not gated by devLog()/NODE_ENV: this activation marker
+    // carries no sensitive data and is relied upon by the Playwright
+    // integration test (ui-tests/tests/jupyterlab_slurm.spec.ts) to confirm
+    // the extension activated, including in production (build:prod) builds.
+    // eslint-disable-next-line no-console
+    console.log('JupyterLab extension jupyterlab-slurm is activated!');
 
     // Declare widgets
     let widget: SlurmWidget | null = null;
