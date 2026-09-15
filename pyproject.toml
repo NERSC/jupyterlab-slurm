@@ -114,8 +114,16 @@ version_cmd = "hatch version"
 [tool.jupyter-releaser.hooks]
 before-build-npm = [
     "python -m pip install 'jupyterlab>=4.5.7,<5'",
-    "jlpm",
-    "jlpm build:prod"
+    # `jlpm` here resolves to JupyterLab's bundled (older Yarn 3.x) package
+    # manager, installed by the pip command above. Our yarn.lock is Yarn 4.x
+    # format (lockfile version 10), so under the releaser's default
+    # immutable-install mode the older bundled Yarn thinks the lockfile
+    # needs modification and aborts (YN0028), surfacing as a bare
+    # "Command 'jlpm' returned non-zero exit status 1." Disabling immutable
+    # installs for these steps avoids that (same workaround as in
+    # build.yml/ci.yml/update-integration-tests.yml).
+    "YARN_ENABLE_IMMUTABLE_INSTALLS=false jlpm",
+    "YARN_ENABLE_IMMUTABLE_INSTALLS=false jlpm build:prod"
 ]
 before-build-python = ["jlpm clean:all"]
 
