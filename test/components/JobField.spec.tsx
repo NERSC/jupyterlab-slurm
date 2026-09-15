@@ -150,7 +150,9 @@ describe('JobField', () => {
   });
 
   test('disables the Copy command button when the value is the empty "—" placeholder', () => {
-    render(<JobField label="Command" value={null} fieldKey="Command" isCommand />);
+    render(
+      <JobField label="Command" value={null} fieldKey="Command" isCommand />
+    );
     expect(screen.getByRole('button', { name: 'Copy command' })).toBeDisabled();
   });
 

@@ -274,8 +274,7 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
         setNextAvailableSqueueFetch(
           autoReload ? new Date(current.getTime() + reloadRate) : null
         );
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         setErrorMessage(
           `Failed to refresh job queue: ${truncateForToast(message)} (${current.toLocaleTimeString()})`
         );
@@ -395,9 +394,7 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
         return;
       }
       try {
-        const rowNodes = jobIds
-          .map(jid => api.getRowNode(jid))
-          .filter(Boolean);
+        const rowNodes = jobIds.map(jid => api.getRowNode(jid)).filter(Boolean);
         if (rowNodes.length === 0) {
           return;
         }
@@ -431,8 +428,7 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
       return;
     }
     const hasUserField = serverColumns.includes('USER');
-    const currentStates: Record<string, { code: string; reason: unknown }> =
-      {};
+    const currentStates: Record<string, { code: string; reason: unknown }> = {};
     for (const row of displayRows) {
       if (hasUserField && String(row['USER']) !== props.userName) {
         continue;
@@ -605,9 +601,7 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
   // made Release/Resume look valid, letting the user hit that confusing
   // permission error instead of a clear "needs an admin" explanation.
   const selectedReasons = useMemo(() => {
-    return selectedRows.map(row =>
-      String(row['NODELIST(REASON)'] ?? '')
-    );
+    return selectedRows.map(row => String(row['NODELIST(REASON)'] ?? ''));
   }, [selectedRows]);
   const hasAdminHoldSelected = selectedReasons.some(r =>
     r.includes('JobHeldAdmin')
@@ -632,11 +626,9 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
   // (real Slurm SIGSTOPs the process while keeping its allocation), and
   // Resume is only meaningful on a job that's actually suspended ("S").
   const canSuspendSelected =
-    selectedStatuses === null ||
-    selectedStatuses.every(s => s === 'R');
+    selectedStatuses === null || selectedStatuses.every(s => s === 'R');
   const canResumeSelected =
-    selectedStatuses === null ||
-    selectedStatuses.every(s => s === 'S');
+    selectedStatuses === null || selectedStatuses.every(s => s === 'S');
 
   // Whether *any* (not necessarily all) selected job is a valid Hold/
   // Suspend target. A "select all" that mixes PD and R jobs (e.g. a
@@ -846,7 +838,9 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
             const status = String(row[statusField] ?? '');
             switch (action) {
               case 'hold':
-                return status === 'PD' && !isHeldReason(row['NODELIST(REASON)']);
+                return (
+                  status === 'PD' && !isHeldReason(row['NODELIST(REASON)'])
+                );
               case 'release':
                 return (
                   status === 'PD' &&
@@ -896,7 +890,11 @@ export function useSlurmQueue(props: ISlurmWidgetProps) {
           // just-cancelled job visible (or a just-held job's status stale)
           // until the throttle window happened to elapse.
           getData(0);
-          if (action === 'cancel' || action === 'requeue' || action === 'requeuehold') {
+          if (
+            action === 'cancel' ||
+            action === 'requeue' ||
+            action === 'requeuehold'
+          ) {
             // Killed jobs disappear from the queue on the next refresh, and
             // Requeue/Requeue&Hold restart the job (potentially under a new
             // row identity once it re-enters the queue) -- in all three

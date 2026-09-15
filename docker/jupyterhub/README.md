@@ -12,7 +12,7 @@ can't:
 - The extension's server process actually runs Slurm commands as the
   logged-in user's own OS identity (release-blocker "validate command
   execution and identity on a real target cluster").
-- Cross-user authorization *through the extension's own HTTP endpoints*
+- Cross-user authorization _through the extension's own HTTP endpoints_
   (not just Slurm's own permission model, which was already verified
   separately with `docker exec`).
 - A real browser/cookie-based JupyterHub login + XSRF flow, rather than a
@@ -30,7 +30,7 @@ The `slurm-docker-cluster` stand-in (`slurmctld`, `slurmdbd`,
 running, on network `slurm_slurm-network`, with named volumes
 `slurm_etc_munge`, `slurm_etc_slurm`, `slurm_slurm_jobdir` (e.g. via
 `docker/cluster.sh up`). This image's `Dockerfile` also needs the local
-`slurm-docker-cluster:<version>` image to already be *built* (which
+`slurm-docker-cluster:<version>` image to already be _built_ (which
 `cluster.sh up` does): rather than committing a copy of the Slurm client
 binaries to this repo, the Hub image installs the exact same Slurm RPMs the
 cluster containers run, straight from that image's own RPM cache

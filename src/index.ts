@@ -140,7 +140,9 @@ const extension: JupyterFrontEndPlugin<void> = {
       label: 'Show job details',
       isEnabled: () => true,
       execute: async (args: any) => {
-        const { SlurmJobDetailsWidget } = await import('./slurmJobDetailsWidget');
+        const { SlurmJobDetailsWidget } = await import(
+          './slurmJobDetailsWidget'
+        );
         // Try to find an existing widget that is still usable
         let w = detailsTracker.currentWidget as any;
         // Check if widget exists, is not disposed, and is still attached

@@ -261,9 +261,7 @@ describe('SlurmJobHistory', () => {
     mockUseSlurmHistory.mockReturnValue(
       baseHistoryState({
         columns: ['JobID', 'Submit', 'End'],
-        rows: [
-          { JobID: '123', Submit: '2024-01-01', End: '2024-01-02' }
-        ]
+        rows: [{ JobID: '123', Submit: '2024-01-01', End: '2024-01-02' }]
       })
     );
     render(

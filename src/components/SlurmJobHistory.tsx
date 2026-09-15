@@ -74,15 +74,17 @@ export default function SlurmJobHistory(props: types.Props) {
   const [selectedCount, setSelectedCount] = useState<number>(0);
   const [requeueMenuAnchor, setRequeueMenuAnchor] =
     useState<HTMLElement | null>(null);
-  const [requeueOption, setRequeueOption] = useState<
-    'requeue' | 'requeuehold'
-  >('requeue');
+  const [requeueOption, setRequeueOption] = useState<'requeue' | 'requeuehold'>(
+    'requeue'
+  );
   const [requeueInFlight, setRequeueInFlight] = useState(false);
 
   const copyToClipboard = useCallback(async (text: string, format: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      Notification.success(`${format} copied to clipboard`, { autoClose: 3000 });
+      Notification.success(`${format} copied to clipboard`, {
+        autoClose: 3000
+      });
     } catch (e) {
       console.warn('Failed to copy', e);
       Notification.error('Failed to copy to clipboard', { autoClose: 3000 });
@@ -454,7 +456,10 @@ export default function SlurmJobHistory(props: types.Props) {
           }
         >
           <span>
-            <ButtonGroup size="small" disabled={selectedCount === 0 || requeueInFlight}>
+            <ButtonGroup
+              size="small"
+              disabled={selectedCount === 0 || requeueInFlight}
+            >
               <Button onClick={() => handleRequeue(requeueOption)}>
                 <RestartAltIcon fontSize="small" />
                 Requeue

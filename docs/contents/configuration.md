@@ -14,7 +14,7 @@ The following settings are currently available:
 - `userOnly` (boolean, default `false`) — start the queue in "user view"
   (only your jobs), instead of the full queue.
 - `notifyOnStateChange` (boolean, default `false`) — show a notification
-  whenever one of *your own* jobs' state changes (e.g. `R` → `CD`),
+  whenever one of _your own_ jobs' state changes (e.g. `R` → `CD`),
   including when a job leaves the queue entirely (e.g. on completion). Jobs
   belonging to other users are never notified on, independent of the
   separate `userOnly` grid filter above.

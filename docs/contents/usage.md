@@ -30,7 +30,7 @@ Select a single job row and click **Details** to open a separate panel
 with the full, normalized set of fields for that job (submit/start/end
 time, resources, working directory, stdout/stderr paths with
 file-existence info, etc.), sourced from `scontrol`/`sacct` on the
-backend. **Details** is disabled for a *grouped* range of still-pending
+backend. **Details** is disabled for a _grouped_ range of still-pending
 array tasks (e.g. `1234_[3-20%4]`, squeue's display form for array
 elements sharing a throttle limit), since such a range isn't a single
 addressable job; select an individual task instead.
@@ -47,19 +47,19 @@ the table:
 
 - **Cancel** — cancels the selected job(s) via `scancel`.
 - **Pause** — a single button that Holds (`scontrol hold`) any selected
-  *pending* job and Suspends (`scontrol suspend`, sends `SIGSTOP`) any
-  selected *running* job, applying whichever is relevant to each row in a
+  _pending_ job and Suspends (`scontrol suspend`, sends `SIGSTOP`) any
+  selected _running_ job, applying whichever is relevant to each row in a
   mixed selection. Already-held jobs are left alone (Slurm treats a
   repeated hold as a no-op).
 - **Resume** — the corresponding "unpause": Releases (`scontrol release`)
-  any selected *held* job and Resumes (`scontrol resume`, sends
-  `SIGCONT`) any selected *suspended* job. Jobs held by an administrator
+  any selected _held_ job and Resumes (`scontrol resume`, sends
+  `SIGCONT`) any selected _suspended_ job. Jobs held by an administrator
   (e.g. automatically, after a suspended job is requeued) can't be
   released by a regular user and are excluded.
 - **Requeue** / **Requeue & Hold** — a split button that requeues the
   selected job(s) (`scontrol requeue`), optionally holding them
   immediately afterward (`scontrol requeuehold`); pick the mode from the
-  small dropdown arrow. Requeuing a *suspended* job always results in an
+  small dropdown arrow. Requeuing a _suspended_ job always results in an
   admin-only hold, regardless of which mode is chosen, so a confirmation
   dialog appears first in that case.
 

@@ -254,33 +254,29 @@ describe('Job action buttons reflect real squeue state end-to-end', () => {
     ]);
 
     // Nothing selected yet: no badge on either button.
-    expect(
-      getButton(/^Clear/).querySelector('.MuiBadge-badge')
-    ).toBeNull();
-    expect(
-      getButton(/^Details/).querySelector('.MuiBadge-badge')
-    ).toBeNull();
+    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toBeNull();
+    expect(getButton(/^Details/).querySelector('.MuiBadge-badge')).toBeNull();
 
     const cb112 = await selectRowByName('job112');
-    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toHaveTextContent(
-      '1'
-    );
+    expect(
+      getButton(/^Clear/).querySelector('.MuiBadge-badge')
+    ).toHaveTextContent('1');
     expect(
       getButton(/^Details/).querySelector('.MuiBadge-badge')
     ).toHaveTextContent('1');
 
     await selectRowByName('job113');
-    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toHaveTextContent(
-      '2'
-    );
+    expect(
+      getButton(/^Clear/).querySelector('.MuiBadge-badge')
+    ).toHaveTextContent('2');
     expect(
       getButton(/^Details/).querySelector('.MuiBadge-badge')
     ).toHaveTextContent('2');
 
     await selectRowByName('job114');
-    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toHaveTextContent(
-      '3'
-    );
+    expect(
+      getButton(/^Clear/).querySelector('.MuiBadge-badge')
+    ).toHaveTextContent('3');
     expect(
       getButton(/^Details/).querySelector('.MuiBadge-badge')
     ).toHaveTextContent('3');
@@ -290,9 +286,9 @@ describe('Job action buttons reflect real squeue state end-to-end', () => {
       cb112.click();
       await new Promise(r => setTimeout(r, 20));
     });
-    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toHaveTextContent(
-      '2'
-    );
+    expect(
+      getButton(/^Clear/).querySelector('.MuiBadge-badge')
+    ).toHaveTextContent('2');
     expect(
       getButton(/^Details/).querySelector('.MuiBadge-badge')
     ).toHaveTextContent('2');
@@ -432,12 +428,8 @@ describe('Job action buttons reflect real squeue state end-to-end', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    expect(
-      getButton(/^Clear/).querySelector('.MuiBadge-badge')
-    ).toBeNull();
-    expect(
-      getButton(/^Details/).querySelector('.MuiBadge-badge')
-    ).toBeNull();
+    expect(getButton(/^Clear/).querySelector('.MuiBadge-badge')).toBeNull();
+    expect(getButton(/^Details/).querySelector('.MuiBadge-badge')).toBeNull();
 
     // Selecting alice's own (visible) job afterward must show exactly 1,
     // not 2 -- confirming bob's job didn't silently linger in the count.

@@ -177,7 +177,10 @@ export const SqueueToolbar: React.FC<ISqueueToolbarProps> = ({
   // pending tail alongside its running tasks) still Pause everything
   // pausable in one click, instead of being disabled entirely.
   const canPauseSelected =
-    canHoldSelected || canSuspendSelected || hasUnheldPdSelected || hasRSelected;
+    canHoldSelected ||
+    canSuspendSelected ||
+    hasUnheldPdSelected ||
+    hasRSelected;
   const firePause = () => {
     if (hasUnheldPdSelected) {
       onJobAction('hold');
@@ -249,9 +252,7 @@ export const SqueueToolbar: React.FC<ISqueueToolbarProps> = ({
             <span>
               <Button
                 className="jp-SlurmWidget-table-button"
-                disabled={
-                  selectedCount === 0 || hasGroupedArrayRangeSelected
-                }
+                disabled={selectedCount === 0 || hasGroupedArrayRangeSelected}
                 onClick={onShowDetails}
               >
                 <InfoIcon />
@@ -320,7 +321,7 @@ export const SqueueToolbar: React.FC<ISqueueToolbarProps> = ({
                 ? 'This job is held by an administrator (e.g. after being requeued while suspended) and can only be released by an admin'
                 : selectedCount > 0 && !canResumeAvailable
                   ? 'Resume only applies to jobs that are held/pending (Release) or suspended (Resume)'
-                : hasHeldSelected && hasSSelected
+                  : hasHeldSelected && hasSSelected
                     ? 'Release the selected held job(s) back into the queue and Resume (SIGCONT) the selected suspended job(s)'
                     : hasHeldSelected
                       ? 'Release the selected held job(s) back into the queue. For suspended jobs, Resume instead sends SIGCONT to unpause them'
@@ -428,15 +429,12 @@ export const SqueueToolbar: React.FC<ISqueueToolbarProps> = ({
             <DialogContentText>
               One or more selected jobs are currently suspended. Requeuing a
               suspended job will place it on an admin-only hold -- only an
-              administrator will be able to release it; you will not be
-              able to resume or release it yourself. Do you want to
-              continue?
+              administrator will be able to release it; you will not be able to
+              resume or release it yourself. Do you want to continue?
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setRequeueConfirmOpen(false)}>
-              Cancel
-            </Button>
+            <Button onClick={() => setRequeueConfirmOpen(false)}>Cancel</Button>
             <Button
               onClick={() => {
                 setRequeueConfirmOpen(false);

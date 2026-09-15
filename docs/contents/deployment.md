@@ -41,7 +41,7 @@ extension itself would have to reimplement.
    so the client binaries can authenticate to `slurmctld`/`slurmdbd`.
 3. A local **`slurm` system user/group** matching the cluster's Slurm
    `SlurmUser` uid/gid. The Slurm client tools validate `SlurmUser` (from
-   `slurm.conf`) against the *local* passwd database even on a client-only
+   `slurm.conf`) against the _local_ passwd database even on a client-only
    host that never runs `slurmd`/`slurmctld` — without this, every client
    command fails with `Invalid user for SlurmUser slurm`. This was found
    during rig validation and is easy to miss.
@@ -125,4 +125,4 @@ rollout:
   the single-user server (not just by the Hub process) by checking
   `jupyter --config-dir` / `jupyter --paths` from inside a spawned
   single-user server, and check for `Rejected hook import not in
-  allowlist` warnings in the server log if a hook silently doesn't fire.
+allowlist` warnings in the server log if a hook silently doesn't fire.

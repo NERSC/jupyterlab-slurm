@@ -55,9 +55,7 @@ describe('SqueueToolbar', () => {
     expect(
       screen.getByRole('button', { name: /select requeue option/i })
     ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: /Details/i })
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Details/i })).toBeDisabled();
   });
 
   test('Clear, Details, and Cancel buttons show no count badge when nothing is selected', () => {
@@ -92,9 +90,9 @@ describe('SqueueToolbar', () => {
       expect(clearButton.querySelector('.MuiBadge-badge')).toHaveTextContent(
         String(count)
       );
-      expect(
-        detailsButton.querySelector('.MuiBadge-badge')
-      ).toHaveTextContent(String(count));
+      expect(detailsButton.querySelector('.MuiBadge-badge')).toHaveTextContent(
+        String(count)
+      );
     }
   );
 
@@ -127,9 +125,7 @@ describe('SqueueToolbar', () => {
       userOnly: false,
       onUserOnlyClick: jest.fn()
     };
-    const { rerender } = render(
-      <SqueueToolbar {...props} selectedCount={1} />
-    );
+    const { rerender } = render(<SqueueToolbar {...props} selectedCount={1} />);
     expect(
       screen
         .getByRole('button', { name: /^Clear/i })
@@ -150,7 +146,9 @@ describe('SqueueToolbar', () => {
 
     rerender(<SqueueToolbar {...props} selectedCount={0} />);
     expect(
-      screen.getByRole('button', { name: /^Clear/i }).querySelector('.MuiBadge-badge')
+      screen
+        .getByRole('button', { name: /^Clear/i })
+        .querySelector('.MuiBadge-badge')
     ).toBeNull();
     expect(
       screen
@@ -159,7 +157,7 @@ describe('SqueueToolbar', () => {
     ).toBeNull();
   });
 
-  test('Clear badge still shows the exact literal count at exactly 99 (MUI Badge\'s default max)', () => {
+  test("Clear badge still shows the exact literal count at exactly 99 (MUI Badge's default max)", () => {
     // Neither Badge sets a custom `max` prop, so MUI's own default (99)
     // applies: 99 itself is still shown literally; only counts *above* 99
     // roll over to "99+" (see the next test).
@@ -236,7 +234,9 @@ describe('SqueueToolbar', () => {
     // nonsensical like "-1".
     renderToolbar({ selectedCount: 0 });
     expect(
-      screen.getByRole('button', { name: /^Clear/i }).querySelector('.MuiBadge-badge')
+      screen
+        .getByRole('button', { name: /^Clear/i })
+        .querySelector('.MuiBadge-badge')
     ).toBeNull();
   });
 
@@ -462,9 +462,7 @@ describe('SqueueToolbar', () => {
     expect(props.onJobAction).not.toHaveBeenCalled();
     expect(screen.getByText(/Requeue a suspended job\?/i)).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /Requeue Anyway/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /Requeue Anyway/i }));
     expect(props.onJobAction).toHaveBeenCalledWith('requeue');
     await waitFor(() =>
       expect(

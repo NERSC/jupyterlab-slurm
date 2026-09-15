@@ -165,10 +165,7 @@ export default function SqueueDataTable(props: ISlurmWidgetProps) {
     if (!totalMs) {
       return null;
     }
-    const remainingMs = Math.max(
-      0,
-      nextAvailableSqueueFetch.getTime() - now
-    );
+    const remainingMs = Math.max(0, nextAvailableSqueueFetch.getTime() - now);
     const elapsedMs = Math.min(totalMs, Math.max(0, totalMs - remainingMs));
     return (elapsedMs / totalMs) * 100;
   }, [autoReload, nextAvailableSqueueFetch, now, props.reloadRate]);
@@ -347,10 +344,10 @@ export default function SqueueDataTable(props: ISlurmWidgetProps) {
     if (valueA === valueB) {
       return 0;
     }
-    if (valueA == null) {
+    if (valueA === null || valueA === undefined) {
       return -1;
     }
-    if (valueB == null) {
+    if (valueB === null || valueB === undefined) {
       return 1;
     }
     if (typeof valueA === 'number' && typeof valueB === 'number') {
@@ -523,8 +520,8 @@ export default function SqueueDataTable(props: ISlurmWidgetProps) {
               selection. */}
           {pinnedRowIds.length > 0 && (
             <div className="jp-SlurmWidget-pinned-hint">
-              Selected job{pinnedRowIds.length > 1 ? 's are' : ' is'} pinned
-              to page 1 and will move there on the next refresh.
+              Selected job{pinnedRowIds.length > 1 ? 's are' : ' is'} pinned to
+              page 1 and will move there on the next refresh.
             </div>
           )}
         </div>
@@ -596,7 +593,6 @@ export default function SqueueDataTable(props: ISlurmWidgetProps) {
           loading={loading && displayRows.length === 0}
         />
       </div>
-
     </div>
   );
 }

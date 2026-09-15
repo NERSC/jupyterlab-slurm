@@ -64,8 +64,9 @@ jest.mock('ag-grid-react', () => ({
       getRowNode: (id: string) =>
         mainNodes.find(
           (n: any) =>
-            (props.getRowId ? props.getRowId({ data: n.data }) : n.data.JOBID) ===
-            id
+            (props.getRowId
+              ? props.getRowId({ data: n.data })
+              : n.data.JOBID) === id
         )
     };
     React.useEffect(() => {
@@ -288,9 +289,7 @@ describe('SqueueDataTable', () => {
       })
     );
     render(<SqueueDataTable {...baseProps()} />);
-    expect(
-      screen.getByText(/pinned to page 1/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/pinned to page 1/i)).toBeInTheDocument();
   });
 
   test('does not show the pinned-selection hint when nothing is selected/pinned', () => {
@@ -335,7 +334,9 @@ describe('SqueueDataTable', () => {
       baseQueueState({ autoReload: true, nextAvailableSqueueFetch: null })
     );
     const { rerender } = render(
-      <SqueueDataTable {...baseProps({ autoReload: true, autoReloadRate: 10 })} />
+      <SqueueDataTable
+        {...baseProps({ autoReload: true, autoReloadRate: 10 })}
+      />
     );
 
     jest.advanceTimersByTime(900);
@@ -346,7 +347,9 @@ describe('SqueueDataTable', () => {
       })
     );
     rerender(
-      <SqueueDataTable {...baseProps({ autoReload: true, autoReloadRate: 10 })} />
+      <SqueueDataTable
+        {...baseProps({ autoReload: true, autoReloadRate: 10 })}
+      />
     );
 
     const expectedSeconds = Math.ceil(reloadRateMs / 1000);

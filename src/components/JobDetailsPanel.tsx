@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Box, Button, Divider, IconButton, Stack, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Divider,
+  IconButton,
+  Stack,
+  Typography
+} from '@mui/material';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ArrowBackIosNewIconMui from '@mui/icons-material/ArrowBackIosNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -107,7 +114,11 @@ export default function JobDetailsPanel(props: JobDetailsPanelProps) {
       { k: 'CPUs', v: f['CPUs'], label: 'CPUs' },
       { k: 'GPUs', v: f['GPUs'], label: 'GPUs' },
       { k: 'GPUType', v: f['GPUType'], label: 'GPU Type' },
-      { k: 'GPUMemVariant', v: f['GPUMemVariant'], label: 'GPU Memory Variant' },
+      {
+        k: 'GPUMemVariant',
+        v: f['GPUMemVariant'],
+        label: 'GPU Memory Variant'
+      },
       { k: 'GPUMem', v: f['GPUMem'], label: 'GPU Memory Used' },
       { k: 'GPUUtil', v: f['GPUUtil'], label: 'GPU Utilization (%)' },
       { k: 'Tasks', v: f['Tasks'], label: 'Tasks' },

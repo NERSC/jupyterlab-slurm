@@ -133,7 +133,9 @@ describe('SqueueDataTable with real AG Grid', () => {
     // section (no separate pinned-top section is used anymore, since AG
     // Grid never renders selection checkboxes for data-driven pinned rows
     // -- see the comment in SqueueDataTable.tsx for the full explanation).
-    const rowsAfterPin = document.querySelectorAll('.ag-center-cols-container .ag-row');
+    const rowsAfterPin = document.querySelectorAll(
+      '.ag-center-cols-container .ag-row'
+    );
     const job123Row = Array.from(rowsAfterPin).find(r =>
       r.textContent?.includes('myjob')
     ) as HTMLElement;

@@ -10,7 +10,11 @@ import {
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { isPathLike, resolveForActions, toRootRelativePath } from '../utils/paths';
+import {
+  isPathLike,
+  resolveForActions,
+  toRootRelativePath
+} from '../utils/paths';
 
 export interface IJobFieldProps {
   label: string;
@@ -88,12 +92,14 @@ export const JobField: React.FC<IJobFieldProps> = ({
   // this server, and (for Stdout/Stderr specifically) a path the server has
   // confirmed doesn't exist isn't worth opening either.
   const pathOutOfRoot =
-    rootDir != null &&
+    rootDir !== null &&
+    rootDir !== undefined &&
     !!resolved &&
     toRootRelativePath(resolved, rootDir) === undefined;
   const pathActionsDisabled =
     noResolvablePath || pathOutOfRoot || fileExists === false;
-  const isEmptyValue = value === '—' || value === '' || value == null;
+  const isEmptyValue =
+    value === '—' || value === '' || value === null || value === undefined;
 
   if (isCommand) {
     const v = value as string;

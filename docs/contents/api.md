@@ -70,20 +70,20 @@ there are no additional top-level fields outside of `success`,
 
 ### Quick reference
 
-| Method | Route | Auth | Purpose |
-| --- | --- | --- | --- |
-| GET | `/status` | session | Health check / version |
-| GET | `/user` | session | Resolve OS username |
-| GET | `/ui-config` | session | Read-only deployment/UI config |
-| GET | `/squeue` | session | Current queue snapshot |
-| GET | `/sacct` | session | Job accounting history |
-| GET | `/job/{job_id}` | session | Normalized single-job details |
-| DELETE | `/scancel` | session + XSRF | Cancel job(s) |
-| PATCH | `/scontrol/{action}` | session + XSRF | Hold/release/other job mutation |
-| POST | `/sbatch` | session + XSRF | Submit a batch script |
-| POST | `/test-suite` | session + XSRF | Start backend compatibility harness (opt-in) |
-| GET | `/test-suite/{run_id}` | session | Poll harness run status |
-| DELETE | `/test-suite/{run_id}` | session + XSRF | Request harness run cancellation |
+| Method | Route                  | Auth           | Purpose                                      |
+| ------ | ---------------------- | -------------- | -------------------------------------------- |
+| GET    | `/status`              | session        | Health check / version                       |
+| GET    | `/user`                | session        | Resolve OS username                          |
+| GET    | `/ui-config`           | session        | Read-only deployment/UI config               |
+| GET    | `/squeue`              | session        | Current queue snapshot                       |
+| GET    | `/sacct`               | session        | Job accounting history                       |
+| GET    | `/job/{job_id}`        | session        | Normalized single-job details                |
+| DELETE | `/scancel`             | session + XSRF | Cancel job(s)                                |
+| PATCH  | `/scontrol/{action}`   | session + XSRF | Hold/release/other job mutation              |
+| POST   | `/sbatch`              | session + XSRF | Submit a batch script                        |
+| POST   | `/test-suite`          | session + XSRF | Start backend compatibility harness (opt-in) |
+| GET    | `/test-suite/{run_id}` | session        | Poll harness run status                      |
+| DELETE | `/test-suite/{run_id}` | session + XSRF | Request harness run cancellation             |
 
 ### GET /status
 
@@ -101,7 +101,7 @@ reporting its version so the frontend can detect a mismatched deployment.
   "responseMessage": "ok",
   "errorMessage": null,
   "exitCode": 0,
-  "data": {"name": "jupyterlab_slurm", "version": "<version>"}
+  "data": { "name": "jupyterlab_slurm", "version": "<version>" }
 }
 ```
 
@@ -118,15 +118,20 @@ Returns the OS username of the notebook server process.
 - **Response** (`200`):
 
 ```json
-{"success": true, "responseMessage": null, "errorMessage": null,
- "exitCode": 0, "data": {"user": "<username>"}}
+{
+  "success": true,
+  "responseMessage": null,
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": { "user": "<username>" }
+}
 ```
 
 - **Errors**: `500` with `success: false` and `errorMessage` set if
   username resolution raises (e.g. environment lookup failure). This
   endpoint previously crashed with an unhandled `TypeError` on its error
   path (attempting `json.dumps()` on a raw exception); this is fixed.
-- **Note**: resolves `os.environ['USER']`, *not* the authenticated
+- **Note**: resolves `os.environ['USER']`, _not_ the authenticated
   Jupyter identity — see the caveat above.
 
 ### GET /ui-config
@@ -142,7 +147,9 @@ Traitlets config (`SlurmUI`), never user-editable from the frontend.
 
 ```json
 {
-  "success": true, "responseMessage": null, "errorMessage": null,
+  "success": true,
+  "responseMessage": null,
+  "errorMessage": null,
   "exitCode": 0,
   "data": {
     "queue_column_labels": {},
@@ -153,7 +160,7 @@ Traitlets config (`SlurmUI`), never user-editable from the frontend.
     "details_sources": {},
     "details_hidden": {},
     "squeue_reload_limit_ms": null,
-    "dev_diagnostics": {"dev_mode_active": false, "policy_source": "runtime"},
+    "dev_diagnostics": { "dev_mode_active": false, "policy_source": "runtime" },
     "server_root_dir": "<absolute path to the server's Contents root>"
   }
 }
@@ -183,13 +190,33 @@ Runs `squeue` and returns the current queue as normalized rows.
 
 ```json
 {
-  "success": true, "responseMessage": "Success: ...",
-  "errorMessage": null, "exitCode": 0,
+  "success": true,
+  "responseMessage": "Success: ...",
+  "errorMessage": null,
+  "exitCode": 0,
   "data": {
-    "rows": [["<jobid>", "<partition>", "<name>", "<user>", "<st>",
-              "<time>", "<nodes>", "<nodelist/reason>"]],
-    "columns": ["JOBID", "PARTITION", "NAME", "USER", "ST", "TIME", "NODES",
-                "NODELIST(REASON)"]
+    "rows": [
+      [
+        "<jobid>",
+        "<partition>",
+        "<name>",
+        "<user>",
+        "<st>",
+        "<time>",
+        "<nodes>",
+        "<nodelist/reason>"
+      ]
+    ],
+    "columns": [
+      "JOBID",
+      "PARTITION",
+      "NAME",
+      "USER",
+      "ST",
+      "TIME",
+      "NODES",
+      "NODELIST(REASON)"
+    ]
   }
 }
 ```
@@ -214,14 +241,35 @@ days, configurable via `SlurmAccounting.sacct_time_window_days` and
 
 ```json
 {
-  "success": true, "responseMessage": "Success: ...",
-  "errorMessage": null, "exitCode": 0,
+  "success": true,
+  "responseMessage": "Success: ...",
+  "errorMessage": null,
+  "exitCode": 0,
   "data": {
-    "rows": [["<jobid>", "<partition>", "<jobname>", "<user>",
-              "<state>", "<submit>", "<elapsed>", "<nnodes>",
-              "<exitcode>"]],
-    "columns": ["JobID", "Partition", "JobName", "User", "State", "Submit",
-                "Elapsed", "NNodes", "ExitCode"]
+    "rows": [
+      [
+        "<jobid>",
+        "<partition>",
+        "<jobname>",
+        "<user>",
+        "<state>",
+        "<submit>",
+        "<elapsed>",
+        "<nnodes>",
+        "<exitcode>"
+      ]
+    ],
+    "columns": [
+      "JobID",
+      "Partition",
+      "JobName",
+      "User",
+      "State",
+      "Submit",
+      "Elapsed",
+      "NNodes",
+      "ExitCode"
+    ]
   }
 }
 ```
@@ -247,22 +295,45 @@ per-array-element fallback for array jobs.
 
 ```json
 {
-  "success": true, "responseMessage": null, "errorMessage": null,
+  "success": true,
+  "responseMessage": null,
+  "errorMessage": null,
   "exitCode": 0,
   "data": {
     "source": "scontrol | sacct",
     "fields": {
-      "JobID": "...", "JobName": "...", "User": "...", "QOS": "...",
-      "Account": "...", "State": "...", "Command": "...",
-      "Partition": "...", "SubmitTime": "...", "StartTime": "...",
-      "EndTime": "...", "Elapsed": "...", "Nodes": "...",
-      "Nodelist": "...", "CPUs": "...", "GPUs": "...",
-      "GPUType": "...", "GPUMemVariant": "...", "GPUMem": "...",
-      "GPUUtil": "...", "Mem": "...",
-      "GRES": "...", "TimeLimit": "...", "Stdout": "...",
-      "Stderr": "...", "WorkDir": "...", "ArrayParent": "...",
-      "ArrayRanges": "...", "ExitCode": "...", "DerivedExitCode": "...",
-      "Reason": "...", "RawScontrol": "..."
+      "JobID": "...",
+      "JobName": "...",
+      "User": "...",
+      "QOS": "...",
+      "Account": "...",
+      "State": "...",
+      "Command": "...",
+      "Partition": "...",
+      "SubmitTime": "...",
+      "StartTime": "...",
+      "EndTime": "...",
+      "Elapsed": "...",
+      "Nodes": "...",
+      "Nodelist": "...",
+      "CPUs": "...",
+      "GPUs": "...",
+      "GPUType": "...",
+      "GPUMemVariant": "...",
+      "GPUMem": "...",
+      "GPUUtil": "...",
+      "Mem": "...",
+      "GRES": "...",
+      "TimeLimit": "...",
+      "Stdout": "...",
+      "Stderr": "...",
+      "WorkDir": "...",
+      "ArrayParent": "...",
+      "ArrayRanges": "...",
+      "ExitCode": "...",
+      "DerivedExitCode": "...",
+      "Reason": "...",
+      "RawScontrol": "..."
     },
     "steps": []
   }
@@ -306,9 +377,11 @@ no-op success).
 
 ```json
 {
-  "success": true, "responseMessage": "Success: scancel 123 456",
-  "errorMessage": null, "exitCode": 0,
-  "data": {"requestedIds": ["123", "456"], "changedIds": ["123", "456"]}
+  "success": true,
+  "responseMessage": "Success: scancel 123 456",
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": { "requestedIds": ["123", "456"], "changedIds": ["123", "456"] }
 }
 ```
 
@@ -334,9 +407,9 @@ operation is not idempotent/safe in the `PUT` sense.
 - **Auth**: required (+ XSRF token)
 - **Path parameter**: `action` — `hold`, `release`, `suspend`,
   `resume`, `requeue`, and `requeuehold` are issued as native `scontrol
-  <action> <jobid>` subcommands (one job id at a time, see below); any
+<action> <jobid>` subcommands (one job id at a time, see below); any
   other action string is passed through as `scontrol <action>
-  <job_ids...>` in a single call, following the same status-code rules
+<job_ids...>` in a single call, following the same status-code rules
   as `/scancel`.
 - **Request body / query**: job IDs, same accepted forms as `/scancel`.
 - **Response** (`200`, `hold`/`release`):
@@ -345,14 +418,15 @@ operation is not idempotent/safe in the `PUT` sense.
 {
   "success": true,
   "responseMessage": "Success scontrol hold",
-  "errorMessage": null, "exitCode": 0,
-  "data": {"requestedIds": ["123"], "changedIds": ["123"]}
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": { "requestedIds": ["123"], "changedIds": ["123"] }
 }
 ```
 
 For multi-job requests, each job id is issued as a separate `scontrol
 hold|release <id>` call; the aggregate `success` is `true` only if
-*all* succeeded, and `data.changedIds` lists only the ones that did
+_all_ succeeded, and `data.changedIds` lists only the ones that did
 (**partial failure** is reported via `success: false` with per-id
 errors joined into `errorMessage`, while `data.changedIds` still
 reflects whichever ids succeeded).
@@ -379,20 +453,25 @@ Submits a batch script via `sbatch`.
 - **Request body** (JSON, `Content-Type: application/json`):
 
 ```json
-{"inputPath": "/path/to/script.sh", "outputPath": "/optional/cwd"}
+{ "inputPath": "/path/to/script.sh", "outputPath": "/optional/cwd" }
 ```
 
-  - `inputPath` (required) — path to the batch script to submit.
-  - `outputPath` (optional) — working directory for the `sbatch`
-    invocation; defaults to the server process's current directory.
+- `inputPath` (required) — path to the batch script to submit.
+- `outputPath` (optional) — working directory for the `sbatch`
+  invocation; defaults to the server process's current directory.
 
 - **Response** (`200`, success):
 
 ```json
 {
-  "success": true, "responseMessage": "Success: sbatch",
-  "errorMessage": null, "exitCode": 0,
-  "data": {"jobId": "<jobid>", "submissionMessage": "Submitted batch job <jobid>"}
+  "success": true,
+  "responseMessage": "Success: sbatch",
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": {
+    "jobId": "<jobid>",
+    "submissionMessage": "Submitted batch job <jobid>"
+  }
 }
 ```
 
@@ -443,8 +522,13 @@ use and its tests keep running.
 - **Response** (`202`):
 
 ```json
-{"success": true, "responseMessage": null, "errorMessage": null,
- "exitCode": 0, "data": {"runId": "<uuid-hex>"}}
+{
+  "success": true,
+  "responseMessage": null,
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": { "runId": "<uuid-hex>" }
+}
 ```
 
 - **Errors**: `409` with `success: false` if a run is already in
@@ -456,16 +540,25 @@ use and its tests keep running.
 - **Response** (`200`):
 
 ```json
-{"success": true, "responseMessage": null, "errorMessage": null,
- "exitCode": 0,
- "data": {
-   "runId": "<uuid-hex>",
-   "status": "queued | running | completed | error",
-   "startedAt": "<epoch-seconds>",
-   "results": [{"name": "squeue|sacct|scontrol|submit-and-account|hold-release-cancel",
-                "success": true, "message": "..."}],
-   "errorMessage": null
- }}
+{
+  "success": true,
+  "responseMessage": null,
+  "errorMessage": null,
+  "exitCode": 0,
+  "data": {
+    "runId": "<uuid-hex>",
+    "status": "queued | running | completed | error",
+    "startedAt": "<epoch-seconds>",
+    "results": [
+      {
+        "name": "squeue|sacct|scontrol|submit-and-account|hold-release-cancel",
+        "success": true,
+        "message": "..."
+      }
+    ],
+    "errorMessage": null
+  }
+}
 ```
 
 - **Errors**: `404` with `success: false` if `run_id` is unknown or
@@ -477,15 +570,17 @@ suite.
 - **Response** (`200`):
 
 ```json
-{"success": true, "data": {"runId": "<uuid-hex>",
-                            "status": "cancel requested"}}
+{
+  "success": true,
+  "data": { "runId": "<uuid-hex>", "status": "cancel requested" }
+}
 ```
 
 - **Errors**: `404` with `success: false` if `run_id` is unknown.
 
 ## HTTP status codes summary
 
-- `200` — the overwhelming majority of responses, *including*
+- `200` — the overwhelming majority of responses, _including_
   genuine Slurm-level command failures against a valid request (bad
   job id passed to a working `scancel`/`scontrol`/`sbatch`, missing
   config); callers must check `success`/`exitCode` in the body, not

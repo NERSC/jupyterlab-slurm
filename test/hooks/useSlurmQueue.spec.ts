@@ -116,7 +116,7 @@ describe('useSlurmQueue', () => {
     mockRequestAPI.mockReset();
   });
 
-  test('canHoldSelected/canReleaseSelected reflect the selection\'s actual state', async () => {
+  test("canHoldSelected/canReleaseSelected reflect the selection's actual state", async () => {
     // Hold/Release are genuine no-ops on anything but a PENDING job -- real
     // Slurm returns exit code 0 for `scontrol hold`/`scontrol release` on a
     // RUNNING/COMPLETED job without actually changing its state, so the UI
@@ -140,16 +140,12 @@ describe('useSlurmQueue', () => {
     // non-held PD job, same as Hold is on a RUNNING one. `displayRows`
     // (not the raw `rows` string[][]) is the keyed-object shape AG Grid's
     // `getSelectedRows()` actually returns in production.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.canHoldSelected).toBe(true);
     expect(result.current.canReleaseSelected).toBe(false);
 
     // A single RUNNING ("R") row selected: not eligible.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.canHoldSelected).toBe(false);
     expect(result.current.canReleaseSelected).toBe(false);
 
@@ -210,22 +206,18 @@ describe('useSlurmQueue', () => {
     // Admin-held job selected: Release must be disabled, and the
     // admin-hold flag surfaced so the toolbar can show a clearer tooltip
     // than a generic "not eligible" message.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.canReleaseSelected).toBe(false);
     expect(result.current.hasAdminHoldSelected).toBe(true);
 
     // A plain user-held ("(JobHeldUser)") PD job remains a normal,
     // fully-eligible Release target.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.canReleaseSelected).toBe(true);
     expect(result.current.hasAdminHoldSelected).toBe(false);
   });
 
-  test('canSuspendSelected/canResumeSelected reflect the selection\'s actual state', async () => {
+  test("canSuspendSelected/canResumeSelected reflect the selection's actual state", async () => {
     // Suspend only applies to a RUNNING job, Resume only to a suspended
     // ("S") one -- mirrors canHoldSelected/canReleaseSelected's PD-gating.
     routeRequest({
@@ -240,16 +232,12 @@ describe('useSlurmQueue', () => {
     expect(result.current.canResumeSelected).toBe(true);
 
     // A single RUNNING ("R") row selected: Suspend eligible, Resume not.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.canSuspendSelected).toBe(true);
     expect(result.current.canResumeSelected).toBe(false);
 
     // A single PENDING ("PD") row selected: neither is eligible.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.canSuspendSelected).toBe(false);
     expect(result.current.canResumeSelected).toBe(false);
   });
@@ -274,16 +262,12 @@ describe('useSlurmQueue', () => {
     expect(result.current.canRequeueSelected).toBe(true);
 
     // A single RUNNING ("R") row selected: Requeue is eligible.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.canRequeueSelected).toBe(true);
 
     // A single PENDING ("PD") row selected, with no R/S row at all:
     // Requeue is not eligible.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.canRequeueSelected).toBe(false);
 
     // Mixed selection including a PENDING job alongside a RUNNING one:
@@ -323,15 +307,11 @@ describe('useSlurmQueue', () => {
     expect(result.current.hasSuspendedSelected).toBe(false);
 
     // Suspended job selected: flag should be true.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.hasSuspendedSelected).toBe(true);
 
     // A plain RUNNING job selected: flag should be false.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.hasSuspendedSelected).toBe(false);
 
     // Mixed selection including a suspended job: flag should be true.
@@ -376,14 +356,10 @@ describe('useSlurmQueue', () => {
 
     expect(result.current.hasGroupedArrayRangeSelected).toBe(false);
 
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.hasGroupedArrayRangeSelected).toBe(true);
 
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[1]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[1]]));
     expect(result.current.hasGroupedArrayRangeSelected).toBe(false);
 
     act(() =>
@@ -438,16 +414,12 @@ describe('useSlurmQueue', () => {
     const { result } = renderHook(() => useSlurmQueue(makeProps()));
     await waitFor(() => expect(result.current.displayRows.length).toBe(1));
 
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.canHoldSelected).toBe(true);
 
     act(() => result.current.reload());
     await waitFor(() => expect(squeueCallCount).toBe(2));
-    await waitFor(() =>
-      expect(result.current.displayRows[0].ST).toBe('R')
-    );
+    await waitFor(() => expect(result.current.displayRows[0].ST).toBe('R'));
 
     // Without reselecting anything, the selection's derived eligibility
     // should now reflect the job's new ("R") state.
@@ -473,9 +445,7 @@ describe('useSlurmQueue', () => {
     // taken at refresh time, not a live derivation of selectedRows. This
     // avoids a row visibly jumping to the top the instant it's clicked,
     // which would be disorienting for a user paging through a large list.
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.pinnedRowIds).toEqual([]);
 
     // Once the next refresh lands, the pin set is (re)computed from the
@@ -524,9 +494,7 @@ describe('useSlurmQueue', () => {
     const { result } = renderHook(() => useSlurmQueue(makeProps()));
     await waitFor(() => expect(result.current.displayRows.length).toBe(1));
 
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.pinnedRowIds).toEqual(['101']));
 
@@ -557,9 +525,7 @@ describe('useSlurmQueue', () => {
     const { result } = renderHook(() => useSlurmQueue(makeProps()));
     await waitFor(() => expect(result.current.displayRows.length).toBe(2));
 
-    act(() =>
-      result.current.setSelectedRows([result.current.displayRows[0]])
-    );
+    act(() => result.current.setSelectedRows([result.current.displayRows[0]]));
     expect(result.current.selectedRows.length).toBe(1);
 
     // Simulate AG Grid's spurious event fired when the row is recreated
@@ -715,7 +681,7 @@ describe('useSlurmQueue', () => {
     expect(suspendBodies[0]).toEqual({ job_ids: ['101'] });
   });
 
-  test('notifyOnStateChange only notifies for the current user\'s own jobs', async () => {
+  test("notifyOnStateChange only notifies for the current user's own jobs", async () => {
     // Both jobA (testuser) and jobB (otheruser) change state between the
     // first and second fetch, but only the current user's own job should
     // trigger a notification -- the queue can include jobs from every user
@@ -737,8 +703,26 @@ describe('useSlurmQueue', () => {
           data: {
             columns: SQUEUE_COLUMNS,
             rows: [
-              ['101', 'debug', 'jobA', 'testuser', stateA, '0:10', '1', 'node001'],
-              ['102', 'regular', 'jobB', 'otheruser', stateB, '0:00', '1', '(Priority)']
+              [
+                '101',
+                'debug',
+                'jobA',
+                'testuser',
+                stateA,
+                '0:10',
+                '1',
+                'node001'
+              ],
+              [
+                '102',
+                'regular',
+                'jobB',
+                'otheruser',
+                stateB,
+                '0:00',
+                '1',
+                '(Priority)'
+              ]
             ]
           }
         };
@@ -811,16 +795,7 @@ describe('useSlurmQueue', () => {
                   '1',
                   '(JobHeldUser)'
                 ], // stayed PD, but became held
-                [
-                  '202',
-                  'debug',
-                  'jobB',
-                  'testuser',
-                  'CD',
-                  '0:12',
-                  '1',
-                  'None'
-                ]
+                ['202', 'debug', 'jobB', 'testuser', 'CD', '0:12', '1', 'None']
               ];
         return {
           success: true,
@@ -837,16 +812,12 @@ describe('useSlurmQueue', () => {
     act(() => result.current.reload());
     await waitFor(() => expect(squeueCallCount).toBe(2));
 
-    await waitFor(() =>
-      expect(mockNotificationInfo).toHaveBeenCalledTimes(2)
-    );
+    await waitFor(() => expect(mockNotificationInfo).toHaveBeenCalledTimes(2));
     const messages = mockNotificationInfo.mock.calls.map(call => call[0]);
 
     // job202: RUNNING -> COMPLETED, in plain English, not "R" -> "CD".
     expect(
-      messages.some(
-        m => m.includes('202') && /RUNNING.*COMPLETED/.test(m)
-      )
+      messages.some(m => m.includes('202') && /RUNNING.*COMPLETED/.test(m))
     ).toBe(true);
     // job201: same raw code (PD) both times, but became held -- must
     // still notify, and must render as "PENDING" -> "PENDING (Held)".
@@ -905,7 +876,16 @@ describe('useSlurmQueue', () => {
           columns: SQUEUE_COLUMNS,
           rows: [
             ['101', 'debug', 'jobR', 'testuser', 'R', '0:10', '1', 'node001'],
-            ['102', 'debug', 'jobPD', 'testuser', 'PD', '0:00', '1', '(Priority)']
+            [
+              '102',
+              'debug',
+              'jobPD',
+              'testuser',
+              'PD',
+              '0:00',
+              '1',
+              '(Priority)'
+            ]
           ]
         }
       }),

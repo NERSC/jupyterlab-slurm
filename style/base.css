@@ -199,7 +199,7 @@
 }
 
 /* Small CSS pie timer next to "Next refresh in Ns" -- a filled wedge that
-   grows clockwise as the refresh interval elapses. Uses `currentColor` (via
+   grows clockwise as the refresh interval elapses. Uses `currentcolor` (via
    `conic-gradient`, whose default color arguments inherit the element's
    text color) so it always matches the surrounding status text exactly,
    rather than standing out as a separate colored widget; opacity is
@@ -212,13 +212,13 @@
   flex: 0 0 auto;
   opacity: 0.65;
   background: conic-gradient(
-    currentColor var(--jp-slurm-pie-percent, 0%),
+    currentcolor var(--jp-slurm-pie-percent, 0%),
     transparent var(--jp-slurm-pie-percent, 0%)
   );
 
   /* Faint full-circle outline so the empty portion of the pie is still
-     visible against the background, not just floating currentColor wedges. */
-  box-shadow: inset 0 0 0 1px currentColor;
+     visible against the background, not just floating currentcolor wedges. */
+  box-shadow: inset 0 0 0 1px currentcolor;
 }
 
 /* Section headers within the Job Details panel (Summary/Timing/Resources/

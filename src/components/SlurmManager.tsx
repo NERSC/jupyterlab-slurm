@@ -115,7 +115,9 @@ export default function SlurmManager(props: types.Props) {
               autoReloadRate={props.settings.autoReloadRate as number}
               itemsPerPageOptions={props.settings.itemsPerPageOptions}
               columnState={props.settings.columnState}
-              notifyOnStateChange={props.settings.notifyOnStateChange as boolean}
+              notifyOnStateChange={
+                props.settings.notifyOnStateChange as boolean
+              }
               jupyterlabFrontend={props.frontend}
               settingRegistry={props.settingRegistry}
               active={activeTab === 0}
