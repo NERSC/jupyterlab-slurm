@@ -25,6 +25,16 @@ jobs:
         run: python -m pip install -U "jupyterlab>=4.0.0,<5"
 
       - name: Lint the extension
+        # `jlpm` here resolves to JupyterLab's bundled (older Yarn 3.x)
+        # package manager, installed by the "Install dependencies" step
+        # above. Our yarn.lock is Yarn 4.x format (lockfile version 10), so
+        # under CI's default immutable-install mode the older bundled Yarn
+        # thinks the lockfile needs modification and aborts (YN0028) with a
+        # terse "Failed with errors" message. Disabling immutable installs
+        # for this step avoids that (see the "Build the extension"/"Package
+        # the extension" steps below for the same workaround).
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: false
         run: |
           set -eux
           jlpm
