@@ -2,6 +2,8 @@ import React from 'react';
 import { ReactWidget, UseSignal } from '@jupyterlab/apputils';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { FileBrowser } from '@jupyterlab/filebrowser';
+import { JupyterFrontEnd } from '@jupyterlab/application';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { Signal } from '@lumino/signaling';
 import { uniqueId } from 'lodash';
 
@@ -21,11 +23,17 @@ export default class SlurmWidget extends ReactWidget {
    */
   private serverRoot: string;
   /**
+   * Jupyterlab application
+   */
+  private frontend: JupyterFrontEnd;
+  /**
    * JupyterLab's default file browser
    */
   private filebrowser: FileBrowser;
 
-  private _settings: ISlurmUserSettings;
+  private settings: ISlurmUserSettings;
+
+  private settingRegistry: ISettingRegistry;
   /**
    * The system username, retrieved from the server
    */
@@ -35,14 +43,21 @@ export default class SlurmWidget extends ReactWidget {
    */
   private userChanged = new Signal<this, string>(this);
 
-  constructor(filebrowser: FileBrowser, settings: ISlurmUserSettings) {
+  constructor(
+    frontend: JupyterFrontEnd,
+    filebrowser: FileBrowser,
+    settings: ISlurmUserSettings,
+    settingRegistry: ISettingRegistry
+  ) {
     super();
     this.id = uniqueId('slurm-');
     this.addClass('jp-SlurmWidget');
-    this.title.label = 'Slurm Queue Manager';
+    this.title.label = 'Slurm Dashboard';
     this.title.closable = true;
+    this.frontend = frontend;
     this.filebrowser = filebrowser;
-    this._settings = settings;
+    this.settings = settings;
+    this.settingRegistry = settingRegistry;
     this._user = '';
     this.serverRoot = PageConfig.getOption('serverRoot');
   }
@@ -59,7 +74,14 @@ export default class SlurmWidget extends ReactWidget {
   private async fetchUser(): Promise<UserData> {
     return requestAPI<any>('user')
       .then(data => {
-        return { user: data.user };
+        if (data && data.success === false) {
+          console.error(
+            'fetchUser: server reported failure',
+            data.errorMessage
+          );
+          return { user: '', exception: data.errorMessage };
+        }
+        return { user: data.user ?? data?.data?.user ?? '' };
       })
       .catch(reason => {
         console.error('fetchUser error', reason);
@@ -68,7 +90,9 @@ export default class SlurmWidget extends ReactWidget {
   }
 
   onAfterAttach(): void {
-    this.fetchUser();
+    this.fetchUser().then(result => {
+      this.user = result.user;
+    });
   }
 
   render(): any {
@@ -76,8 +100,10 @@ export default class SlurmWidget extends ReactWidget {
       <UseSignal signal={this.userChanged}>
         {(sender?: any, args?: string | undefined) => (
           <SlurmManager
+            frontend={this.frontend}
             filebrowser={this.filebrowser}
-            settings={this._settings}
+            settings={this.settings}
+            settingRegistry={this.settingRegistry}
             serverRoot={this.serverRoot}
             user={this.user}
           />

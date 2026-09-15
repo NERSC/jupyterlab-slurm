@@ -1,0 +1,22 @@
+#!/bin/bash
+# Host-side wrapper that relays `sbatch` invocations from the jupyterlab-slurm
+# backend into the local `slurm-docker-cluster` stand-in (container
+# `slurmctld`). Unlike squeue/scontrol/sacct/scancel, sbatch takes a *host*
+# script path as its final argument; since the container doesn't share the
+# host filesystem, we `docker cp` the script in first and submit the
+# in-container copy. NOTE: this means StdOut/StdErr paths reported by the
+# real cluster will be container-local paths (e.g. under /data), not
+# host-readable -- a limitation of this local stand-in, not of the backend.
+set -euo pipefail
+args=("$@")
+last_index=$((${#args[@]} - 1))
+script_path="${args[$last_index]}"
+unset 'args[last_index]'
+container_name="jl_slurm_submit_$(date +%s)_$$.sh"
+/usr/local/bin/docker cp "$script_path" "slurmctld:/tmp/${container_name}"
+/usr/local/bin/docker exec slurmctld chmod +x "/tmp/${container_name}"
+if [ "${#args[@]}" -gt 0 ]; then
+  exec /usr/local/bin/docker exec slurmctld sbatch "${args[@]}" "/tmp/${container_name}"
+else
+  exec /usr/local/bin/docker exec slurmctld sbatch "/tmp/${container_name}"
+fi

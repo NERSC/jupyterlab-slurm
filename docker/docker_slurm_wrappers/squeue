@@ -1,0 +1,7 @@
+#!/bin/bash
+# Host-side wrapper that relays `squeue` invocations from the jupyterlab-slurm
+# backend into the local `slurm-docker-cluster` stand-in (container
+# `slurmctld`), so the backend can be tested against a real Slurm daemon
+# instead of the mocked test fixtures.
+set -euo pipefail
+exec /usr/local/bin/docker exec slurmctld squeue "$@"

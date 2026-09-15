@@ -8,8 +8,16 @@ except ImportError:
     warnings.warn("Importing 'jupyterlab_slurm' outside a proper installation.")
     __version__ = "dev"
 
-from .config import SlurmCommandPaths
+from .config import SlurmCommandPaths, SlurmUI, SlurmAccounting
 from .handlers import setup_handlers
+
+# The opt-in compatibility test-suite harness lives in its own optional
+# module (test_suite.py) so it can be omitted entirely from a production
+# build. See test_suite.py for details.
+try:
+    from .test_suite import SlurmTesting
+except ImportError:  # pragma: no cover - expected in a stripped-down prod build
+    SlurmTesting = None
 
 
 def _jupyter_labextension_paths():
@@ -41,11 +49,20 @@ def _load_jupyter_server_extension(server_app):
     web_app = server_app.web_app
     web_app.settings.update(slurm_commands.get_paths())
 
-    temporary_directory = web_app.settings['temporary_directory'] if 'temporary_directory' in web_app.settings else None
-    #server_app.log.addHandler(logging.FileHandler('/tmp/jupyter_debug'))
-    #server_app.log.setLevel(logging.DEBUG)
+    # Wire the remaining admin-configurable settings so deployments (e.g. NERSC)
+    # can fully define behavior via the Jupyter server config. Handlers read these
+    # back as plain dicts from web_app.settings.
+    slurm_ui = SlurmUI(parent=server_app)
+    web_app.settings['SlurmUI'] = slurm_ui.get_config()
 
-    # add get_example url
+    slurm_accounting = SlurmAccounting(parent=server_app)
+    web_app.settings['SlurmAccounting'] = slurm_accounting.get_config()
+
+    if SlurmTesting is not None:
+        slurm_testing = SlurmTesting(parent=server_app)
+        web_app.settings['SlurmTesting'] = slurm_testing.get_config()
+
+    temporary_directory = web_app.settings['temporary_directory'] if 'temporary_directory' in web_app.settings else None
     setup_handlers(
         web_app, temporary_directory=temporary_directory, log=server_app.log)
 

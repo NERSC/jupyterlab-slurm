@@ -17,13 +17,15 @@
     "rootDir": "src",
     "strict": true,
     "strictNullChecks": true,
+    "skipLibCheck": true,
     "target": "ES2018"
   },
   "include": [
     "src/*.ts",
     "src/*.tsx",
     "src/components/*.tsx",
-    "src/slurm-config/config.json",
-    "src/store/index.ts"
+    "src/hooks/*.ts",
+    "src/utils/*.ts",
+    "src/slurm-config/config.json"
   ]
 }
