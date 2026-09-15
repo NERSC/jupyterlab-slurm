@@ -16,9 +16,18 @@
     },
     "license": "BSD-3-Clause",
     "author": {
-        "name": "Jon Hays, William Krinsman, NERSC",
+        "name": "Matt Henderson, LBNL",
         "email": ""
     },
+    "contributors": [
+        "Shreyas Cholia",
+        "Jonathan Hays",
+        "William Krinsman",
+        "Justin Ley",
+        "Tim Robinson",
+        "Philipp Rudiger",
+        "Trevor Slaton"
+    ],
     "files": [
         "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
         "style/**/*.{css,eot,gif,html,jpg,json,png,svg,woff2,ttf}",

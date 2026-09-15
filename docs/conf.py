@@ -21,7 +21,7 @@
 
 project = 'jupyterlab-slurm'
 copyright = '2025, NERSC'
-author = 'NERSC'
+author = 'Matt Henderson, LBNL'
 
 # The short X.Y version
 version = '4'
@@ -140,7 +140,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'jupyterlab-slurm.tex', 'jupyterlab-slurm Documentation',
-     'Jon Hays, William Krinsman, NERSC', 'manual'),
+     author, 'manual'),
 ]
 
 

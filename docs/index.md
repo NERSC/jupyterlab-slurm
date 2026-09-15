@@ -19,6 +19,7 @@ contents/deployment
 contents/api
 contents/architecture
 contents/development
+contents/authors
 ```
 
 ## Relevant Links
